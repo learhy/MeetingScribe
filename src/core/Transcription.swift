@@ -252,6 +252,9 @@ class LocalWhisperProvider: TranscriptionProvider {
         }
         
         while true {
+            // Reset buffer for next read
+            inputBuffer.frameLength = 0
+            
             // Read chunk from input file
             try asset.read(into: inputBuffer)
             
@@ -259,10 +262,9 @@ class LocalWhisperProvider: TranscriptionProvider {
                 break // End of file
             }
             
-            // Calculate output buffer size
-            let outputFrameCapacity = AVAudioFrameCount(
-                Double(inputBuffer.frameLength) * outputFormat.sampleRate / asset.processingFormat.sampleRate
-            )
+            // Calculate output buffer size (add extra capacity for safety)
+            let ratio = outputFormat.sampleRate / asset.processingFormat.sampleRate
+            let outputFrameCapacity = AVAudioFrameCount(Double(inputBuffer.frameLength) * ratio) + 1024
             
             guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat,
                                                       frameCapacity: outputFrameCapacity) else {
@@ -271,23 +273,26 @@ class LocalWhisperProvider: TranscriptionProvider {
             
             // Convert
             var error: NSError?
-            var done = false
-            converter.convert(to: outputBuffer, error: &error) { _, outStatus in
-                if done {
-                    outStatus.pointee = .noDataNow
-                    return nil
-                }
-                done = true
+            let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
                 outStatus.pointee = .haveData
                 return inputBuffer
             }
+            
+            let status = converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
             
             if let error = error {
                 throw TranscriptionError.apiError("Audio conversion failed: \(error.localizedDescription)")
             }
             
-            // Write converted audio to output file
-            try outputFile.write(from: outputBuffer)
+            // Check conversion status
+            if status == .error {
+                throw TranscriptionError.apiError("Audio conversion returned error status")
+            }
+            
+            // Write converted audio to output file (only if we have data)
+            if outputBuffer.frameLength > 0 {
+                try outputFile.write(from: outputBuffer)
+            }
         }
         
         logger.info("Audio resampled to 16kHz at: \(resampledURL.path)")
