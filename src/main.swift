@@ -262,13 +262,14 @@ class MeetingScribeService {
             // Start capture
             try await audioCapture?.startCapture()
             
-            // Generate expected audio file path (system track)
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-            let timestamp = formatter.string(from: currentRecordingStartTime ?? Date())
-            currentAudioFilePath = outputDir.appendingPathComponent("meeting_\(timestamp)_system.wav").path
+            // Get the actual audio file path from StreamHandler
+            currentAudioFilePath = audioCapture?.systemAudioFilePath
             
-            logger.info("Audio capture started successfully")
+            if let path = currentAudioFilePath {
+                logger.info("Audio capture started successfully, file: \(path)")
+            } else {
+                logger.warning("Audio capture started but file path not available")
+            }
             
         } catch {
             logger.error("Failed to start audio capture: \(error.localizedDescription)")

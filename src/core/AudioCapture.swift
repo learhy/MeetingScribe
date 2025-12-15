@@ -18,6 +18,7 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
     private var micCapture: MicCapture?
 
     private var sessionTimestamp: String?
+    private(set) var systemAudioFilePath: String?
 
     // System-audio conversion
     private var sysSourceFormat: AVAudioFormat?
@@ -172,6 +173,7 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
                 let systemURL = baseDir.appendingPathComponent("meeting_\(ts)_system.wav")
                 let sysW = try WAVStreamWriter(fileURL: systemURL, sampleRate: 48_000, channels: 2, bitsPerSample: 16)
                 self.systemWriter = sysW
+                self.systemAudioFilePath = systemURL.path
                 self.logger.info("✅ System WAV: \(systemURL.path)")
 
                 if self.micEnabled {
