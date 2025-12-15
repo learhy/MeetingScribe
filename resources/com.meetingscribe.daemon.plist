@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.meetingscribe.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/meetingscribe</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/USERNAME/Library/Logs/MeetingScribe/stderr.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/USERNAME/Library/Logs/MeetingScribe/stdout.log</string>
+</dict>
+</plist>

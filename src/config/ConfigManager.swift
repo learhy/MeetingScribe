@@ -1,0 +1,152 @@
+import Foundation
+
+struct AppConfiguration: Codable {
+    struct Detection: Codable {
+        var pollInterval: Double = 2.0
+        var debounceChecks: Int = 2
+        var confidenceThreshold: Int = 85
+    }
+    
+    struct Audio: Codable {
+        var outputDirectory: String = "~/Documents/MeetingScribe/recordings/"
+        var sampleRate: Int = 48000
+        var bitDepth: Int = 16
+        var channels: Int = 2
+    }
+    
+    struct Transcription: Codable {
+        var provider: String = "openai"  // "openai" | "local"
+        
+        struct OpenAI: Codable {
+            var apiKeyKeychainItem: String = "MeetingScribe-OpenAI-Key"
+            var model: String = "whisper-1"
+        }
+        
+        struct Local: Codable {
+            var modelPath: String = "~/.meetingscribe/models/whisper-base.bin"
+        }
+        
+        var openai: OpenAI = OpenAI()
+        var local: Local = Local()
+    }
+    
+    struct Notes: Codable {
+        struct LLM: Codable {
+            var provider: String = "anthropic"  // "openai" | "anthropic" | "ollama"
+            
+            struct OpenAI: Codable {
+                var apiKeyKeychainItem: String = "MeetingScribe-OpenAI-Key"
+                var model: String = "gpt-4"
+            }
+            
+            struct Anthropic: Codable {
+                var apiKeyKeychainItem: String = "MeetingScribe-Anthropic-Key"
+                var model: String = "claude-4.5-sonnet"
+            }
+            
+            struct Ollama: Codable {
+                var endpoint: String = "http://localhost:11434"
+                var model: String = "llama3"
+            }
+            
+            var openai: OpenAI = OpenAI()
+            var anthropic: Anthropic = Anthropic()
+            var ollama: Ollama = Ollama()
+            var systemPromptFile: String = "~/.meetingscribe/prompts/default.txt"
+        }
+        
+        var llm: LLM = LLM()
+        var templateFile: String = "~/.meetingscribe/templates/default.md"
+        var backend: String = "bear"  // "bear" | "notion" | "obsidian"
+        
+        struct Bear: Codable {
+            var tags: [String] = ["#meetings", "#teams"]
+            var fallbackDirectory: String = "~/Documents/MeetingScribe/notes/"
+        }
+        
+        var bear: Bear = Bear()
+    }
+    
+    struct UI: Codable {
+        var showNotifications: Bool = true
+        var notifyOnStart: Bool = true
+        var notifyOnEnd: Bool = true
+    }
+    
+    var version: String = "1.0"
+    var detection: Detection = Detection()
+    var audio: Audio = Audio()
+    var transcription: Transcription = Transcription()
+    var notes: Notes = Notes()
+    var ui: UI = UI()
+}
+
+class ConfigManager {
+    static let shared = ConfigManager()
+    
+    private let logger = DualLogger(category: "ConfigManager")
+    private let configPath: URL
+    private(set) var config: AppConfiguration
+    
+    private init() {
+        // Config file path
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let configDir = homeDir.appendingPathComponent(".meetingscribe")
+        self.configPath = configDir.appendingPathComponent("config.json")
+        
+        // Load or create default config
+        if let loadedConfig = Self.loadConfig(from: configPath) {
+            self.config = loadedConfig
+        } else {
+            self.config = AppConfiguration()
+            Self.saveConfig(config, to: configPath)
+        }
+    }
+    
+    private static func loadConfig(from url: URL) -> AppConfiguration? {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+        
+        do {
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            return try decoder.decode(AppConfiguration.self, from: data)
+        } catch {
+            print("Error loading config: \(error)")
+            return nil
+        }
+    }
+    
+    private static func saveConfig(_ config: AppConfiguration, to url: URL) {
+        do {
+            let dir = url.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(config)
+            try data.write(to: url)
+        } catch {
+            print("Error saving config: \(error)")
+        }
+    }
+    
+    func reload() {
+        if let loadedConfig = Self.loadConfig(from: configPath) {
+            self.config = loadedConfig
+            logger.info("Configuration reloaded")
+        }
+    }
+    
+    func save() {
+        Self.saveConfig(config, to: configPath)
+        logger.info("Configuration saved")
+    }
+    
+    func expandPath(_ path: String) -> URL {
+        let nsPath = NSString(string: path)
+        let expandedPath = nsPath.expandingTildeInPath
+        return URL(fileURLWithPath: expandedPath)
+    }
+}

@@ -1,0 +1,306 @@
+import Foundation
+
+enum NotesGenerationError: Error {
+    case apiError(String)
+    case networkError(Error)
+    case invalidResponse
+    case promptLoadError
+}
+
+protocol LLMProvider {
+    func generate(transcript: String, systemPrompt: String) async throws -> String
+}
+
+// MARK: - OpenAI Provider
+
+class OpenAIProvider: LLMProvider {
+    private let apiKey: String
+    private let model: String
+    private let logger = DualLogger(category: "OpenAI")
+    
+    init(apiKey: String, model: String = "gpt-4") {
+        self.apiKey = apiKey
+        self.model = model
+    }
+    
+    func generate(transcript: String, systemPrompt: String) async throws -> String {
+        logger.info("Generating notes with OpenAI \(model)")
+        
+        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody: [String: Any] = [
+            "model": model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": "Generate meeting notes from this transcript:\n\n\(transcript)"]
+            ],
+            "max_tokens": 4096
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NotesGenerationError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                logger.error("API error (\(httpResponse.statusCode)): \(errorMessage)")
+                throw NotesGenerationError.apiError(errorMessage)
+            }
+            
+            struct OpenAIResponse: Codable {
+                struct Choice: Codable {
+                    struct Message: Codable {
+                        let content: String
+                    }
+                    let message: Message
+                }
+                let choices: [Choice]
+            }
+            
+            let decoder = JSONDecoder()
+            let openAIResponse = try decoder.decode(OpenAIResponse.self, from: data)
+            
+            guard let notes = openAIResponse.choices.first?.message.content else {
+                throw NotesGenerationError.invalidResponse
+            }
+            
+            logger.info("Notes generated successfully")
+            return notes
+            
+        } catch let error as NotesGenerationError {
+            throw error
+        } catch {
+            logger.error("Network error: \(error.localizedDescription)")
+            throw NotesGenerationError.networkError(error)
+        }
+    }
+}
+
+// MARK: - Anthropic Provider
+
+class AnthropicProvider: LLMProvider {
+    private let apiKey: String
+    private let model: String
+    private let logger = DualLogger(category: "Anthropic")
+    
+    init(apiKey: String, model: String = "claude-4.5-sonnet") {
+        self.apiKey = apiKey
+        self.model = model
+    }
+    
+    func generate(transcript: String, systemPrompt: String) async throws -> String {
+        logger.info("Generating notes with Anthropic \(model)")
+        
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody: [String: Any] = [
+            "model": model,
+            "max_tokens": 4096,
+            "system": systemPrompt,
+            "messages": [
+                ["role": "user", "content": "Generate meeting notes from this transcript:\n\n\(transcript)"]
+            ]
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NotesGenerationError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                logger.error("API error (\(httpResponse.statusCode)): \(errorMessage)")
+                throw NotesGenerationError.apiError(errorMessage)
+            }
+            
+            struct AnthropicResponse: Codable {
+                struct Content: Codable {
+                    let type: String
+                    let text: String
+                }
+                let content: [Content]
+            }
+            
+            let decoder = JSONDecoder()
+            let anthropicResponse = try decoder.decode(AnthropicResponse.self, from: data)
+            
+            guard let notes = anthropicResponse.content.first?.text else {
+                throw NotesGenerationError.invalidResponse
+            }
+            
+            logger.info("Notes generated successfully")
+            return notes
+            
+        } catch let error as NotesGenerationError {
+            throw error
+        } catch {
+            logger.error("Network error: \(error.localizedDescription)")
+            throw NotesGenerationError.networkError(error)
+        }
+    }
+}
+
+// MARK: - Ollama Provider
+
+class OllamaProvider: LLMProvider {
+    private let endpoint: String
+    private let model: String
+    private let logger = DualLogger(category: "Ollama")
+    
+    init(endpoint: String = "http://localhost:11434", model: String = "llama3") {
+        self.endpoint = endpoint
+        self.model = model
+    }
+    
+    func generate(transcript: String, systemPrompt: String) async throws -> String {
+        logger.info("Generating notes with Ollama \(model)")
+        
+        let url = URL(string: "\(endpoint)/api/generate")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let prompt = "\(systemPrompt)\n\nGenerate meeting notes from this transcript:\n\n\(transcript)"
+        
+        let requestBody: [String: Any] = [
+            "model": model,
+            "prompt": prompt,
+            "stream": false
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NotesGenerationError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                logger.error("API error (\(httpResponse.statusCode)): \(errorMessage)")
+                throw NotesGenerationError.apiError(errorMessage)
+            }
+            
+            struct OllamaResponse: Codable {
+                let response: String
+            }
+            
+            let decoder = JSONDecoder()
+            let ollamaResponse = try decoder.decode(OllamaResponse.self, from: data)
+            
+            logger.info("Notes generated successfully")
+            return ollamaResponse.response
+            
+        } catch let error as NotesGenerationError {
+            throw error
+        } catch {
+            logger.error("Network error: \(error.localizedDescription)")
+            throw NotesGenerationError.networkError(error)
+        }
+    }
+}
+
+// MARK: - Notes Generation Service
+
+class NotesGenerationService {
+    private let logger = DualLogger(category: "NotesGeneration")
+    private let config: ConfigManager
+    
+    init(config: ConfigManager = .shared) {
+        self.config = config
+    }
+    
+    func generateNotes(transcript: String) async throws -> String {
+        let systemPrompt = try loadSystemPrompt()
+        let provider = try createProvider()
+        return try await provider.generate(transcript: transcript, systemPrompt: systemPrompt)
+    }
+    
+    private func loadSystemPrompt() throws -> String {
+        let promptPath = config.expandPath(config.config.notes.llm.systemPromptFile)
+        
+        guard FileManager.default.fileExists(atPath: promptPath.path) else {
+            // Return default prompt if file doesn't exist
+            return defaultSystemPrompt
+        }
+        
+        do {
+            return try String(contentsOf: promptPath, encoding: .utf8)
+        } catch {
+            logger.warning("Failed to load custom prompt, using default")
+            return defaultSystemPrompt
+        }
+    }
+    
+    private func createProvider() throws -> LLMProvider {
+        let notesConfig = config.config.notes.llm
+        
+        switch notesConfig.provider {
+        case "openai":
+            let apiKey = try SecretsManager.shared.retrieveSecret(
+                forKey: notesConfig.openai.apiKeyKeychainItem
+            )
+            return OpenAIProvider(apiKey: apiKey, model: notesConfig.openai.model)
+            
+        case "anthropic":
+            let apiKey = try SecretsManager.shared.retrieveSecret(
+                forKey: notesConfig.anthropic.apiKeyKeychainItem
+            )
+            return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model)
+            
+        case "ollama":
+            return OllamaProvider(endpoint: notesConfig.ollama.endpoint, model: notesConfig.ollama.model)
+            
+        default:
+            logger.warning("Unknown provider '\(notesConfig.provider)', falling back to Anthropic")
+            let apiKey = try SecretsManager.shared.retrieveSecret(
+                forKey: notesConfig.anthropic.apiKeyKeychainItem
+            )
+            return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model)
+        }
+    }
+    
+    private var defaultSystemPrompt: String {
+        """
+        You are a professional meeting notes assistant. Your task is to generate clear, concise, and well-structured meeting notes from transcripts.
+        
+        Guidelines:
+        1. Start with a brief summary (2-3 sentences) of the meeting's purpose and outcome
+        2. Extract key discussion points as bullet points
+        3. Identify action items with owners (if mentioned)
+        4. List any decisions made
+        5. Note any follow-up meetings or deadlines
+        6. Use clear, professional language
+        7. Format output in Markdown
+        
+        Structure:
+        - Summary
+        - Key Points
+        - Action Items (if any)
+        - Decisions (if any)
+        - Next Steps (if any)
+        
+        Be concise but comprehensive. Focus on actionable information.
+        """
+    }
+}
