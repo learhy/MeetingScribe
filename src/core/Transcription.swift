@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 enum TranscriptionError: Error {
     case invalidAudioFile
@@ -141,17 +142,24 @@ class LocalWhisperProvider: TranscriptionProvider {
             throw TranscriptionError.invalidAudioFile
         }
         
+        // Resample audio to 16kHz (required by whisper.cpp)
+        let resampledURL = try await resampleAudio(audioFileURL: audioFileURL)
+        defer {
+            // Clean up resampled file
+            try? FileManager.default.removeItem(at: resampledURL)
+        }
+        
         // Create temporary output directory
         let tempDir = FileManager.default.temporaryDirectory
         let outputPrefix = tempDir.appendingPathComponent(UUID().uuidString)
         
-        // Run whisper.cpp
+        // Run whisper.cpp with resampled audio
         // Command: ./main -m model.bin -f audio.wav -otxt -of output_prefix
         let process = Process()
         process.executableURL = whisperBinaryPath
         process.arguments = [
             "-m", modelPath.path,           // Model file
-            "-f", audioFileURL.path,        // Audio file
+            "-f", resampledURL.path,        // Audio file (16kHz)
             "-otxt",                        // Output as text
             "-of", outputPrefix.path,       // Output file prefix
             "--no-timestamps",              // Don't include timestamps in output
@@ -207,6 +215,83 @@ class LocalWhisperProvider: TranscriptionProvider {
             logger.error("Local Whisper error: \(error.localizedDescription)")
             throw TranscriptionError.networkError(error)
         }
+    }
+    
+    private func resampleAudio(audioFileURL: URL) async throws -> URL {
+        logger.info("Resampling audio to 16kHz for whisper.cpp...")
+        
+        // Create temporary file for resampled audio
+        let tempDir = FileManager.default.temporaryDirectory
+        let resampledURL = tempDir.appendingPathComponent("\(UUID().uuidString)_16k.wav")
+        
+        // Use AVFoundation to resample
+        let asset = try AVAudioFile(forReading: audioFileURL)
+        
+        // Create output format: 16kHz, mono, Int16
+        guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
+                                              sampleRate: 16000,
+                                              channels: 1,
+                                              interleaved: true) else {
+            throw TranscriptionError.apiError("Failed to create output audio format")
+        }
+        
+        // Create output file
+        let outputFile = try AVAudioFile(forWriting: resampledURL,
+                                        settings: outputFormat.settings)
+        
+        // Create converter
+        guard let converter = AVAudioConverter(from: asset.processingFormat, to: outputFormat) else {
+            throw TranscriptionError.apiError("Failed to create audio converter")
+        }
+        
+        // Read and convert audio in chunks
+        let bufferSize: AVAudioFrameCount = 4096
+        guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: asset.processingFormat,
+                                                 frameCapacity: bufferSize) else {
+            throw TranscriptionError.apiError("Failed to create input buffer")
+        }
+        
+        while true {
+            // Read chunk from input file
+            try asset.read(into: inputBuffer)
+            
+            if inputBuffer.frameLength == 0 {
+                break // End of file
+            }
+            
+            // Calculate output buffer size
+            let outputFrameCapacity = AVAudioFrameCount(
+                Double(inputBuffer.frameLength) * outputFormat.sampleRate / asset.processingFormat.sampleRate
+            )
+            
+            guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat,
+                                                      frameCapacity: outputFrameCapacity) else {
+                throw TranscriptionError.apiError("Failed to create output buffer")
+            }
+            
+            // Convert
+            var error: NSError?
+            var done = false
+            converter.convert(to: outputBuffer, error: &error) { _, outStatus in
+                if done {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                done = true
+                outStatus.pointee = .haveData
+                return inputBuffer
+            }
+            
+            if let error = error {
+                throw TranscriptionError.apiError("Audio conversion failed: \(error.localizedDescription)")
+            }
+            
+            // Write converted audio to output file
+            try outputFile.write(from: outputBuffer)
+        }
+        
+        logger.info("Audio resampled to 16kHz at: \(resampledURL.path)")
+        return resampledURL
     }
 }
 
