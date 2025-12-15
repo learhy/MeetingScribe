@@ -42,7 +42,7 @@ struct AppConfiguration: Codable {
             
             struct Anthropic: Codable {
                 var apiKeyKeychainItem: String = "MeetingScribe-Anthropic-Key"
-                var model: String = "claude-4.5-sonnet"
+                var model: String = "claude-sonnet-4-5"
             }
             
             struct Ollama: Codable {

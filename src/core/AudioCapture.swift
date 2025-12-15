@@ -13,12 +13,11 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
 
     private var stream: SCStream?
 
-    private var systemWriter: WAVStreamWriter?
-    private var micWriter: WAVStreamWriter?
+    private var mixer: AudioMixer?
     private var micCapture: MicCapture?
 
     private var sessionTimestamp: String?
-    private(set) var systemAudioFilePath: String?
+    private(set) var mixedAudioFilePath: String?
 
     // System-audio conversion
     private var sysSourceFormat: AVAudioFormat?
@@ -35,6 +34,11 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
 
     private var isStopped = false
     private let stoppedSemaphore = DispatchSemaphore(value: 0)
+    
+    // Track if we've attempted mic restart (to avoid infinite retries)
+    private var micRestartAttempted = false
+    private var systemAudioBufferCount = 0
+    private var hasDetectedSignificantAudio = false
 
     init(application: SCRunningApplication, outputDir: URL?, micEnabled: Bool) {
         self.application = application
@@ -152,7 +156,7 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
 
         // Create output file(s) before starting the stream so we don't drop initial buffers.
         // IMPORTANT: system capture must not depend on mic capture.
-        if self.systemWriter == nil {
+        if self.mixer == nil {
             do {
                 let baseDir: URL
                 if let override = self.outputDirOverride {
@@ -170,29 +174,25 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
                 let ts = formatter.string(from: Date())
                 self.sessionTimestamp = ts
 
-                let systemURL = baseDir.appendingPathComponent("meeting_\(ts)_system.wav")
-                let sysW = try WAVStreamWriter(fileURL: systemURL, sampleRate: 48_000, channels: 2, bitsPerSample: 16)
-                self.systemWriter = sysW
-                self.systemAudioFilePath = systemURL.path
-                self.logger.info("✅ System WAV: \(systemURL.path)")
+                let mixedURL = baseDir.appendingPathComponent("meeting_\(ts)_mixed.wav")
+                let mixedWriter = try WAVStreamWriter(fileURL: mixedURL, sampleRate: 48_000, channels: 2, bitsPerSample: 16)
+                
+                // Create AudioMixer with system gain=2.0x, mic gain=0.8x
+                self.mixer = AudioMixer(writer: mixedWriter, sysGain: 2.0, micGain: 0.8)
+                self.mixedAudioFilePath = mixedURL.path
+                self.logger.info("✅ Mixed WAV: \(mixedURL.path)")
 
                 if self.micEnabled {
                     // Mic is optional; failures must not break system capture.
-                    let micURL = baseDir.appendingPathComponent("meeting_\(ts)_mic.wav")
                     do {
-                        let micW = try WAVStreamWriter(fileURL: micURL, sampleRate: 48_000, channels: 2, bitsPerSample: 16)
-                        self.micWriter = micW
-
                         self.micCapture = try MicCapture(onSamples: { [weak self] samples in
                             guard let self else { return }
-                            self.appendToMic(samples)
+                            self.mixer?.appendMic(samples)
                         })
                         try self.micCapture?.start()
-
-                        self.logger.info("✅ Mic WAV: \(micURL.path)")
+                        self.logger.info("✅ Mic capture started (will mix into mixed.wav)")
                     } catch {
                         self.logger.warning("Mic capture unavailable; continuing with system-only: \(error.localizedDescription)")
-                        self.micWriter = nil
                         self.micCapture = nil
                     }
                 } else {
@@ -200,8 +200,7 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
                 }
             } catch {
                 self.logger.error("Failed to initialize recording: \(error.localizedDescription)")
-                self.systemWriter = nil
-                self.micWriter = nil
+                self.mixer = nil
                 self.micCapture = nil
                 self.sessionTimestamp = nil
             }
@@ -227,10 +226,8 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
             micCapture?.stop()
             micCapture = nil
 
-            systemWriter?.finalize()
-            micWriter?.finalize()
-            systemWriter = nil
-            micWriter = nil
+            mixer?.finalize()
+            mixer = nil
             sessionTimestamp = nil
 
             sysSourceFormat = nil
@@ -263,30 +260,59 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
             return
         }
 
-        guard let systemWriter = self.systemWriter else {
+        guard let mixer = self.mixer else {
             return
         }
 
-        // Convert the system-audio CMSampleBuffer to 48kHz stereo interleaved int16 and write to system file.
+        // Convert the system-audio CMSampleBuffer to 48kHz stereo interleaved int16 and send to mixer.
         if let samples = self.convertSystemAudioToTarget(sampleBuffer: sampleBuffer) {
-            do {
-                try samples.withUnsafeBufferPointer { buf in
-                    try systemWriter.appendInterleavedInt16(buf)
+            mixer.appendSystem(samples)
+            
+            // Detect if we're receiving significant audio (not just silence)
+            if !hasDetectedSignificantAudio && !micRestartAttempted {
+                // Check first 100 samples for non-zero audio
+                let sampleCount = min(100, samples.count)
+                let nonZeroCount = samples.prefix(sampleCount).filter { abs($0) > 100 }.count
+                
+                if nonZeroCount > 10 {
+                    hasDetectedSignificantAudio = true
+                    logger.info("🔊 Detected actual audio in system stream (call likely started)")
+                    
+                    // Now restart mic to reclaim it from Teams
+                    if micEnabled && micCapture != nil {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                            self?.restartMicrophoneCapture()
+                        }
+                    }
                 }
-            } catch {
-                self.logger.error("Failed writing system audio: \(error.localizedDescription)")
             }
         }
     }
 
-    private func appendToMic(_ samples: [Int16]) {
-        guard let micWriter = self.micWriter else { return }
-        do {
-            try samples.withUnsafeBufferPointer { buf in
-                try micWriter.appendInterleavedInt16(buf)
+    
+    private func restartMicrophoneCapture() {
+        micRestartAttempted = true
+        
+        logger.info("🔄 Attempting to restart microphone capture (Teams may have released exclusive access)")
+        
+        // Stop existing mic capture
+        micCapture?.stop()
+        micCapture = nil
+        
+        // Wait a moment for audio routing to settle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self, self.mixer != nil else { return }
+            
+            do {
+                self.micCapture = try MicCapture(onSamples: { [weak self] samples in
+                    guard let self else { return }
+                    self.mixer?.appendMic(samples)
+                })
+                try self.micCapture?.start()
+                self.logger.info("✅ Microphone capture restarted successfully")
+            } catch {
+                self.logger.warning("Failed to restart microphone: \(error.localizedDescription)")
             }
-        } catch {
-            self.logger.error("Failed writing mic audio: \(error.localizedDescription)")
         }
     }
 

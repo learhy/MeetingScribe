@@ -27,13 +27,13 @@ add_key() {
     fi
     
     # Check if key already exists
-    if security find-generic-password -a "$USER" -s "$service_name" >/dev/null 2>&1; then
+    if security find-generic-password -a "$service_name" -s "com.meetingscribe" >/dev/null 2>&1; then
         echo "⚠️  Key already exists. Updating..."
-        security delete-generic-password -a "$USER" -s "$service_name"
+        security delete-generic-password -a "$service_name" -s "com.meetingscribe"
     fi
     
     # Add new key
-    security add-generic-password -a "$USER" -s "$service_name" -w "$api_key"
+    security add-generic-password -a "$service_name" -s "com.meetingscribe" -w "$api_key"
     echo "✅ Key stored in Keychain"
     echo ""
 }
@@ -43,7 +43,7 @@ verify_key() {
     local service_name=$1
     local key_name=$2
     
-    if security find-generic-password -a "$USER" -s "$service_name" -w >/dev/null 2>&1; then
+    if security find-generic-password -a "$service_name" -s "com.meetingscribe" -w >/dev/null 2>&1; then
         echo "✅ $key_name is configured"
         return 0
     else

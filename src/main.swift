@@ -263,7 +263,7 @@ class MeetingScribeService {
             try await audioCapture?.startCapture()
             
             // Get the actual audio file path from StreamHandler
-            currentAudioFilePath = audioCapture?.systemAudioFilePath
+            currentAudioFilePath = audioCapture?.mixedAudioFilePath
             
             if let path = currentAudioFilePath {
                 logger.info("Audio capture started successfully, file: \(path)")

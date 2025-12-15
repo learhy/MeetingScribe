@@ -224,75 +224,28 @@ class LocalWhisperProvider: TranscriptionProvider {
         let tempDir = FileManager.default.temporaryDirectory
         let resampledURL = tempDir.appendingPathComponent("\(UUID().uuidString)_16k.wav")
         
-        // Use AVFoundation to resample
-        let asset = try AVAudioFile(forReading: audioFileURL)
+        // Use ffmpeg for reliable resampling
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        process.arguments = [
+            "-i", audioFileURL.path,        // Input file
+            "-ar", "16000",                 // Sample rate: 16kHz
+            "-ac", "1",                     // Channels: mono
+            "-c:a", "pcm_s16le",            // Codec: 16-bit PCM
+            "-y",                           // Overwrite output file
+            resampledURL.path               // Output file
+        ]
         
-        // Create output format: 16kHz, mono, Int16
-        guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
-                                              sampleRate: 16000,
-                                              channels: 1,
-                                              interleaved: true) else {
-            throw TranscriptionError.apiError("Failed to create output audio format")
-        }
+        // Redirect stdin/stdout/stderr to prevent ffmpeg from hanging
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
         
-        // Create output file
-        let outputFile = try AVAudioFile(forWriting: resampledURL,
-                                        settings: outputFormat.settings)
+        try process.run()
+        process.waitUntilExit()
         
-        // Create converter
-        guard let converter = AVAudioConverter(from: asset.processingFormat, to: outputFormat) else {
-            throw TranscriptionError.apiError("Failed to create audio converter")
-        }
-        
-        // Read and convert audio in chunks
-        let bufferSize: AVAudioFrameCount = 4096
-        guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: asset.processingFormat,
-                                                 frameCapacity: bufferSize) else {
-            throw TranscriptionError.apiError("Failed to create input buffer")
-        }
-        
-        while true {
-            // Reset buffer for next read
-            inputBuffer.frameLength = 0
-            
-            // Read chunk from input file
-            try asset.read(into: inputBuffer)
-            
-            if inputBuffer.frameLength == 0 {
-                break // End of file
-            }
-            
-            // Calculate output buffer size (add extra capacity for safety)
-            let ratio = outputFormat.sampleRate / asset.processingFormat.sampleRate
-            let outputFrameCapacity = AVAudioFrameCount(Double(inputBuffer.frameLength) * ratio) + 1024
-            
-            guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat,
-                                                      frameCapacity: outputFrameCapacity) else {
-                throw TranscriptionError.apiError("Failed to create output buffer")
-            }
-            
-            // Convert
-            var error: NSError?
-            let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
-                outStatus.pointee = .haveData
-                return inputBuffer
-            }
-            
-            let status = converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
-            
-            if let error = error {
-                throw TranscriptionError.apiError("Audio conversion failed: \(error.localizedDescription)")
-            }
-            
-            // Check conversion status
-            if status == .error {
-                throw TranscriptionError.apiError("Audio conversion returned error status")
-            }
-            
-            // Write converted audio to output file (only if we have data)
-            if outputBuffer.frameLength > 0 {
-                try outputFile.write(from: outputBuffer)
-            }
+        guard process.terminationStatus == 0 else {
+            throw TranscriptionError.apiError("ffmpeg resampling failed with exit code \(process.terminationStatus)")
         }
         
         logger.info("Audio resampled to 16kHz at: \(resampledURL.path)")
