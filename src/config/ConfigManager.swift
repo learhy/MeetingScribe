@@ -15,7 +15,7 @@ struct AppConfiguration: Codable {
     }
     
     struct Transcription: Codable {
-        var provider: String = "openai"  // "openai" | "local"
+        var provider: String = "local"  // "openai" | "local"
         
         struct OpenAI: Codable {
             var apiKeyKeychainItem: String = "MeetingScribe-OpenAI-Key"
@@ -23,7 +23,8 @@ struct AppConfiguration: Codable {
         }
         
         struct Local: Codable {
-            var modelPath: String = "~/.meetingscribe/models/whisper-base.bin"
+            var modelPath: String = "~/My Drive/software_projects/whisper.cpp/models/ggml-base.en.bin"
+            var whisperBinaryPath: String = "~/My Drive/software_projects/whisper.cpp/main"
         }
         
         var openai: OpenAI = OpenAI()

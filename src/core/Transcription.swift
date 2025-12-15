@@ -97,20 +97,116 @@ class OpenAIWhisperProvider: TranscriptionProvider {
     }
 }
 
-// MARK: - Local Whisper Provider (Placeholder)
+// MARK: - Local Whisper Provider
 
 class LocalWhisperProvider: TranscriptionProvider {
+    private let whisperBinaryPath: URL
     private let modelPath: URL
     private let logger = DualLogger(category: "LocalWhisper")
     
-    init(modelPath: URL) {
+    init(modelPath: URL, whisperBinaryPath: URL? = nil) {
         self.modelPath = modelPath
+        
+        // Default to whisper.cpp in adjacent project if not specified
+        if let customPath = whisperBinaryPath {
+            self.whisperBinaryPath = customPath
+        } else {
+            // Try to find whisper.cpp in sibling directory
+            let homeDir = FileManager.default.homeDirectoryForCurrentUser
+            let softwareProjects = homeDir.appendingPathComponent("My Drive/software_projects")
+            self.whisperBinaryPath = softwareProjects
+                .appendingPathComponent("whisper.cpp")
+                .appendingPathComponent("main")
+        }
     }
     
     func transcribe(audioFileURL: URL) async throws -> String {
-        logger.warning("Local Whisper not yet implemented - using placeholder")
-        // TODO: Implement local whisper.cpp integration
-        throw TranscriptionError.apiError("Local Whisper not implemented")
+        logger.info("Starting local Whisper transcription...")
+        logger.info("Binary: \(whisperBinaryPath.path)")
+        logger.info("Model: \(modelPath.path)")
+        logger.info("Audio: \(audioFileURL.path)")
+        
+        // Verify whisper binary exists
+        guard FileManager.default.fileExists(atPath: whisperBinaryPath.path) else {
+            throw TranscriptionError.apiError("Whisper binary not found at: \(whisperBinaryPath.path)")
+        }
+        
+        // Verify model exists
+        guard FileManager.default.fileExists(atPath: modelPath.path) else {
+            throw TranscriptionError.apiError("Whisper model not found at: \(modelPath.path)")
+        }
+        
+        // Verify audio file exists
+        guard FileManager.default.fileExists(atPath: audioFileURL.path) else {
+            throw TranscriptionError.invalidAudioFile
+        }
+        
+        // Create temporary output directory
+        let tempDir = FileManager.default.temporaryDirectory
+        let outputPrefix = tempDir.appendingPathComponent(UUID().uuidString)
+        
+        // Run whisper.cpp
+        // Command: ./main -m model.bin -f audio.wav -otxt -of output_prefix
+        let process = Process()
+        process.executableURL = whisperBinaryPath
+        process.arguments = [
+            "-m", modelPath.path,           // Model file
+            "-f", audioFileURL.path,        // Audio file
+            "-otxt",                        // Output as text
+            "-of", outputPrefix.path,       // Output file prefix
+            "--no-timestamps",              // Don't include timestamps in output
+            "-t", "4"                       // Use 4 threads
+        ]
+        
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            let exitCode = process.terminationStatus
+            
+            // Log stderr output for debugging
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
+                logger.info("Whisper stderr: \(errorOutput)")
+            }
+            
+            guard exitCode == 0 else {
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? "Unknown error"
+                throw TranscriptionError.apiError("Whisper failed with exit code \(exitCode): \(output)")
+            }
+            
+            // Read the output file
+            let outputFile = URL(fileURLWithPath: "\(outputPrefix.path).txt")
+            
+            guard FileManager.default.fileExists(atPath: outputFile.path) else {
+                throw TranscriptionError.invalidResponse
+            }
+            
+            let transcript = try String(contentsOf: outputFile, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Clean up temporary file
+            try? FileManager.default.removeItem(at: outputFile)
+            
+            guard !transcript.isEmpty else {
+                throw TranscriptionError.invalidResponse
+            }
+            
+            logger.info("Local transcription completed successfully")
+            return transcript
+            
+        } catch let error as TranscriptionError {
+            throw error
+        } catch {
+            logger.error("Local Whisper error: \(error.localizedDescription)")
+            throw TranscriptionError.networkError(error)
+        }
     }
 }
 
@@ -144,7 +240,8 @@ class TranscriptionService {
             
         case "local":
             let modelPath = config.expandPath(transcriptionConfig.local.modelPath)
-            return LocalWhisperProvider(modelPath: modelPath)
+            let binaryPath = config.expandPath(transcriptionConfig.local.whisperBinaryPath)
+            return LocalWhisperProvider(modelPath: modelPath, whisperBinaryPath: binaryPath)
             
         default:
             logger.warning("Unknown provider '\(transcriptionConfig.provider)', falling back to OpenAI")

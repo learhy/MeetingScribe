@@ -1,15 +1,12 @@
 import Foundation
 import AppKit
+import ScreenCaptureKit
 
-@main
-struct MeetingScribe {
-    static func main() async {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-        app.run()
-    }
-}
+// Entry point
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = DualLogger(category: "MeetingScribe")
@@ -61,6 +58,8 @@ class MeetingScribeService {
     private var audioCapture: StreamHandler?
     private var isRunning = false
     private var currentRecordingStartTime: Date?
+    private var currentAudioFilePath: String?
+    private var micPermissionGranted = false
     
     init() {
         self.callDetector = HybridCallDetector(
@@ -92,6 +91,9 @@ class MeetingScribeService {
             logger.error("Screen recording permission not granted - cannot start")
             return
         }
+        
+        // Store mic permission status
+        micPermissionGranted = perms.micGranted
         
         // Start call detection
         await callDetector.startMonitoring()
@@ -129,10 +131,10 @@ class MeetingScribeService {
             sendNotification(title: "Recording Started", body: "Meeting recording has begun")
         }
         
-        // TODO: Start audio capture
-        // This would require finding the Teams/Zoom application
-        // For now, log placeholder
-        logger.info("Audio capture would start here")
+        // Start audio capture
+        Task {
+            await startAudioCapture(platform: callInfo.platform)
+        }
     }
     
     private func handleCallEnded(_ platform: String) {
@@ -150,30 +152,42 @@ class MeetingScribeService {
             sendNotification(title: "Processing Meeting", body: "Transcribing and generating notes...")
         }
         
-        // Process recording asynchronously
+        // Stop audio capture and wait for it to finalize, then process
         Task {
-            await processRecording(startTime: startTime, duration: duration, platform: platform)
+            await stopAudioCaptureAndProcess(startTime: startTime, duration: duration, platform: platform)
         }
         
         currentRecordingStartTime = nil
     }
     
     private func processRecording(startTime: Date, duration: TimeInterval, platform: String) async {
-        // TODO: Get actual audio file path from audio capture
-        // For now, use placeholder
-        let audioFilePath = "~/Documents/MeetingScribe/recordings/meeting_placeholder.wav"
+        // Get actual audio file path from capture
+        guard let audioFilePath = currentAudioFilePath else {
+            logger.error("No audio file path available - cannot process recording")
+            sendNotification(title: "Processing Failed", body: "No audio file was recorded")
+            return
+        }
+        
+        // Verify the audio file exists
+        guard FileManager.default.fileExists(atPath: audioFilePath) else {
+            logger.error("Audio file does not exist at path: \(audioFilePath)")
+            sendNotification(title: "Processing Failed", body: "Audio file not found")
+            return
+        }
+        
+        logger.info("Processing audio file: \(audioFilePath)")
         
         do {
             // 1. Transcribe
             logger.info("Starting transcription...")
-            let audioURL = URL(fileURLWithPath: (audioFilePath as NSString).expandingTildeInPath)
-            // let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
-            let transcript = "Placeholder transcript"  // Placeholder for demo
+            let audioURL = URL(fileURLWithPath: audioFilePath)
+            let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
+            logger.info("Transcription complete: \(transcript.prefix(100))...")
             
             // 2. Generate notes
             logger.info("Generating notes...")
-            // let generatedNotes = try await notesService.generateNotes(transcript: transcript)
-            let generatedNotes = "Placeholder meeting notes"  // Placeholder for demo
+            let generatedNotes = try await notesService.generateNotes(transcript: transcript)
+            logger.info("Notes generation complete")
             
             // 3. Render template
             let dateFormatter = DateFormatter()
@@ -218,5 +232,114 @@ class MeetingScribeService {
         notification.title = title
         notification.informativeText = body
         NSUserNotificationCenter.default.deliver(notification)
+    }
+    
+    // MARK: - Audio Capture Management
+    
+    private func startAudioCapture(platform: String) async {
+        do {
+            // Find the application based on platform
+            guard let app = try await findApplication(for: platform) else {
+                logger.error("Could not find \(platform) application")
+                sendNotification(title: "Recording Failed", body: "Could not find \(platform) application")
+                return
+            }
+            
+            logger.info("Found application: \(app.applicationName) (\(app.bundleIdentifier))")
+            
+            // Get output directory from config
+            // Note: If directory doesn't exist, StreamHandler will fall back to ~/Library/Logs/AudioCapture/recordings/
+            let outputDir = config.expandPath(config.config.audio.outputDirectory)
+            try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+            
+            // Create StreamHandler
+            audioCapture = StreamHandler(
+                application: app,
+                outputDir: outputDir,
+                micEnabled: micPermissionGranted
+            )
+            
+            // Start capture
+            try await audioCapture?.startCapture()
+            
+            // Generate expected audio file path (system track)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+            let timestamp = formatter.string(from: currentRecordingStartTime ?? Date())
+            currentAudioFilePath = outputDir.appendingPathComponent("meeting_\(timestamp)_system.wav").path
+            
+            logger.info("Audio capture started successfully")
+            
+        } catch {
+            logger.error("Failed to start audio capture: \(error.localizedDescription)")
+            sendNotification(title: "Recording Failed", body: error.localizedDescription)
+        }
+    }
+    
+    private func stopAudioCaptureAndProcess(startTime: Date, duration: TimeInterval, platform: String) async {
+        guard let capture = audioCapture else {
+            logger.warning("No active audio capture to stop")
+            return
+        }
+        
+        logger.info("Stopping audio capture...")
+        capture.stopCapture()
+        
+        // Wait for capture to finish and finalize the file
+        await capture.waitUntilStopped()
+        logger.info("Audio capture stopped and finalized")
+        
+        // Now process the recording
+        await processRecording(startTime: startTime, duration: duration, platform: platform)
+    }
+    
+    private func findApplication(for platform: String) async throws -> SCRunningApplication? {
+        // Get shareable content to enumerate running applications
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        
+        // Search for the application based on platform
+        switch platform.lowercased() {
+        case "teams":
+            // Look for Microsoft Teams
+            return content.applications.first { app in
+                let bundleId = app.bundleIdentifier.lowercased()
+                let appName = app.applicationName.lowercased()
+                return bundleId.contains("teams") || appName.contains("teams")
+            }
+            
+        case "zoom":
+            // Look for Zoom
+            return content.applications.first { app in
+                let bundleId = app.bundleIdentifier.lowercased()
+                let appName = app.applicationName.lowercased()
+                return bundleId.contains("zoom") || appName.contains("zoom")
+            }
+            
+        case "manual":
+            // For manual recording, try to find Teams or Zoom, or use the first available app
+            if let teamsApp = content.applications.first(where: { app in
+                app.bundleIdentifier.lowercased().contains("teams") ||
+                app.applicationName.lowercased().contains("teams")
+            }) {
+                return teamsApp
+            }
+            
+            if let zoomApp = content.applications.first(where: { app in
+                app.bundleIdentifier.lowercased().contains("zoom") ||
+                app.applicationName.lowercased().contains("zoom")
+            }) {
+                return zoomApp
+            }
+            
+            // Fallback: use any app with audio (prefer Chrome, Safari, etc.)
+            return content.applications.first { app in
+                let appName = app.applicationName.lowercased()
+                return appName.contains("chrome") || appName.contains("safari") || appName.contains("firefox")
+            }
+            
+        default:
+            logger.warning("Unknown platform: \(platform)")
+            return nil
+        }
     }
 }
