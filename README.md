@@ -22,13 +22,23 @@ Automated meeting transcription and notes service for macOS that automatically d
 
 ## Installation
 
-### 1. Build
+### 1. Build and Sign (Recommended)
 
+To avoid keychain prompts on every run, set your signing identity:
+
+```bash
+export SIGNING_IDENTITY="Your Developer ID"
+./scripts/build-and-sign.sh
+```
+
+Or build unsigned:
 ```bash
 ./scripts/build-and-sign.sh
 ```
 
 ### 2. Install
+
+This installs the app bundle to `~/Applications/MeetingScribe.app` and sets up the LaunchAgent:
 
 ```bash
 ./scripts/install.sh
@@ -39,24 +49,42 @@ Automated meeting transcription and notes service for macOS that automatically d
 On first run, macOS will prompt for:
 - **Screen Recording** permission (required)
 - **Microphone** permission (optional)
+- **Keychain access** for API keys (first use only)
 
-Grant these in **System Settings > Privacy & Security**
+**Important**: Grant permissions to `MeetingScribe.app` in **System Settings > Privacy & Security > Screen & System Audio Recording**
+
+If you see repeated permission denials:
+```bash
+# Reset TCC permissions
+tccutil reset ScreenCapture com.meetingscribe.daemon
+
+# Restart the service
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon.plist
+```
 
 ### 4. Configure API Keys
 
-```bash
-# Create configuration directory
-mkdir -p ~/.meetingscribe
+On first transcription/notes generation, you'll be prompted to allow keychain access.
 
-# The app will create a default config on first run
-# Edit ~/.meetingscribe/config.json to customize settings
+The app stores API keys in macOS Keychain. Configure your provider in `~/.meetingscribe/config.json`:
+
+```bash
+# Edit configuration
+vim ~/.meetingscribe/config.json
 ```
 
-Store API keys securely using the built-in secrets manager:
-
-```bash
-# Example: Store OpenAI API key
-# (This will be done through the app, not directly)
+For local Whisper (no API key needed), set:
+```json
+{
+  "transcription": {
+    "provider": "local",
+    "local": {
+      "modelPath": "~/path/to/whisper.cpp/models/ggml-base.en.bin",
+      "whisperBinaryPath": "~/path/to/whisper.cpp/main"
+    }
+  }
+}
 ```
 
 ## Usage
@@ -200,23 +228,34 @@ rm -rf ~/Library/Logs/MeetingScribe  # Remove logs
 meeting-scribe/
 ├── src/
 │   ├── core/              # Core functionality
-│   │   ├── CallDetector.swift
-│   │   ├── AudioCapture.swift
-│   │   ├── Transcription.swift
-│   │   ├── NotesGeneration.swift
-│   │   └── TemplateEngine.swift
+│   │   ├── CallDetector.swift          # Hybrid Teams/Zoom detection
+│   │   ├── AudioCapture.swift          # ScreenCaptureKit audio
+│   │   ├── Transcription.swift         # OpenAI/Local Whisper
+│   │   ├── NotesGeneration.swift       # Multi-LLM with timeouts
+│   │   ├── GeneratedNotesParser.swift  # Split summary/notes
+│   │   ├── TemplateEngine.swift        # Note formatting
+│   │   ├── NotificationManager.swift   # UserNotifications (macOS 11+)
+│   │   ├── PermissionChecker.swift     # TCC permission handling
+│   │   ├── DualLogger.swift            # Unified+stderr logging
+│   │   └── WAVStreamWriter.swift       # Audio file output
 │   ├── plugins/           # Notes backend plugins
 │   │   ├── NotesPlugin.swift
-│   │   └── BearPlugin.swift
-│   ├── ui/                # User interface
-│   │   └── MenuBarController.swift
+│   │   └── BearPlugin.swift            # Bear.app integration
 │   ├── config/            # Configuration
 │   │   ├── ConfigManager.swift
-│   │   └── SecretsManager.swift
-│   └── main.swift         # Entry point
+│   │   └── SecretsManager.swift        # Keychain API key storage
+│   └── main.swift         # Entry point + service orchestration
 ├── tests/                 # Unit tests
+│   └── MeetingScribeTests.swift
 ├── scripts/               # Build and install scripts
+│   ├── build-and-sign.sh  # Creates .app bundle
+│   ├── install.sh         # Installs to ~/Applications
+│   └── uninstall.sh
 ├── resources/             # LaunchAgent plist, templates
+│   └── com.meetingscribe.daemon.plist
+├── build/                 # Build artifacts (gitignored)
+│   ├── meetingscribe      # Standalone binary
+│   └── MeetingScribe.app  # App bundle
 └── README.md
 ```
 
@@ -236,14 +275,24 @@ meeting-scribe/
 - No audio transmitted externally except to configured APIs (OpenAI/Anthropic/Ollama)
 - API keys stored securely in macOS Keychain
 
+## Recent Improvements
+
+- ✅ **Local Whisper.cpp integration** - No API costs for transcription
+- ✅ **UserNotifications framework** - Modern notification system (macOS 11+)
+- ✅ **App bundle packaging** - Stable permissions and keychain access
+- ✅ **Notes parsing** - Prevents duplicate summary/notes sections
+- ✅ **LLM timeouts** - 120s timeout prevents hanging on API calls
+- ✅ **Port crash fix** - Handles negative port values from proc_info
+- ✅ **LaunchAgent compatibility** - Uses modern bootstrap/bootout
+
 ## Future Enhancements
 
-- [ ] Zoom call detection improvements
-- [ ] Local Whisper.cpp integration
+- [ ] Zoom call detection improvements (window count threshold tuning)
 - [ ] Additional notes backend plugins (Notion, Obsidian)
 - [ ] Speaker diarization
 - [ ] Action item extraction
 - [ ] Encryption at rest
+- [ ] Menu bar UI improvements
 
 ## License
 
