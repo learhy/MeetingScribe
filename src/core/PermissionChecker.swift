@@ -55,6 +55,14 @@ class PermissionChecker {
     func ensureScreenPermission() async -> PermissionStatus {
         return await checkPermissions()
     }
+    
+    /// Opens System Settings to the Screen Recording privacy pane
+    func openSystemSettings() {
+        // Open Privacy & Security > Screen Recording
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
 
     private func requestMicrophoneAccessIfNeeded() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)

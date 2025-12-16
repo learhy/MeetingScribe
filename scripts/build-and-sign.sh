@@ -26,6 +26,30 @@ echo "✅ Build complete: build/meetingscribe"
 echo "✅ App bundle ready: $APP_DIR"
 
 # Code signing
+# Auto-detect Apple Developer certificate if SIGNING_IDENTITY not set
+if [ -z "$SIGNING_IDENTITY" ]; then
+    echo "No SIGNING_IDENTITY set, checking for Apple Developer certificate..."
+    
+    # Look for Apple Development certificate
+    DEV_CERT=$(security find-identity -v -p codesigning | grep "Apple Development" | head -n1 | awk '{print $2}')
+    
+    if [ -n "$DEV_CERT" ]; then
+        SIGNING_IDENTITY="$DEV_CERT"
+        echo "✅ Found Apple Developer certificate: $DEV_CERT"
+        echo "   Using this for stable TCC identity across builds"
+    else
+        echo "⚠️  WARNING: No Apple Developer certificate found"
+        echo "   TCC permissions will reset on each build with ad-hoc signing"
+        echo ""
+        echo "   To fix this:"
+        echo "   1. Get a free Apple Developer certificate (no $99 membership needed)"
+        echo "   2. See DISTRIBUTION.md for setup instructions"
+        echo "   3. Or set SIGNING_IDENTITY environment variable"
+        echo ""
+        echo "   Continuing with ad-hoc signing..."
+    fi
+fi
+
 if [ -n "$SIGNING_IDENTITY" ]; then
     echo "Signing app bundle with identity: $SIGNING_IDENTITY"
     

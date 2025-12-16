@@ -103,13 +103,37 @@ cd meeting-scribe
 
 ### Code Signing
 
-For local development, the build script will ad-hoc sign the app. For distribution, you need a Developer ID certificate.
+**IMPORTANT for Development**: TCC (macOS privacy permissions) identifies apps by their code signature. Ad-hoc signing changes the signature on every build, causing TCC to treat each build as a new app and reset permissions. Using a stable signing identity (Apple Developer certificate) solves this.
+
+#### Why You Need a Signing Certificate
+
+<cite index="11-1,11-2,12-1,12-2">According to Apple engineers, TCC requires a stable signing identity to persist permissions across builds. Ad-hoc signing causes "TCC thrash" where permissions reset every time you rebuild.</cite>
+
+**The Problem:**
+- Each build with ad-hoc signing creates a new code signature
+- TCC sees this as a "new app" and requires re-granting permissions
+- Old permission entries become orphaned in TCC database
+- You must manually go to System Settings and enable permissions after every build
+
+**The Solution:**
+- Use an Apple Developer certificate (free with Apple ID - no $99/year membership needed)
+- Certificate provides stable identity across builds
+- TCC remembers permissions permanently
 
 #### Setup Code Signing
 
-1. **Get a Developer ID Certificate**
-   - Enroll in the Apple Developer Program ($99/year)
-   - Generate a Developer ID Application certificate in Xcode or at developer.apple.com
+1. **Get an Apple Developer Certificate (FREE)**
+   
+   **Option A: Apple Development Certificate (Free - Recommended for Development)**
+   - Sign in to Xcode with your Apple ID (Xcode > Settings > Accounts)
+   - Click "Manage Certificates..."
+   - Click "+" and select "Apple Development"
+   - Certificate is automatically installed in your Keychain
+   - No paid Apple Developer Program membership required!
+   
+   **Option B: Developer ID Certificate (For Distribution)**
+   - Requires Apple Developer Program membership ($99/year)
+   - Generate a Developer ID Application certificate at developer.apple.com
    - Download and install the certificate in your Keychain
 
 2. **Find Your Signing Identity**
@@ -117,11 +141,27 @@ For local development, the build script will ad-hoc sign the app. For distributi
    security find-identity -v -p codesigning
    ```
    
-   Look for "Developer ID Application: Your Name (XXXXXXXXXX)"
+   Look for:
+   - "Apple Development: Your Name (XXXXXXXXXX)" (free certificate)
+   - or "Developer ID Application: Your Name (XXXXXXXXXX)" (paid certificate)
 
 3. **Build with Signing**
+   
+   **Automatic (Recommended):**
    ```bash
-   export SIGNING_IDENTITY="Developer ID Application: Your Name (XXXXXXXXXX)"
+   ./scripts/build-and-sign.sh
+   ```
+   The script will auto-detect your Apple Development certificate!
+   
+   **Manual:**
+   ```bash
+   export SIGNING_IDENTITY="Apple Development: Your Name"
+   ./scripts/build-and-sign.sh
+   ```
+   
+   Or for distribution:
+   ```bash
+   export SIGNING_IDENTITY="Developer ID Application: Your Name"
    ./scripts/build-and-sign.sh
    ```
 

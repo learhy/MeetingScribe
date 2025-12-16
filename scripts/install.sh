@@ -7,8 +7,12 @@ INSTALL_MODE="${1:-user}"
 
 echo "Installing MeetingScribe..."
 
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # Check if binary exists
-if [ ! -f "build/meetingscribe" ]; then
+if [ ! -f "$PROJECT_DIR/build/meetingscribe" ]; then
     echo "❌ Binary not found. Run ./scripts/build-and-sign.sh first"
     exit 1
 fi
@@ -22,11 +26,12 @@ else
     echo "Installing app bundle (user)..."
 fi
 
-APP_SRC="build/MeetingScribe.app"
+APP_SRC="$PROJECT_DIR/build/MeetingScribe.app"
 APP_DEST="$APP_DEST_DIR/MeetingScribe.app"
 
 if [ ! -d "$APP_SRC" ]; then
-    echo "❌ App bundle not found. Run ./scripts/build-and-sign.sh first"
+    echo "❌ App bundle not found at: $APP_SRC"
+    echo "Run ./scripts/build-and-sign.sh first"
     exit 1
 fi
 
@@ -45,16 +50,23 @@ fi
 # Install CLI control script
 echo "Installing CLI control script..."
 sudo mkdir -p /usr/local/bin
-sudo cp scripts/meetingscribe-ctl.sh /usr/local/bin/meetingscribe-ctl
+sudo cp "$PROJECT_DIR/scripts/meetingscribe-ctl.sh" /usr/local/bin/meetingscribe-ctl
 sudo chmod +x /usr/local/bin/meetingscribe-ctl
 
 # Install LaunchAgent
 echo "Installing LaunchAgent..."
-PLIST_SRC="resources/com.meetingscribe.daemon.plist"
+PLIST_SRC="$PROJECT_DIR/resources/com.meetingscribe.daemon.plist"
 PLIST_DEST="$HOME/Library/LaunchAgents/com.meetingscribe.daemon.plist"
 
 # Replace USERNAME placeholder
 sed "s/USERNAME/$USER/g" "$PLIST_SRC" > "$PLIST_DEST"
+
+# Verify app was actually copied
+if [ ! -d "$APP_DEST" ]; then
+    echo "❌ Failed to copy app bundle to $APP_DEST"
+    exit 1
+fi
+echo "✅ App bundle installed to: $APP_DEST"
 
 # Create log directory
 mkdir -p "$HOME/Library/Logs/MeetingScribe"

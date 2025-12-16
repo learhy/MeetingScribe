@@ -35,6 +35,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.meetingScribeService?.toggleAutoRecording()
         }
         
+        menuBarController?.onRecheckPermissions = { [weak self] in
+            self?.recheckPermissions()
+        }
+        
+        menuBarController?.onResetPermissions = { [weak self] in
+            self?.resetPermissions()
+        }
+        
         // Link service state to menu bar
         meetingScribeService?.onStateChanged = { [weak self] state in
             DispatchQueue.main.async {
@@ -48,15 +56,110 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // Start the service
+        // Check permissions and start service
         Task {
-            await meetingScribeService?.run()
+            await startWithPermissionCheck()
         }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         logger.info("MeetingScribe terminating...")
         meetingScribeService?.stop()
+    }
+    
+    private func startWithPermissionCheck() async {
+        let permissionChecker = PermissionChecker()
+        let perms = await permissionChecker.checkPermissions()
+        
+        if !perms.screenGranted {
+            logger.warning("Screen recording permission not granted - entering disabled state")
+            DispatchQueue.main.async { [weak self] in
+                self?.menuBarController?.updateState(.disabled)
+            }
+            
+            // Start periodic permission recheck
+            startPermissionRecheckLoop()
+            return
+        }
+        
+        // Permissions OK - start service
+        await meetingScribeService?.run()
+    }
+    
+    private func recheckPermissions() {
+        Task {
+            let permissionChecker = PermissionChecker()
+            let perms = await permissionChecker.checkPermissions()
+            
+            if perms.screenGranted {
+                logger.info("Permissions granted! Starting service...")
+                await meetingScribeService?.run()
+            } else {
+                logger.warning("Permissions still not granted")
+                let alert = NSAlert()
+                alert.messageText = "Permissions Not Granted"
+                alert.informativeText = "Screen Recording permission is still not enabled. Please check System Settings."
+                alert.alertStyle = .warning
+                alert.runModal()
+            }
+        }
+    }
+    
+    private func resetPermissions() {
+        Task {
+            let bundleID = Bundle.main.bundleIdentifier ?? "com.meetingscribe.daemon"
+            logger.info("Resetting TCC permissions for \(bundleID)")
+            
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            process.arguments = ["reset", "All", bundleID]
+            
+            do {
+                try process.run()
+                process.waitUntilExit()
+                
+                if process.terminationStatus == 0 {
+                    logger.info("TCC permissions reset successfully")
+                    
+                    DispatchQueue.main.async {
+                        let alert = NSAlert()
+                        alert.messageText = "Permissions Reset"
+                        alert.informativeText = "Privacy permissions have been reset. Please grant them again in System Settings."
+                        alert.alertStyle = .informational
+                        alert.runModal()
+                    }
+                } else {
+                    logger.error("Failed to reset TCC permissions (exit code: \(process.terminationStatus))")
+                    
+                    DispatchQueue.main.async {
+                        let alert = NSAlert()
+                        alert.messageText = "Reset Failed"
+                        alert.informativeText = "Could not reset permissions automatically. You may need to manually remove MeetingScribe from System Settings > Privacy & Security > Screen Recording."
+                        alert.alertStyle = .warning
+                        alert.runModal()
+                    }
+                }
+            } catch {
+                logger.error("Failed to run tccutil: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func startPermissionRecheckLoop() {
+        Task {
+            while true {
+                try? await Task.sleep(for: .seconds(30))
+                
+                let permissionChecker = PermissionChecker()
+                let perms = await permissionChecker.checkPermissions()
+                
+                if perms.screenGranted {
+                    logger.info("Permissions detected! Starting service...")
+                    await meetingScribeService?.run()
+                    break
+                }
+            }
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 import AppKit
 
 enum RecordingState {
+    case disabled      // Missing required permissions
     case idle
     case recording
     case processing
@@ -9,10 +10,13 @@ enum RecordingState {
 class MenuBarController {
     private let statusItem: NSStatusItem
     private let menu: NSMenu
+    private var permissionGuide: PermissionGuideWindow?
     
     var onManualStart: (() -> Void)?
     var onManualStop: (() -> Void)?
     var onToggleAutoRecording: (() -> Void)?
+    var onRecheckPermissions: (() -> Void)?
+    var onResetPermissions: (() -> Void)?
     
     private var isRecording = false
     private var currentState: RecordingState = .idle
@@ -87,6 +91,7 @@ class MenuBarController {
     func updateState(_ state: RecordingState) {
         currentState = state
         updateIcon()
+        updateMenuForState()
     }
     
     func updateAutoRecordingState(_ enabled: Bool) {
@@ -112,6 +117,9 @@ class MenuBarController {
         let color: NSColor
         
         switch currentState {
+        case .disabled:
+            symbolName = "exclamationmark.triangle.fill"
+            color = .systemRed
         case .idle:
             symbolName = isRecording ? "mic.circle.fill" : "mic.circle"
             color = .controlTextColor  // System default (transparent)
@@ -140,5 +148,92 @@ class MenuBarController {
                 break
             }
         }
+    }
+    
+    private func updateMenuForState() {
+        // Show different menu based on state
+        if currentState == .disabled {
+            buildDisabledMenu()
+        } else {
+            buildNormalMenu()
+        }
+    }
+    
+    private func buildDisabledMenu() {
+        menu.removeAllItems()
+        
+        let grantItem = NSMenuItem(title: "⚠️  Grant Permissions...", action: #selector(showPermissionGuide), keyEquivalent: "")
+        grantItem.target = self
+        menu.addItem(grantItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let recheckItem = NSMenuItem(title: "Recheck Permissions", action: #selector(recheckPermissions), keyEquivalent: "")
+        recheckItem.target = self
+        menu.addItem(recheckItem)
+        
+        let resetItem = NSMenuItem(title: "Reset Permissions...", action: #selector(resetPermissions), keyEquivalent: "")
+        resetItem.target = self
+        menu.addItem(resetItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: "Quit MeetingScribe", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+    }
+    
+    private func buildNormalMenu() {
+        menu.removeAllItems()
+        
+        let startItem = NSMenuItem(title: "Start Recording", action: #selector(startRecording), keyEquivalent: "")
+        startItem.target = self
+        startItem.isHidden = isRecording
+        menu.addItem(startItem)
+        
+        let stopItem = NSMenuItem(title: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "")
+        stopItem.target = self
+        stopItem.isHidden = !isRecording
+        menu.addItem(stopItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let toggleAutoTitle = autoRecordingEnabled ? "Disable Auto Recording" : "Enable Auto Recording"
+        let toggleAutoItem = NSMenuItem(title: toggleAutoTitle, action: #selector(toggleAutoRecording), keyEquivalent: "")
+        toggleAutoItem.target = self
+        menu.addItem(toggleAutoItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: "Quit MeetingScribe", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+    }
+    
+    @objc private func showPermissionGuide() {
+        if permissionGuide == nil {
+            permissionGuide = PermissionGuideWindow()
+            permissionGuide?.onRecheck = { [weak self] in
+                self?.onRecheckPermissions?()
+            }
+            permissionGuide?.onReset = { [weak self] in
+                self?.onResetPermissions?()
+            }
+        }
+        permissionGuide?.show()
+    }
+    
+    @objc private func recheckPermissions() {
+        onRecheckPermissions?()
+    }
+    
+    @objc private func resetPermissions() {
+        onResetPermissions?()
     }
 }
