@@ -94,6 +94,11 @@ class MeetingScribeService {
         
         // Store mic permission status
         micPermissionGranted = perms.micGranted
+
+        // Warm up notifications (so permission prompts don't happen mid-flow).
+        if config.config.ui.showNotifications {
+            await NotificationManager.shared.warmup()
+        }
         
         // Start call detection
         await callDetector.startMonitoring()
@@ -195,13 +200,15 @@ class MeetingScribeService {
             let timeFormatter = DateFormatter()
             timeFormatter.timeStyle = .short
             
+            let splitNotes = GeneratedNotesParser.split(generatedNotes)
+            
             let noteData = NoteData(
                 date: dateFormatter.string(from: startTime),
                 time: timeFormatter.string(from: startTime),
                 duration: formatDuration(duration),
                 title: "Meeting Notes - \(dateFormatter.string(from: startTime))",
-                summary: generatedNotes,
-                notes: generatedNotes,
+                summary: splitNotes.summary,
+                notes: splitNotes.notes,
                 transcript: transcript,
                 audioFile: audioFilePath
             )
@@ -228,10 +235,11 @@ class MeetingScribeService {
     }
     
     private func sendNotification(title: String, body: String) {
-        let notification = NSUserNotification()
-        notification.title = title
-        notification.informativeText = body
-        NSUserNotificationCenter.default.deliver(notification)
+        guard config.config.ui.showNotifications else { return }
+
+        Task {
+            await NotificationManager.shared.send(title: title, body: body)
+        }
     }
     
     // MARK: - Audio Capture Management

@@ -165,8 +165,9 @@ If screen recording permission is denied:
 3. Enable checkbox for **meetingscribe**
 4. Restart the service:
    ```bash
-   launchctl unload ~/Library/LaunchAgents/com.meetingscribe.daemon.plist
-   launchctl load ~/Library/LaunchAgents/com.meetingscribe.daemon.plist
+   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon.plist 2>/dev/null || true
+   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon.plist
+   launchctl kickstart -k gui/$(id -u)/com.meetingscribe.daemon 2>/dev/null || true
    ```
 
 ### Teams Not Detected

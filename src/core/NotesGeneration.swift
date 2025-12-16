@@ -17,10 +17,12 @@ class OpenAIProvider: LLMProvider {
     private let apiKey: String
     private let model: String
     private let logger = DualLogger(category: "OpenAI")
+    private let timeoutSeconds: TimeInterval
     
-    init(apiKey: String, model: String = "gpt-4") {
+    init(apiKey: String, model: String = "gpt-4", timeoutSeconds: TimeInterval = 120) {
         self.apiKey = apiKey
         self.model = model
+        self.timeoutSeconds = timeoutSeconds
     }
     
     func generate(transcript: String, systemPrompt: String) async throws -> String {
@@ -29,6 +31,7 @@ class OpenAIProvider: LLMProvider {
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = timeoutSeconds
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
@@ -42,9 +45,14 @@ class OpenAIProvider: LLMProvider {
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds
+        let session = URLSession(configuration: config)
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw NotesGenerationError.invalidResponse
@@ -91,10 +99,12 @@ class AnthropicProvider: LLMProvider {
     private let apiKey: String
     private let model: String
     private let logger = DualLogger(category: "Anthropic")
+    private let timeoutSeconds: TimeInterval
     
-    init(apiKey: String, model: String = "claude-4.5-sonnet") {
+    init(apiKey: String, model: String = "claude-4.5-sonnet", timeoutSeconds: TimeInterval = 120) {
         self.apiKey = apiKey
         self.model = model
+        self.timeoutSeconds = timeoutSeconds
     }
     
     func generate(transcript: String, systemPrompt: String) async throws -> String {
@@ -103,6 +113,7 @@ class AnthropicProvider: LLMProvider {
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = timeoutSeconds
         request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -117,9 +128,14 @@ class AnthropicProvider: LLMProvider {
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds
+        let session = URLSession(configuration: config)
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw NotesGenerationError.invalidResponse
@@ -164,10 +180,12 @@ class OllamaProvider: LLMProvider {
     private let endpoint: String
     private let model: String
     private let logger = DualLogger(category: "Ollama")
+    private let timeoutSeconds: TimeInterval
     
-    init(endpoint: String = "http://localhost:11434", model: String = "llama3") {
+    init(endpoint: String = "http://localhost:11434", model: String = "llama3", timeoutSeconds: TimeInterval = 120) {
         self.endpoint = endpoint
         self.model = model
+        self.timeoutSeconds = timeoutSeconds
     }
     
     func generate(transcript: String, systemPrompt: String) async throws -> String {
@@ -176,6 +194,7 @@ class OllamaProvider: LLMProvider {
         let url = URL(string: "\(endpoint)/api/generate")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = timeoutSeconds
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let prompt = "\(systemPrompt)\n\nGenerate meeting notes from this transcript:\n\n\(transcript)"
@@ -187,9 +206,14 @@ class OllamaProvider: LLMProvider {
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds
+        let session = URLSession(configuration: config)
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw NotesGenerationError.invalidResponse
@@ -225,6 +249,7 @@ class OllamaProvider: LLMProvider {
 class NotesGenerationService {
     private let logger = DualLogger(category: "NotesGeneration")
     private let config: ConfigManager
+    private let timeoutSeconds: TimeInterval = 120
     
     init(config: ConfigManager = .shared) {
         self.config = config
@@ -233,7 +258,34 @@ class NotesGenerationService {
     func generateNotes(transcript: String) async throws -> String {
         let systemPrompt = try loadSystemPrompt()
         let provider = try createProvider()
-        return try await provider.generate(transcript: transcript, systemPrompt: systemPrompt)
+
+        let start = Date()
+        logger.info("Notes generation started (timeout=\(Int(timeoutSeconds))s)")
+
+        do {
+            let timeoutSeconds = self.timeoutSeconds
+            let notes = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    try await provider.generate(transcript: transcript, systemPrompt: systemPrompt)
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(timeoutSeconds))
+                    throw NotesGenerationError.apiError("Notes generation timed out after \(Int(timeoutSeconds))s")
+                }
+
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
+
+            let elapsed = Date().timeIntervalSince(start)
+            logger.info("Notes generation finished in \(String(format: "%.1f", elapsed))s")
+            return notes
+        } catch {
+            let elapsed = Date().timeIntervalSince(start)
+            logger.error("Notes generation failed after \(String(format: "%.1f", elapsed))s: \(error.localizedDescription)")
+            throw error
+        }
     }
     
     private func loadSystemPrompt() throws -> String {
@@ -260,23 +312,23 @@ class NotesGenerationService {
             let apiKey = try SecretsManager.shared.retrieveSecret(
                 forKey: notesConfig.openai.apiKeyKeychainItem
             )
-            return OpenAIProvider(apiKey: apiKey, model: notesConfig.openai.model)
+            return OpenAIProvider(apiKey: apiKey, model: notesConfig.openai.model, timeoutSeconds: timeoutSeconds)
             
         case "anthropic":
             let apiKey = try SecretsManager.shared.retrieveSecret(
                 forKey: notesConfig.anthropic.apiKeyKeychainItem
             )
-            return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model)
+            return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model, timeoutSeconds: timeoutSeconds)
             
         case "ollama":
-            return OllamaProvider(endpoint: notesConfig.ollama.endpoint, model: notesConfig.ollama.model)
+            return OllamaProvider(endpoint: notesConfig.ollama.endpoint, model: notesConfig.ollama.model, timeoutSeconds: timeoutSeconds)
             
         default:
             logger.warning("Unknown provider '\(notesConfig.provider)', falling back to Anthropic")
             let apiKey = try SecretsManager.shared.retrieveSecret(
                 forKey: notesConfig.anthropic.apiKeyKeychainItem
             )
-            return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model)
+            return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model, timeoutSeconds: timeoutSeconds)
         }
     }
     

@@ -7,13 +7,23 @@ echo "Building MeetingScribe..."
 # Build with Swift Package Manager
 swift build -c release
 
-# Create binary directory
+# Create build artifacts directory
 mkdir -p build
 
-# Copy binary
+# Copy standalone binary (handy for local testing)
 cp .build/release/meetingscribe build/
 
+# Create minimal app bundle (improves macOS permissions + UserNotifications behavior)
+APP_NAME="MeetingScribe.app"
+APP_DIR="build/$APP_NAME"
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+
+cp .build/release/meetingscribe "$APP_DIR/Contents/MacOS/meetingscribe"
+cp Info.plist "$APP_DIR/Contents/Info.plist"
+
 echo "✅ Build complete: build/meetingscribe"
+echo "✅ App bundle ready: $APP_DIR"
 
 # Optional: Code signing
 if [ -n "$SIGNING_IDENTITY" ]; then

@@ -10,8 +10,24 @@ if [ ! -f "build/meetingscribe" ]; then
     exit 1
 fi
 
-# Install binary
-echo "Installing binary..."
+# Install app bundle (preferred for permissions + stability)
+echo "Installing app bundle..."
+APP_SRC="build/MeetingScribe.app"
+APP_DEST_DIR="$HOME/Applications"
+APP_DEST="$APP_DEST_DIR/MeetingScribe.app"
+
+if [ ! -d "$APP_SRC" ]; then
+    echo "❌ App bundle not found. Run ./scripts/build-and-sign.sh first"
+    exit 1
+fi
+
+mkdir -p "$APP_DEST_DIR"
+rm -rf "$APP_DEST"
+cp -R "$APP_SRC" "$APP_DEST"
+chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
+
+# Keep a /usr/local/bin convenience shim for manual testing if desired
+echo "Installing binary shim..."
 sudo mkdir -p /usr/local/bin
 sudo cp build/meetingscribe /usr/local/bin/
 sudo chmod +x /usr/local/bin/meetingscribe
@@ -27,9 +43,12 @@ sed "s/USERNAME/$USER/g" "$PLIST_SRC" > "$PLIST_DEST"
 # Create log directory
 mkdir -p "$HOME/Library/Logs/MeetingScribe"
 
-# Load LaunchAgent
-launchctl unload "$PLIST_DEST" 2>/dev/null || true
-launchctl load "$PLIST_DEST"
+# Load LaunchAgent (modern launchctl)
+DOMAIN="gui/$(id -u)"
+launchctl bootout "$DOMAIN" "$PLIST_DEST" 2>/dev/null || true
+launchctl bootstrap "$DOMAIN" "$PLIST_DEST"
+# Ensure it's started/restarted now
+launchctl kickstart -k "$DOMAIN/com.meetingscribe.daemon" 2>/dev/null || true
 
 echo "✅ Installation complete"
 echo ""

@@ -15,6 +15,9 @@ class PermissionChecker {
     func checkPermissions() async -> PermissionStatus {
         // 1) Screen recording (required for ScreenCaptureKit audio capture)
         logger.info("Checking screen recording permission...")
+        logger.info("Process: \(ProcessInfo.processInfo.processName)")
+        logger.info("Executable: \(CommandLine.arguments.first ?? "(unknown)")")
+        logger.info("Bundle: \(Bundle.main.bundlePath)")
 
         var screenGranted = false
         do {
@@ -31,7 +34,7 @@ class PermissionChecker {
             logger.info("Please grant screen recording permission:")
             logger.info("1. Open System Settings")
             logger.info("2. Go to Privacy & Security > Screen Recording")
-            logger.info("3. Enable the checkbox next to AudioCapture")
+            logger.info("3. Enable the checkbox next to meetingscribe")
             logger.info("4. Restart this application")
             logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         }

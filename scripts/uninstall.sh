@@ -8,7 +8,8 @@ PLIST="$HOME/Library/LaunchAgents/com.meetingscribe.daemon.plist"
 
 # Unload LaunchAgent
 if [ -f "$PLIST" ]; then
-    launchctl unload "$PLIST" 2>/dev/null || true
+    DOMAIN="gui/$(id -u)"
+    launchctl bootout "$DOMAIN" "$PLIST" 2>/dev/null || true
     rm "$PLIST"
     echo "✅ LaunchAgent removed"
 fi

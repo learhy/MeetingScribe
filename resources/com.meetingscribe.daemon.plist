@@ -6,7 +6,7 @@
     <string>com.meetingscribe.daemon</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/meetingscribe</string>
+        <string>/Users/USERNAME/Applications/MeetingScribe.app/Contents/MacOS/meetingscribe</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

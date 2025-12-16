@@ -54,10 +54,11 @@ class BearPlugin: NotesPlugin {
         var components = URLComponents(string: "bear://x-callback-url/create")!
         
         let tagsString = tags.joined(separator: ",")
+        let bearText = stripLeadingTitleFromNoteBody(note, title: title)
         
         components.queryItems = [
             URLQueryItem(name: "title", value: title),
-            URLQueryItem(name: "text", value: note),
+            URLQueryItem(name: "text", value: bearText),
             URLQueryItem(name: "tags", value: tagsString)
         ]
         
@@ -66,7 +67,7 @@ class BearPlugin: NotesPlugin {
         }
         
         // Open URL
-        await NSWorkspace.shared.open(url)
+        NSWorkspace.shared.open(url)
         
         // Give Bear time to process
         try await Task.sleep(for: .seconds(1))
@@ -80,6 +81,40 @@ class BearPlugin: NotesPlugin {
             fallbackDirectory = URL(fileURLWithPath: (fallbackPath as NSString).expandingTildeInPath)
         }
         return true
+    }
+    
+    private func stripLeadingTitleFromNoteBody(_ note: String, title: String) -> String {
+        var lines = note.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        
+        guard let firstNonEmptyIndex = lines.firstIndex(where: {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) else {
+            return note
+        }
+        
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstLine = lines[firstNonEmptyIndex].trimmingCharacters(in: .whitespaces)
+        
+        let candidates: Set<String> = [
+            "# \(normalizedTitle)",
+            "## \(normalizedTitle)",
+            normalizedTitle
+        ]
+        
+        guard candidates.contains(firstLine) else {
+            return note
+        }
+        
+        // Drop the title line.
+        lines.remove(at: firstNonEmptyIndex)
+        
+        // Drop one blank line directly after the title (common in Markdown templates).
+        if firstNonEmptyIndex < lines.count,
+           lines[firstNonEmptyIndex].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lines.remove(at: firstNonEmptyIndex)
+        }
+        
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     func healthCheck() async -> Bool {
