@@ -16,6 +16,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("MeetingScribe starting...")
         
+        // Activate the app so menu bar icon appears
+        NSApp.setActivationPolicy(.accessory)
+        
         // Initialize menu bar
         menuBarController = MenuBarController()
         
