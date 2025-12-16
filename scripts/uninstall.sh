@@ -14,10 +14,21 @@ if [ -f "$PLIST" ]; then
     echo "✅ LaunchAgent removed"
 fi
 
-# Remove binary
-if [ -f "/usr/local/bin/meetingscribe" ]; then
-    sudo rm /usr/local/bin/meetingscribe
-    echo "✅ Binary removed"
+# Remove CLI control script
+if [ -f "/usr/local/bin/meetingscribe-ctl" ]; then
+    sudo rm /usr/local/bin/meetingscribe-ctl
+    echo "✅ CLI control script removed"
+fi
+
+# Remove app bundle (check both user and system locations)
+if [ -d "$HOME/Applications/MeetingScribe.app" ]; then
+    rm -rf "$HOME/Applications/MeetingScribe.app"
+    echo "✅ App bundle removed (user)"
+fi
+
+if [ -d "/Applications/MeetingScribe.app" ]; then
+    sudo rm -rf "/Applications/MeetingScribe.app"
+    echo "✅ App bundle removed (system)"
 fi
 
 echo ""

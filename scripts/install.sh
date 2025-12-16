@@ -2,6 +2,9 @@
 
 set -e
 
+# Installation mode: 'user' (default) or 'system'
+INSTALL_MODE="${1:-user}"
+
 echo "Installing MeetingScribe..."
 
 # Check if binary exists
@@ -10,10 +13,16 @@ if [ ! -f "build/meetingscribe" ]; then
     exit 1
 fi
 
-# Install app bundle (preferred for permissions + stability)
-echo "Installing app bundle..."
+# Determine installation directory based on mode
+if [ "$INSTALL_MODE" = "system" ]; then
+    APP_DEST_DIR="/Applications"
+    echo "Installing app bundle (system-wide)..."
+else
+    APP_DEST_DIR="$HOME/Applications"
+    echo "Installing app bundle (user)..."
+fi
+
 APP_SRC="build/MeetingScribe.app"
-APP_DEST_DIR="$HOME/Applications"
 APP_DEST="$APP_DEST_DIR/MeetingScribe.app"
 
 if [ ! -d "$APP_SRC" ]; then
@@ -21,16 +30,23 @@ if [ ! -d "$APP_SRC" ]; then
     exit 1
 fi
 
-mkdir -p "$APP_DEST_DIR"
-rm -rf "$APP_DEST"
-cp -R "$APP_SRC" "$APP_DEST"
-chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
+if [ "$INSTALL_MODE" = "system" ]; then
+    sudo mkdir -p "$APP_DEST_DIR"
+    sudo rm -rf "$APP_DEST"
+    sudo cp -R "$APP_SRC" "$APP_DEST"
+    sudo chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
+else
+    mkdir -p "$APP_DEST_DIR"
+    rm -rf "$APP_DEST"
+    cp -R "$APP_SRC" "$APP_DEST"
+    chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
+fi
 
-# Keep a /usr/local/bin convenience shim for manual testing if desired
-echo "Installing binary shim..."
+# Install CLI control script
+echo "Installing CLI control script..."
 sudo mkdir -p /usr/local/bin
-sudo cp build/meetingscribe /usr/local/bin/
-sudo chmod +x /usr/local/bin/meetingscribe
+sudo cp scripts/meetingscribe-ctl.sh /usr/local/bin/meetingscribe-ctl
+sudo chmod +x /usr/local/bin/meetingscribe-ctl
 
 # Install LaunchAgent
 echo "Installing LaunchAgent..."
@@ -55,4 +71,11 @@ echo ""
 echo "MeetingScribe is now running in the background"
 echo "Look for the microphone icon in your menu bar"
 echo ""
-echo "Logs: tail -f ~/Library/Logs/MeetingScribe/stderr.log"
+echo "Control the daemon with:"
+echo "  meetingscribe-ctl status   # Check status"
+echo "  meetingscribe-ctl stop     # Stop daemon"
+echo "  meetingscribe-ctl start    # Start daemon"
+echo "  meetingscribe-ctl restart  # Restart daemon"
+echo "  meetingscribe-ctl logs     # View logs"
+echo ""
+echo "Installed to: $APP_DEST"

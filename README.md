@@ -8,8 +8,10 @@ Automated meeting transcription and notes service for macOS that automatically d
 - ✅ **Audio Capture**: High-quality bidirectional audio recording using ScreenCaptureKit
 - ✅ **AI Transcription**: Support for OpenAI Whisper API and local Whisper models
 - ✅ **Smart Notes Generation**: Multi-LLM support (OpenAI, Anthropic Claude, Ollama)
+- ✅ **LLM-Generated Titles**: Automatic meeting title generation from transcript content
 - ✅ **Bear.app Integration**: Automatic note saving with fallback to local files
-- ✅ **Menu Bar Interface**: Manual recording control and status monitoring
+- ✅ **Menu Bar Interface**: Manual recording control, status light indicator, and auto-recording toggle
+- ✅ **CLI Control**: Start, stop, restart daemon and view logs from command line
 - ✅ **Background Service**: Runs automatically on login as LaunchAgent
 
 ## Requirements
@@ -22,7 +24,20 @@ Automated meeting transcription and notes service for macOS that automatically d
 
 ## Installation
 
-### 1. Build and Sign (Recommended)
+### For End Users
+
+Download the latest release from [Releases](https://github.com/your-repo/meeting-scribe/releases):
+
+1. Download `MeetingScribe-X.X.dmg`
+2. Open the DMG and drag `MeetingScribe.app` to `/Applications`
+3. Open MeetingScribe from Applications
+4. Grant permissions when prompted
+
+See [DISTRIBUTION.md](DISTRIBUTION.md) for detailed installation instructions.
+
+### For Developers
+
+#### 1. Build and Sign (Recommended)
 
 To avoid keychain prompts on every run, set your signing identity:
 
@@ -31,17 +46,21 @@ export SIGNING_IDENTITY="Your Developer ID"
 ./scripts/build-and-sign.sh
 ```
 
-Or build unsigned:
+Or build unsigned for local development:
 ```bash
 ./scripts/build-and-sign.sh
 ```
 
-### 2. Install
+#### 2. Install
 
 This installs the app bundle to `~/Applications/MeetingScribe.app` and sets up the LaunchAgent:
 
 ```bash
+# User installation (recommended for development)
 ./scripts/install.sh
+
+# Or system-wide installation
+./scripts/install.sh system
 ```
 
 ### 3. Grant Permissions
@@ -104,6 +123,19 @@ Once installed, MeetingScribe runs in the background and automatically:
 Click the menu bar icon and select:
 - **Start Recording** - Begin manual recording
 - **Stop Recording** - Stop and process recording
+- **Disable Auto Recording** - Prevent automatic recording detection
+
+### Daemon Control
+
+Control the background daemon using the CLI:
+
+```bash
+meetingscribe-ctl status    # Check if daemon is running
+meetingscribe-ctl stop      # Stop the daemon
+meetingscribe-ctl start     # Start the daemon
+meetingscribe-ctl restart   # Restart the daemon
+meetingscribe-ctl logs      # View daemon logs (tail -f)
+```
 
 ## Configuration
 
@@ -180,6 +212,8 @@ swift test
 
 View logs:
 ```bash
+meetingscribe-ctl logs
+# Or directly:
 tail -f ~/Library/Logs/MeetingScribe/stderr.log
 ```
 
@@ -193,9 +227,7 @@ If screen recording permission is denied:
 3. Enable checkbox for **meetingscribe**
 4. Restart the service:
    ```bash
-   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon.plist 2>/dev/null || true
-   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon.plist
-   launchctl kickstart -k gui/$(id -u)/com.meetingscribe.daemon 2>/dev/null || true
+   meetingscribe-ctl restart
    ```
 
 ### Teams Not Detected

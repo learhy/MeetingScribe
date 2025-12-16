@@ -25,16 +25,42 @@ cp Info.plist "$APP_DIR/Contents/Info.plist"
 echo "✅ Build complete: build/meetingscribe"
 echo "✅ App bundle ready: $APP_DIR"
 
-# Optional: Code signing
+# Code signing
 if [ -n "$SIGNING_IDENTITY" ]; then
-    echo "Signing binary with identity: $SIGNING_IDENTITY"
+    echo "Signing app bundle with identity: $SIGNING_IDENTITY"
+    
+    # Check if entitlements file exists
+    if [ -f "MeetingScribe.entitlements" ]; then
+        ENTITLEMENTS_FLAG="--entitlements MeetingScribe.entitlements"
+    else
+        echo "⚠️  No entitlements file found, signing without entitlements"
+        ENTITLEMENTS_FLAG=""
+    fi
+    
+    # Sign the binary inside the app bundle
     codesign --force --sign "$SIGNING_IDENTITY" \
-        --entitlements MeetingScribe.entitlements \
+        $ENTITLEMENTS_FLAG \
         --options runtime \
-        build/meetingscribe
+        "$APP_DIR/Contents/MacOS/meetingscribe"
+    
+    # Sign the entire app bundle
+    codesign --force --sign "$SIGNING_IDENTITY" \
+        $ENTITLEMENTS_FLAG \
+        --options runtime \
+        "$APP_DIR"
+    
+    # Verify signature
+    echo "Verifying signature..."
+    codesign --verify --verbose "$APP_DIR"
+    
     echo "✅ Code signing complete"
 else
     echo "⚠️  No signing identity found (set SIGNING_IDENTITY environment variable to sign)"
+    echo "     App will be ad-hoc signed for local use only"
+    
+    # Ad-hoc signing for local development
+    codesign --force --sign - "$APP_DIR/Contents/MacOS/meetingscribe" 2>/dev/null || true
+    codesign --force --sign - "$APP_DIR" 2>/dev/null || true
 fi
 
 echo ""

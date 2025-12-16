@@ -29,6 +29,10 @@ Pods/
 # Build products
 build/
 .build-tmp/
+dist/
+*.dmg
+*.zip
+*.pkg
 
 # macOS
 .DS_Store
