@@ -17,6 +17,7 @@ class MenuBarController {
     var onToggleAutoRecording: (() -> Void)?
     var onRecheckPermissions: (() -> Void)?
     var onResetPermissions: (() -> Void)?
+    var onRequestPermissions: (() -> Void)?
     
     private var isRecording = false
     private var currentState: RecordingState = .idle
@@ -224,6 +225,9 @@ class MenuBarController {
             }
             permissionGuide?.onReset = { [weak self] in
                 self?.onResetPermissions?()
+            }
+            permissionGuide?.onRequest = { [weak self] in
+                self?.onRequestPermissions?()
             }
         }
         permissionGuide?.show()

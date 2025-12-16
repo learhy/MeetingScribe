@@ -5,6 +5,7 @@ class PermissionGuideWindow: NSWindow {
     
     var onRecheck: (() -> Void)?
     var onReset: (() -> Void)?
+    var onRequest: (() -> Void)?
     
     init() {
         // Create a floating window
@@ -44,14 +45,15 @@ class PermissionGuideWindow: NSWindow {
         let instructions = """
         MeetingScribe needs Screen Recording permission to capture meeting audio.
         
-        To grant permission:
+        Option 1 - Request Permission (Recommended):
+        1. Click "Request Permission" below
+        2. Click "OK" in the system prompt that appears
+        3. If it says restart required, click "Recheck" after restarting
         
-        1. Click "Open System Settings" below
-        2. Find "MeetingScribe" in the list
-        3. Enable the checkbox next to it
-        4. Click "Recheck Permissions"
-        
-        If you don't see MeetingScribe in the list, try "Reset Permissions" to clear old entries.
+        Option 2 - Manual Setup:
+        1. Click "Open System Settings"
+        2. Find "MeetingScribe" and enable the checkbox
+        3. Click "Recheck Permissions"
         """
         
         let instructionsLabel = NSTextField(wrappingLabelWithString: instructions)
@@ -60,30 +62,30 @@ class PermissionGuideWindow: NSWindow {
         instructionsLabel.alignment = .left
         contentView.addSubview(instructionsLabel)
         
+        // Request Permission button (primary action)
+        let requestButton = NSButton(frame: NSRect(x: 20, y: 40, width: 160, height: 32))
+        requestButton.title = "Request Permission"
+        requestButton.bezelStyle = .rounded
+        requestButton.keyEquivalent = "\r"
+        requestButton.target = self
+        requestButton.action = #selector(requestPermission)
+        contentView.addSubview(requestButton)
+        
         // Open System Settings button
-        let openSettingsButton = NSButton(frame: NSRect(x: 20, y: 40, width: 180, height: 32))
-        openSettingsButton.title = "Open System Settings"
+        let openSettingsButton = NSButton(frame: NSRect(x: 190, y: 40, width: 100, height: 32))
+        openSettingsButton.title = "Settings..."
         openSettingsButton.bezelStyle = .rounded
-        openSettingsButton.keyEquivalent = "\r"
         openSettingsButton.target = self
         openSettingsButton.action = #selector(openSettings)
         contentView.addSubview(openSettingsButton)
         
         // Recheck button
-        let recheckButton = NSButton(frame: NSRect(x: 210, y: 40, width: 90, height: 32))
+        let recheckButton = NSButton(frame: NSRect(x: 300, y: 40, width: 90, height: 32))
         recheckButton.title = "Recheck"
         recheckButton.bezelStyle = .rounded
         recheckButton.target = self
         recheckButton.action = #selector(recheck)
         contentView.addSubview(recheckButton)
-        
-        // Reset button
-        let resetButton = NSButton(frame: NSRect(x: 310, y: 40, width: 90, height: 32))
-        resetButton.title = "Reset..."
-        resetButton.bezelStyle = .rounded
-        resetButton.target = self
-        resetButton.action = #selector(reset)
-        contentView.addSubview(resetButton)
         
         // Quit button
         let quitButton = NSButton(frame: NSRect(x: 20, y: 8, width: 60, height: 24))
@@ -94,6 +96,11 @@ class PermissionGuideWindow: NSWindow {
         contentView.addSubview(quitButton)
         
         self.contentView = contentView
+    }
+    
+    @objc private func requestPermission() {
+        logger.info("Requesting permission (will trigger system prompt)...")
+        onRequest?()
     }
     
     @objc private func openSettings() {
@@ -107,21 +114,6 @@ class PermissionGuideWindow: NSWindow {
         onRecheck?()
     }
     
-    @objc private func reset() {
-        logger.info("Reset permissions requested")
-        
-        let alert = NSAlert()
-        alert.messageText = "Reset TCC Permissions?"
-        alert.informativeText = "This will clear all privacy permissions for MeetingScribe. You'll need to grant them again.\n\nNote: This only works if the app is still at the same location."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Reset")
-        alert.addButton(withTitle: "Cancel")
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            onReset?()
-        }
-    }
     
     @objc private func quit() {
         NSApplication.shared.terminate(nil)

@@ -63,6 +63,22 @@ class PermissionChecker {
             NSWorkspace.shared.open(url)
         }
     }
+    
+    /// Actively requests screen recording permission - triggers macOS prompt on first run
+    func requestScreenRecordingPermission() async -> Bool {
+        logger.info("Requesting screen recording permission (will trigger system prompt)...")
+        
+        // The act of trying to access shareable content triggers the permission prompt
+        do {
+            let _ = try await SCShareableContent.excludingDesktopWindows(false,
+                                                                          onScreenWindowsOnly: false)
+            logger.info("✅ Screen recording permission granted")
+            return true
+        } catch {
+            logger.warning("Screen recording permission denied or prompt dismissed")
+            return false
+        }
+    }
 
     private func requestMicrophoneAccessIfNeeded() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)

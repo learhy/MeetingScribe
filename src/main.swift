@@ -43,6 +43,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.resetPermissions()
         }
         
+        menuBarController?.onRequestPermissions = { [weak self] in
+            self?.requestPermissions()
+        }
+        
         // Link service state to menu bar
         meetingScribeService?.onStateChanged = { [weak self] state in
             DispatchQueue.main.async {
@@ -86,6 +90,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         await meetingScribeService?.run()
     }
     
+    private func requestPermissions() {
+        Task {
+            let permissionChecker = PermissionChecker()
+            logger.info("Actively requesting screen recording permission...")
+            
+            let granted = await permissionChecker.requestScreenRecordingPermission()
+            
+            if granted {
+                logger.info("Permission granted! Starting service...")
+                await meetingScribeService?.run()
+                
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "Permission Granted!"
+                    alert.informativeText = "Screen Recording permission has been enabled. MeetingScribe is now active."
+                    alert.alertStyle = .informational
+                    alert.runModal()
+                }
+            } else {
+                logger.warning("Permission denied or prompt dismissed")
+                
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "Permission Required"
+                    alert.informativeText = "Screen Recording permission is required for MeetingScribe to work.\n\nYou can grant it manually in System Settings > Privacy & Security > Screen Recording."
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                }
+            }
+        }
+    }
+    
     private func recheckPermissions() {
         Task {
             let permissionChecker = PermissionChecker()
@@ -96,11 +132,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 await meetingScribeService?.run()
             } else {
                 logger.warning("Permissions still not granted")
-                let alert = NSAlert()
-                alert.messageText = "Permissions Not Granted"
-                alert.informativeText = "Screen Recording permission is still not enabled. Please check System Settings."
-                alert.alertStyle = .warning
-                alert.runModal()
+                
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "Permissions Not Granted"
+                    alert.informativeText = "Screen Recording permission is still not enabled. Please check System Settings."
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                }
             }
         }
     }
