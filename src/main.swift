@@ -31,6 +31,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.meetingScribeService?.stopManualRecording()
         }
         
+        menuBarController?.onToggleAutoRecording = { [weak self] in
+            self?.meetingScribeService?.toggleAutoRecording()
+        }
+        
+        // Link service state to menu bar
+        meetingScribeService?.onStateChanged = { [weak self] state in
+            DispatchQueue.main.async {
+                self?.menuBarController?.updateState(state)
+            }
+        }
+        
+        meetingScribeService?.onAutoRecordingChanged = { [weak self] enabled in
+            DispatchQueue.main.async {
+                self?.menuBarController?.updateAutoRecordingState(enabled)
+            }
+        }
+        
         // Start the service
         Task {
             await meetingScribeService?.run()
@@ -60,6 +77,11 @@ class MeetingScribeService {
     private var currentRecordingStartTime: Date?
     private var currentAudioFilePath: String?
     private var micPermissionGranted = false
+    private var autoRecordingEnabled = true
+    private var isCancelled = false
+    
+    var onStateChanged: ((RecordingState) -> Void)?
+    var onAutoRecordingChanged: ((Bool) -> Void)?
     
     init() {
         self.callDetector = HybridCallDetector(
@@ -84,6 +106,10 @@ class MeetingScribeService {
     func run() async {
         logger.info("Service starting...")
         isRunning = true
+        
+        // Load auto-recording setting from config
+        autoRecordingEnabled = config.config.ui.autoRecordingEnabled
+        onAutoRecordingChanged?(autoRecordingEnabled)
         
         // Check permissions
         let perms = await permissionChecker.ensureScreenPermission()
@@ -127,9 +153,58 @@ class MeetingScribeService {
         handleCallEnded("manual")
     }
     
+    func toggleAutoRecording() {
+        autoRecordingEnabled.toggle()
+        config.updateAutoRecordingEnabled(autoRecordingEnabled)
+        
+        logger.info("Auto-recording \(autoRecordingEnabled ? "enabled" : "disabled")")
+        onAutoRecordingChanged?(autoRecordingEnabled)
+        
+        // If disabling and currently recording, cancel the recording
+        if !autoRecordingEnabled && currentRecordingStartTime != nil {
+            logger.info("Cancelling current recording due to auto-recording disable")
+            cancelCurrentRecording()
+        }
+    }
+    
+    private func cancelCurrentRecording() {
+        guard let startTime = currentRecordingStartTime else {
+            logger.warning("No active recording to cancel")
+            return
+        }
+        
+        logger.info("Cancelling recording...")
+        isCancelled = true
+        
+        let duration = Date().timeIntervalSince(startTime)
+        
+        // Update state to processing
+        onStateChanged?(.processing)
+        
+        // Send notification
+        sendNotification(title: "Recording Cancelled", body: "Processing partial transcript...")
+        
+        // Stop audio capture and process what we have
+        Task {
+            await stopAudioCaptureAndProcess(startTime: startTime, duration: duration, platform: "cancelled")
+        }
+        
+        currentRecordingStartTime = nil
+    }
+    
     private func handleCallStarted(_ callInfo: CallInfo) {
+        // Check if auto-recording is enabled
+        if !autoRecordingEnabled {
+            logger.info("Call detected but auto-recording is disabled: \(callInfo.platform)")
+            return
+        }
+        
         logger.info("Call started: \(callInfo.platform)")
         currentRecordingStartTime = Date()
+        isCancelled = false
+        
+        // Update state to recording
+        onStateChanged?(.recording)
         
         // Send notification
         if config.config.ui.notifyOnStart {
@@ -151,6 +226,9 @@ class MeetingScribeService {
         }
         
         let duration = Date().timeIntervalSince(startTime)
+        
+        // Update state to processing
+        onStateChanged?(.processing)
         
         // Send notification
         if config.config.ui.notifyOnEnd {
@@ -194,19 +272,38 @@ class MeetingScribeService {
             let generatedNotes = try await notesService.generateNotes(transcript: transcript)
             logger.info("Notes generation complete")
             
-            // 3. Render template
+            // 3. Split notes to get summary
+            let splitNotes = GeneratedNotesParser.split(generatedNotes)
+            
+            // 4. Generate title from transcript and summary
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
+            
+            var meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
+            if isCancelled {
+                meetingTitle = "Cancelled Recording - \(dateFormatter.string(from: startTime))"
+            } else {
+                do {
+                    logger.info("Generating meeting title...")
+                    let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: splitNotes.summary)
+                    if !generatedTitle.isEmpty {
+                        meetingTitle = generatedTitle
+                        logger.info("Generated title: \(generatedTitle)")
+                    }
+                } catch {
+                    logger.warning("Failed to generate title, using date-based title: \(error.localizedDescription)")
+                }
+            }
+            
+            // 5. Render template
             let timeFormatter = DateFormatter()
             timeFormatter.timeStyle = .short
-            
-            let splitNotes = GeneratedNotesParser.split(generatedNotes)
             
             let noteData = NoteData(
                 date: dateFormatter.string(from: startTime),
                 time: timeFormatter.string(from: startTime),
                 duration: formatDuration(duration),
-                title: "Meeting Notes - \(dateFormatter.string(from: startTime))",
+                title: meetingTitle,
                 summary: splitNotes.summary,
                 notes: splitNotes.notes,
                 transcript: transcript,
@@ -215,16 +312,22 @@ class MeetingScribeService {
             
             let renderedNote = try templateEngine.render(noteData: noteData)
             
-            // 4. Save to plugin
+            // 6. Save to plugin
             logger.info("Saving notes...")
             let result = try await notesPlugin.save(note: renderedNote, title: noteData.title)
             
             logger.info("Processing complete: \(result.message)")
             sendNotification(title: "Notes Ready", body: result.message)
             
+            // Reset state to idle
+            onStateChanged?(.idle)
+            
         } catch {
             logger.error("Failed to process recording: \(error.localizedDescription)")
             sendNotification(title: "Processing Failed", body: error.localizedDescription)
+            
+            // Reset state to idle on error
+            onStateChanged?(.idle)
         }
     }
     

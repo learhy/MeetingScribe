@@ -72,6 +72,7 @@ struct AppConfiguration: Codable {
         var showNotifications: Bool = true
         var notifyOnStart: Bool = true
         var notifyOnEnd: Bool = true
+        var autoRecordingEnabled: Bool = true
     }
     
     var version: String = "1.0"
@@ -143,6 +144,11 @@ class ConfigManager {
     func save() {
         Self.saveConfig(config, to: configPath)
         logger.info("Configuration saved")
+    }
+    
+    func updateAutoRecordingEnabled(_ enabled: Bool) {
+        config.ui.autoRecordingEnabled = enabled
+        save()
     }
     
     func expandPath(_ path: String) -> URL {

@@ -288,6 +288,52 @@ class NotesGenerationService {
         }
     }
     
+    func generateTitle(transcript: String, summary: String) async throws -> String {
+        let provider = try createProvider()
+        let titleTimeout: TimeInterval = 30
+        
+        let start = Date()
+        logger.info("Title generation started (timeout=\(Int(titleTimeout))s)")
+        
+        // Use first 2000 chars of transcript + summary as context
+        let transcriptPrefix = String(transcript.prefix(2000))
+        let context = "Summary: \(summary)\n\nTranscript excerpt: \(transcriptPrefix)"
+        
+        let titlePrompt = "Generate a brief, descriptive 3-7 word meeting title from the following content. Return only the title, no quotes or extra formatting."
+        
+        do {
+            let title = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    try await provider.generate(transcript: context, systemPrompt: titlePrompt)
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(titleTimeout))
+                    throw NotesGenerationError.apiError("Title generation timed out after \(Int(titleTimeout))s")
+                }
+                
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
+            
+            let elapsed = Date().timeIntervalSince(start)
+            logger.info("Title generation finished in \(String(format: "%.1f", elapsed))s")
+            
+            // Sanitize title
+            let sanitized = title
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\"", with: "")
+                .replacingOccurrences(of: "'", with: "")
+                .prefix(100)
+            
+            return String(sanitized)
+        } catch {
+            let elapsed = Date().timeIntervalSince(start)
+            logger.warning("Title generation failed after \(String(format: "%.1f", elapsed))s: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
     private func loadSystemPrompt() throws -> String {
         let promptPath = config.expandPath(config.config.notes.llm.systemPromptFile)
         
