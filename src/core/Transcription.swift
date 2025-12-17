@@ -267,6 +267,13 @@ struct DiarizedTranscript: Codable {
     let speakers: [String]
     let numSpeakers: Int
     let audioFile: String
+    
+    enum CodingKeys: String, CodingKey {
+        case segments
+        case speakers
+        case numSpeakers = "num_speakers"
+        case audioFile = "audio_file"
+    }
 }
 
 class TranscriptionService {
