@@ -7,6 +7,7 @@ Automated meeting transcription and notes service for macOS that automatically d
 - ✅ **Automatic Call Detection**: Hybrid detection for Teams/Zoom calls using window analysis and network monitoring
 - ✅ **Audio Capture**: High-quality bidirectional audio recording using ScreenCaptureKit
 - ✅ **AI Transcription**: Support for OpenAI Whisper API and local Whisper models
+- ✅ **Speaker Diarization**: Automatically identify different speakers in transcripts (see [DIARIZATION.md](DIARIZATION.md))
 - ✅ **Smart Notes Generation**: Multi-LLM support (OpenAI, Anthropic Claude, Ollama)
 - ✅ **LLM-Generated Titles**: Automatic meeting title generation from transcript content
 - ✅ **Bear.app Integration**: Automatic note saving with fallback to local files
@@ -309,6 +310,7 @@ meeting-scribe/
 
 ## Recent Improvements
 
+- ✅ **Speaker diarization (Phase 1)** - Identify different speakers with SPEAKER_00, SPEAKER_01 labels
 - ✅ **Local Whisper.cpp integration** - No API costs for transcription
 - ✅ **UserNotifications framework** - Modern notification system (macOS 11+)
 - ✅ **App bundle packaging** - Stable permissions and keychain access
@@ -321,7 +323,8 @@ meeting-scribe/
 
 - [ ] Zoom call detection improvements (window count threshold tuning)
 - [ ] Additional notes backend plugins (Notion, Obsidian)
-- [ ] Speaker diarization
+- [ ] Speaker diarization Phase 2 (local vs remote speaker detection)
+- [ ] Speaker diarization Phase 3 (actual speaker names)
 - [ ] Action item extraction
 - [ ] Encryption at rest
 - [ ] Menu bar UI improvements

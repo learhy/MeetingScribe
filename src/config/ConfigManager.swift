@@ -18,7 +18,7 @@ struct AppConfiguration: Codable {
         var provider: String = "local"  // "openai" | "local"
         
         struct OpenAI: Codable {
-            var apiKeyKeychainItem: String = "MeetingScribe-OpenAI-Key"
+            var apiKey: String = ""
             var model: String = "whisper-1"
         }
         
@@ -27,8 +27,19 @@ struct AppConfiguration: Codable {
             var whisperBinaryPath: String = "~/My Drive/software_projects/whisper.cpp/main"
         }
         
+        struct Diarization: Codable {
+            var enabled: Bool = false
+            var minSpeakers: Int? = nil
+            var maxSpeakers: Int? = nil
+            var hfToken: String = ""
+            var pythonPath: String = "python3"
+            var scriptPath: String = "~/My Drive/software_projects/meeting-scribe/scripts/diarize_audio.py"
+            var whisperModel: String = "base"  // tiny, base, small, medium, large
+        }
+        
         var openai: OpenAI = OpenAI()
         var local: Local = Local()
+        var diarization: Diarization = Diarization()
     }
     
     struct Notes: Codable {
@@ -36,12 +47,12 @@ struct AppConfiguration: Codable {
             var provider: String = "anthropic"  // "openai" | "anthropic" | "ollama"
             
             struct OpenAI: Codable {
-                var apiKeyKeychainItem: String = "MeetingScribe-OpenAI-Key"
+                var apiKey: String = ""
                 var model: String = "gpt-4"
             }
             
             struct Anthropic: Codable {
-                var apiKeyKeychainItem: String = "MeetingScribe-Anthropic-Key"
+                var apiKey: String = ""
                 var model: String = "claude-sonnet-4-5"
             }
             

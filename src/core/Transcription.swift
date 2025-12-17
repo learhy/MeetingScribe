@@ -255,6 +255,20 @@ class LocalWhisperProvider: TranscriptionProvider {
 
 // MARK: - Transcription Service
 
+struct DiarizedSegment: Codable {
+    let start: Double
+    let end: Double
+    let speaker: String
+    let text: String
+}
+
+struct DiarizedTranscript: Codable {
+    let segments: [DiarizedSegment]
+    let speakers: [String]
+    let numSpeakers: Int
+    let audioFile: String
+}
+
 class TranscriptionService {
     private let logger = DualLogger(category: "TranscriptionService")
     private let config: ConfigManager
@@ -264,8 +278,114 @@ class TranscriptionService {
     }
     
     func transcribe(audioFileURL: URL) async throws -> String {
+        // Check if diarization is enabled
+        if config.config.transcription.diarization.enabled {
+            logger.info("Diarization enabled, attempting diarized transcription")
+            do {
+                let diarizedResult = try await transcribeWithDiarization(audioFileURL: audioFileURL)
+                return formatDiarizedTranscript(diarizedResult)
+            } catch {
+                logger.warning("Diarization failed, falling back to standard transcription: \(error.localizedDescription)")
+                // Fall through to standard transcription
+            }
+        }
+        
+        // Standard transcription (no diarization)
         let provider = try createProvider()
         return try await provider.transcribe(audioFileURL: audioFileURL)
+    }
+    
+    func transcribeWithDiarization(audioFileURL: URL) async throws -> DiarizedTranscript {
+        let diarizationConfig = config.config.transcription.diarization
+        
+        // Validate HuggingFace token
+        guard !diarizationConfig.hfToken.isEmpty else {
+            throw TranscriptionError.apiError("HuggingFace token not configured. Add it to ~/.meetingscribe/config.json under transcription.diarization.hfToken")
+        }
+        
+        let pythonPath = diarizationConfig.pythonPath
+        let scriptPath = config.expandPath(diarizationConfig.scriptPath)
+        
+        // Verify script exists
+        guard FileManager.default.fileExists(atPath: scriptPath.path) else {
+            throw TranscriptionError.apiError("Diarization script not found at: \(scriptPath.path)")
+        }
+        
+        logger.info("Running diarization script: \(scriptPath.path)")
+        
+        // Build arguments
+        var arguments = [
+            scriptPath.path,
+            audioFileURL.path,
+            "--hf-token", diarizationConfig.hfToken,
+            "--whisper-model", diarizationConfig.whisperModel
+        ]
+        
+        if let minSpeakers = diarizationConfig.minSpeakers {
+            arguments.append(contentsOf: ["--min-speakers", String(minSpeakers)])
+        }
+        if let maxSpeakers = diarizationConfig.maxSpeakers {
+            arguments.append(contentsOf: ["--max-speakers", String(maxSpeakers)])
+        }
+        
+        // Create temporary output file
+        let tempDir = FileManager.default.temporaryDirectory
+        let outputFile = tempDir.appendingPathComponent("\(UUID().uuidString)_diarization.json")
+        arguments.append(contentsOf: ["--output", outputFile.path])
+        
+        // Execute Python script
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: pythonPath)
+        process.arguments = arguments
+        
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            // Log stderr for debugging
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
+                logger.info("Diarization stderr: \(errorOutput)")
+            }
+            
+            guard process.terminationStatus == 0 else {
+                throw TranscriptionError.apiError("Diarization script failed with exit code \(process.terminationStatus)")
+            }
+            
+            // Read output JSON
+            guard FileManager.default.fileExists(atPath: outputFile.path) else {
+                throw TranscriptionError.invalidResponse
+            }
+            
+            let jsonData = try Data(contentsOf: outputFile)
+            let decoder = JSONDecoder()
+            let result = try decoder.decode(DiarizedTranscript.self, from: jsonData)
+            
+            // Clean up temporary file
+            try? FileManager.default.removeItem(at: outputFile)
+            
+            logger.info("Diarization completed: \(result.numSpeakers) speakers detected")
+            return result
+            
+        } catch let error as TranscriptionError {
+            throw error
+        } catch {
+            logger.error("Diarization error: \(error.localizedDescription)")
+            throw TranscriptionError.networkError(error)
+        }
+    }
+    
+    private func formatDiarizedTranscript(_ diarized: DiarizedTranscript) -> String {
+        var formatted = ""
+        
+        for segment in diarized.segments {
+            formatted += "\(segment.speaker): \(segment.text)\n"
+        }
+        
+        return formatted.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private func createProvider() throws -> TranscriptionProvider {
@@ -273,9 +393,10 @@ class TranscriptionService {
         
         switch transcriptionConfig.provider {
         case "openai":
-            let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: transcriptionConfig.openai.apiKeyKeychainItem
-            )
+            let apiKey = transcriptionConfig.openai.apiKey
+            guard !apiKey.isEmpty else {
+                throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
+            }
             return OpenAIWhisperProvider(
                 apiKey: apiKey,
                 model: transcriptionConfig.openai.model
@@ -288,9 +409,10 @@ class TranscriptionService {
             
         default:
             logger.warning("Unknown provider '\(transcriptionConfig.provider)', falling back to OpenAI")
-            let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: transcriptionConfig.openai.apiKeyKeychainItem
-            )
+            let apiKey = transcriptionConfig.openai.apiKey
+            guard !apiKey.isEmpty else {
+                throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
+            }
             return OpenAIWhisperProvider(
                 apiKey: apiKey,
                 model: transcriptionConfig.openai.model

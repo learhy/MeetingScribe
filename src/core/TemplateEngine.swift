@@ -57,8 +57,11 @@ class TemplateEngine {
     
     private var defaultTemplate: String {
         """
-        # Meeting Notes - {date}
+        # {title}
         
+        ---
+        
+        **Date:** {date}
         **Time:** {time}
         **Duration:** {duration}
         
