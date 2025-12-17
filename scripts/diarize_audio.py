@@ -20,8 +20,15 @@ import argparse
 import json
 import sys
 import os
+import warnings
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+
+# Suppress warnings from libraries
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*torchcodec.*")
+warnings.filterwarnings("ignore", message=".*FP16.*")
+warnings.filterwarnings("ignore", message=".*torchaudio.*")
 
 # Add common ffmpeg locations to PATH for Whisper
 if '/opt/homebrew/bin' not in os.environ.get('PATH', ''):
