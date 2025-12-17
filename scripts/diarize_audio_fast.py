@@ -39,7 +39,7 @@ try:
     import whisper
     import torchaudio
     from speechbrain.pretrained import EncoderClassifier
-    from sklearn.cluster import MeanShift
+    from sklearn.cluster import AgglomerativeClustering
 except ImportError as e:
     print(f"Error: Missing required dependency: {e}", file=sys.stderr)
     print("Please install: pip install speechbrain scikit-learn openai-whisper torch torchaudio", file=sys.stderr)
@@ -140,31 +140,32 @@ def extract_embeddings_with_speechbrain(
 
 def cluster_speakers(
     embeddings: np.ndarray,
-    bandwidth: float = None
+    distance_threshold: float = 0.90
 ) -> np.ndarray:
     """
-    Cluster speaker embeddings using MeanShift.
+    Cluster speaker embeddings using Agglomerative Clustering.
     
     Args:
         embeddings: Array of shape (num_windows, embedding_dim)
-        bandwidth: MeanShift bandwidth parameter (None = auto-estimate)
+        distance_threshold: Cosine distance threshold for clustering (0.3-0.8)
+                           Lower = more speakers, Higher = fewer speakers
     
     Returns:
         labels: Array of speaker labels for each window
     """
-    # Normalize embeddings (L2 norm) for better clustering
+    # Normalize embeddings (L2 norm) for cosine distance
     from sklearn.preprocessing import normalize
     embeddings_normalized = normalize(embeddings, axis=1, norm='l2')
     
-    if bandwidth is None:
-        # Auto-estimate bandwidth using quantile of pairwise distances
-        # Use smaller quantile for better speaker separation
-        from sklearn.cluster import estimate_bandwidth
-        bandwidth = estimate_bandwidth(embeddings_normalized, quantile=0.1, n_samples=500)
-        print(f"Auto-estimated bandwidth: {bandwidth:.4f}", file=sys.stderr)
+    print(f"Clustering speakers (distance_threshold={distance_threshold:.2f}, metric=cosine)...", file=sys.stderr)
     
-    print(f"Clustering speakers (bandwidth={bandwidth:.4f})...", file=sys.stderr)
-    clustering = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+    # Agglomerative clustering with cosine distance
+    clustering = AgglomerativeClustering(
+        n_clusters=None,              # Auto-detect number of speakers
+        distance_threshold=distance_threshold,
+        metric='cosine',              # Better for embeddings
+        linkage='average'             # Average linkage works well for speaker diarization
+    )
     labels = clustering.fit_predict(embeddings_normalized)
     
     num_speakers = len(np.unique(labels))
@@ -337,10 +338,10 @@ def main():
         help="Embedding step size in seconds (default: 0.75)"
     )
     parser.add_argument(
-        "--bandwidth",
+        "--distance-threshold",
         type=float,
-        default=None,
-        help="MeanShift clustering bandwidth (default: auto-estimate)"
+        default=0.90,
+        help="Agglomerative clustering distance threshold (default: 0.90, range: 0.85-0.95)"
     )
     parser.add_argument(
         "--output",
@@ -367,7 +368,7 @@ def main():
     )
     
     # Step 3: Cluster speakers
-    labels = cluster_speakers(embeddings, bandwidth=args.bandwidth)
+    labels = cluster_speakers(embeddings, distance_threshold=args.distance_threshold)
     
     # Step 4: Create diarization segments
     diarization_segments = create_diarization_segments(
