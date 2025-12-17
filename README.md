@@ -310,6 +310,7 @@ meeting-scribe/
 
 ## Recent Improvements
 
+- ✅ **Fast speaker diarization** - 60% faster using SpeechBrain (2:26 vs 4+ min for 26-min audio), no HF token required
 - ✅ **Speaker diarization (Phase 1)** - Identify different speakers with SPEAKER_00, SPEAKER_01 labels
 - ✅ **Local Whisper.cpp integration** - No API costs for transcription
 - ✅ **UserNotifications framework** - Modern notification system (macOS 11+)
@@ -324,7 +325,8 @@ meeting-scribe/
 - [ ] Zoom call detection improvements (window count threshold tuning)
 - [ ] Additional notes backend plugins (Notion, Obsidian)
 - [ ] Speaker diarization Phase 2 (local vs remote speaker detection)
-- [ ] Speaker diarization Phase 3 (actual speaker names)
+- [ ] Speaker diarization Phase 3 (actual speaker names via voice profiles)
+- [ ] Add Silero VAD for noise filtering in diarization
 - [ ] Action item extraction
 - [ ] Encryption at rest
 - [ ] Menu bar UI improvements
