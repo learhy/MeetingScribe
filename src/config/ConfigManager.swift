@@ -31,10 +31,11 @@ struct AppConfiguration: Codable {
             var enabled: Bool = false
             var minSpeakers: Int? = nil
             var maxSpeakers: Int? = nil
-            var hfToken: String = ""
+            var hfToken: String = ""  // No longer required for fast diarization
             var pythonPath: String = "python3"
-            var scriptPath: String = "~/My Drive/software_projects/meeting-scribe/scripts/diarize_audio.py"
+            var scriptPath: String = "~/My Drive/software_projects/meeting-scribe/scripts/diarize_audio_fast.py"
             var whisperModel: String = "base"  // tiny, base, small, medium, large
+            var distanceThreshold: Double = 0.90  // Agglomerative clustering threshold (0.85-0.95)
         }
         
         var openai: OpenAI = OpenAI()

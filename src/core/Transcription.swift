@@ -305,11 +305,6 @@ class TranscriptionService {
     func transcribeWithDiarization(audioFileURL: URL) async throws -> DiarizedTranscript {
         let diarizationConfig = config.config.transcription.diarization
         
-        // Validate HuggingFace token
-        guard !diarizationConfig.hfToken.isEmpty else {
-            throw TranscriptionError.apiError("HuggingFace token not configured. Add it to ~/.meetingscribe/config.json under transcription.diarization.hfToken")
-        }
-        
         let pythonPath = diarizationConfig.pythonPath
         let scriptPath = config.expandPath(diarizationConfig.scriptPath)
         
@@ -318,22 +313,18 @@ class TranscriptionService {
             throw TranscriptionError.apiError("Diarization script not found at: \(scriptPath.path)")
         }
         
-        logger.info("Running diarization script: \(scriptPath.path)")
+        logger.info("Running fast diarization script: \(scriptPath.path)")
         
-        // Build arguments
+        // Build arguments for fast diarization (no HF token required)
         var arguments = [
             scriptPath.path,
             audioFileURL.path,
-            "--hf-token", diarizationConfig.hfToken,
-            "--whisper-model", diarizationConfig.whisperModel
+            "--whisper-model", diarizationConfig.whisperModel,
+            "--distance-threshold", String(diarizationConfig.distanceThreshold)
         ]
         
-        if let minSpeakers = diarizationConfig.minSpeakers {
-            arguments.append(contentsOf: ["--min-speakers", String(minSpeakers)])
-        }
-        if let maxSpeakers = diarizationConfig.maxSpeakers {
-            arguments.append(contentsOf: ["--max-speakers", String(maxSpeakers)])
-        }
+        // Note: min/max speakers not supported by fast diarization
+        // It auto-detects based on distance threshold
         
         // Create temporary output file
         let tempDir = FileManager.default.temporaryDirectory
