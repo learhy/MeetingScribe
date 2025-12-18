@@ -112,14 +112,18 @@ class TestBundledPython:
         import numpy as np
         import soundfile as sf
         
-        # Create a simple test audio file (2 seconds, 16kHz)
-        duration = 2.0
+        # Create a test audio file (10 seconds, 16kHz - need enough for embeddings)
+        duration = 10.0
         sample_rate = 16000
         samples = int(duration * sample_rate)
         
-        # Generate a simple sine wave
+        # Generate audio with varying frequency to simulate different speakers
         t = np.linspace(0, duration, samples)
-        audio = np.sin(2 * np.pi * 440 * t) * 0.5  # 440 Hz tone
+        # First half: 440 Hz, second half: 880 Hz
+        audio = np.concatenate([
+            np.sin(2 * np.pi * 440 * t[:samples//2]) * 0.5,
+            np.sin(2 * np.pi * 880 * t[samples//2:]) * 0.5
+        ])
         
         test_audio = tmp_path / "test_audio.wav"
         sf.write(str(test_audio), audio, sample_rate)
