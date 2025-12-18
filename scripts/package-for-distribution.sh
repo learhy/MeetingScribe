@@ -71,22 +71,27 @@ mkdir -p "$DMG_TEMP"
 cp -R "$APP_BUNDLE" "$DMG_TEMP/"
 
 # Create a symbolic link to /Applications for easy drag-and-drop
-ln -s /Applications "$DMG_TEMP/Applications"
+# Use absolute path to ensure it works correctly
+ln -s "/Applications" "$DMG_TEMP/Applications"
 
 # Create README for users
 cat > "$DMG_TEMP/README.txt" << EOF
 MeetingScribe v${VERSION}
 
-ZERO-CONFIGURATION INSTALLATION
+ONE-STEP INSTALLATION
 All dependencies (Python, ML models) are bundled. Just drag and drop!
 
 Installation:
 1. Drag MeetingScribe.app to the Applications folder
-2. Open MeetingScribe from Applications
-3. Grant permissions when prompted (Screen Recording, Microphone)
+2. Launch MeetingScribe from Applications
+3. The setup wizard will guide you through:
+   - Installing to the correct location (if needed)
+   - Setting up the background daemon
+   - Installing command-line tools
+   - Granting required permissions
 4. Look for the microphone icon in your menu bar
 
-That's it! No manual Python setup required.
+That's it! The installer handles everything automatically.
 
 Requirements:
 - macOS 13.0 (Ventura) or later
@@ -162,11 +167,15 @@ tell application "Finder"
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
         set icon size of viewOptions to 128
-        set background color of viewOptions to {255, 255, 255}
+        -- Light gray background (RGB values 0-65535 scale)
+        set background color of viewOptions to {56000, 56000, 56000}
         
         -- Position icons
         set position of item "MeetingScribe.app" of container window to {150, 200}
         set position of item "Applications" of container window to {450, 200}
+        
+        -- Make Applications alias more visible
+        set label index of item "Applications" of container window to 2
         
         update without registering applications
         delay 2

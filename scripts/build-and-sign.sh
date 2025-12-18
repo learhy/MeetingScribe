@@ -22,6 +22,14 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp .build/release/meetingscribe "$APP_DIR/Contents/MacOS/meetingscribe"
 cp Info.plist "$APP_DIR/Contents/Info.plist"
 
+# Copy app icon
+if [ -f "resources/AppIcon.icns" ]; then
+    cp resources/AppIcon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
+    echo "✅ App icon copied"
+else
+    echo "⚠️  Warning: AppIcon.icns not found at resources/AppIcon.icns"
+fi
+
 # Bundle Python environment
 echo "Bundling Python environment..."
 if [ ! -d "build/python-bundle" ]; then
@@ -46,6 +54,13 @@ cp scripts/meetingscribe-ctl.sh "$APP_DIR/Contents/Resources/scripts/"
 
 # Copy uninstall script to Resources (for clean uninstallation)
 cp scripts/uninstall.sh "$APP_DIR/Contents/Resources/scripts/"
+
+# Copy reset-permissions script
+cp scripts/reset-permissions.sh "$APP_DIR/Contents/Resources/scripts/"
+
+# Embed first-run installer and all supporting scripts
+echo "Embedding first-run installer..."
+./scripts/embed-installer.sh "$APP_DIR"
 
 # Make bundled Python executable
 chmod +x "$APP_DIR/Contents/Resources/python/bin/python3"
