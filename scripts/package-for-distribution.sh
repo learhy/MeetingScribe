@@ -132,10 +132,57 @@ EOF
 
 # Create DMG using hdiutil
 echo "Building DMG image..."
+
+# First create a writable DMG to customize it
+TEMP_DMG="$OUTPUT_DIR/${APP_NAME}-temp.dmg"
+rm -f "$TEMP_DMG"
+
 hdiutil create -volname "$APP_NAME" \
     -srcfolder "$DMG_TEMP" \
-    -ov -format UDZO \
-    "$DMG_PATH"
+    -ov -format UDRW \
+    "$TEMP_DMG"
+
+# Mount the temporary DMG
+echo "Customizing DMG appearance..."
+DEVICE=$(hdiutil attach -readwrite -noverify "$TEMP_DMG" | egrep '^/dev/' | sed 1q | awk '{print $1}')
+VOLUME_PATH="/Volumes/$APP_NAME"
+
+# Wait for mount
+sleep 2
+
+# Set icon positions and appearance using AppleScript
+osascript <<EOF
+tell application "Finder"
+    tell disk "$APP_NAME"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {400, 100, 1000, 500}
+        set viewOptions to the icon view options of container window
+        set arrangement of viewOptions to not arranged
+        set icon size of viewOptions to 128
+        set background color of viewOptions to {255, 255, 255}
+        
+        -- Position icons
+        set position of item "MeetingScribe.app" of container window to {150, 200}
+        set position of item "Applications" of container window to {450, 200}
+        
+        update without registering applications
+        delay 2
+        close
+    end tell
+end tell
+EOF
+
+# Unmount
+sync
+hdiutil detach "$DEVICE"
+
+# Convert to compressed read-only DMG
+rm -f "$DMG_PATH"
+hdiutil convert "$TEMP_DMG" -format UDZO -o "$DMG_PATH"
+rm -f "$TEMP_DMG"
 
 rm -rf "$DMG_TEMP"
 
