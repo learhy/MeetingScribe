@@ -41,6 +41,9 @@ mkdir -p "$APP_DIR/Contents/Resources/scripts"
 cp scripts/diarize_audio_fast.py "$APP_DIR/Contents/Resources/scripts/"
 cp scripts/requirements-diarization.txt "$APP_DIR/Contents/Resources/scripts/"
 
+# Copy CLI control script to Resources (for optional installation)
+cp scripts/meetingscribe-ctl.sh "$APP_DIR/Contents/Resources/scripts/"
+
 # Make bundled Python executable
 chmod +x "$APP_DIR/Contents/Resources/python/bin/python3"
 

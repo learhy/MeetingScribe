@@ -19,6 +19,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Activate the app so menu bar icon appears
         NSApp.setActivationPolicy(.accessory)
         
+        // Prompt to install CLI tool on first launch
+        // This runs async so it doesn't block startup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            CLIInstaller.promptAndInstall()
+        }
+        
         // Initialize menu bar
         menuBarController = MenuBarController()
         

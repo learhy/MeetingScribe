@@ -138,8 +138,7 @@ mkdir -p "$ZIP_TEMP"
 # Copy app bundle
 cp -R "$APP_BUNDLE" "$ZIP_TEMP/"
 
-# Copy README
-cp "$OUTPUT_DIR/../build/dmg_temp/README.txt" "$ZIP_TEMP/" 2>/dev/null || \
+# Create README
 cat > "$ZIP_TEMP/README.txt" << EOF
 MeetingScribe v${VERSION}
 
