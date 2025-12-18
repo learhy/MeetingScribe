@@ -76,7 +76,6 @@ This installs the app bundle to `~/Applications/MeetingScribe.app` and sets up t
 On first run, macOS will prompt for:
 - **Screen Recording** permission (required)
 - **Microphone** permission (optional)
-- **Keychain access** for API keys (first use only)
 
 **Important**: Grant permissions to `MeetingScribe.app` in **System Settings > Privacy & Security > Screen & System Audio Recording**
 
@@ -92,26 +91,43 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.meetingscribe.daemon
 
 ### 4. Configure API Keys
 
-On first transcription/notes generation, you'll be prompted to allow keychain access.
+**After installation, you must configure your LLM provider API key.**
 
-The app stores API keys in macOS Keychain. Configure your provider in `~/.meetingscribe/config.json`:
+The installer will open `~/.meetingscribe/` folder. Edit `config.json` and add your API key:
 
 ```bash
 # Edit configuration
 vim ~/.meetingscribe/config.json
 ```
 
-For local Whisper (no API key needed), set:
+Add your API key to the appropriate provider:
 ```json
 {
-  "transcription": {
-    "provider": "local",
-    "local": {
-      "modelPath": "~/path/to/whisper.cpp/models/ggml-base.en.bin",
-      "whisperBinaryPath": "~/path/to/whisper.cpp/main"
+  "notes": {
+    "llm": {
+      "provider": "anthropic",
+      "anthropic": {
+        "apiKey": "sk-ant-your-key-here",
+        "model": "claude-sonnet-4-5"
+      },
+      "openai": {
+        "apiKey": "sk-your-key-here",
+        "model": "gpt-4"
+      },
+      "ollama": {
+        "endpoint": "http://localhost:11434",
+        "model": "llama3"
+      }
     }
   }
 }
+```
+
+**Note**: If you don't configure an API key, the menu bar icon will show an orange warning triangle. Click "LLM Provider Key Required" to open the config folder.
+
+After updating the config, restart the service:
+```bash
+meetingscribe-ctl restart
 ```
 
 ## Usage
@@ -173,7 +189,16 @@ Edit `~/.meetingscribe/config.json`:
     "llm": {
       "provider": "anthropic",
       "anthropic": {
-        "model": "claude-4.5-sonnet"
+        "apiKey": "sk-ant-your-key-here",
+        "model": "claude-sonnet-4-5"
+      },
+      "openai": {
+        "apiKey": "sk-your-key-here",
+        "model": "gpt-4"
+      },
+      "ollama": {
+        "endpoint": "http://localhost:11434",
+        "model": "llama3"
       }
     },
     "backend": "bear"

@@ -2,6 +2,7 @@ import AppKit
 
 enum RecordingState {
     case disabled      // Missing required permissions
+    case configError   // Missing required configuration (API keys)
     case idle
     case recording
     case processing
@@ -140,6 +141,9 @@ class MenuBarController {
         case .disabled:
             symbolName = "exclamationmark.triangle.fill"
             color = .systemRed
+        case .configError:
+            symbolName = "exclamationmark.triangle.fill"
+            color = .systemOrange
         case .idle:
             symbolName = isRecording ? "message.circle.fill" : "message.circle"
             color = .controlTextColor  // System default (transparent)
@@ -172,9 +176,12 @@ class MenuBarController {
     
     private func updateMenuForState() {
         // Show different menu based on state
-        if currentState == .disabled {
+        switch currentState {
+        case .disabled:
             buildDisabledMenu()
-        } else {
+        case .configError:
+            buildConfigErrorMenu()
+        default:
             buildNormalMenu()
         }
     }
@@ -195,6 +202,26 @@ class MenuBarController {
         let resetItem = NSMenuItem(title: "Reset Permissions...", action: #selector(resetPermissions), keyEquivalent: "")
         resetItem.target = self
         menu.addItem(resetItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let quitItem = NSMenuItem(title: "Quit MeetingScribe", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+    }
+    
+    private func buildConfigErrorMenu() {
+        menu.removeAllItems()
+        
+        let configItem = NSMenuItem(title: "⚠️  LLM Provider Key Required", action: #selector(openConfigFolder), keyEquivalent: "")
+        configItem.target = self
+        menu.addItem(configItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let prefsItem = NSMenuItem(title: "Open Configuration Folder", action: #selector(openConfigFolder), keyEquivalent: "")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -258,5 +285,9 @@ class MenuBarController {
     
     @objc private func resetPermissions() {
         onResetPermissions?()
+    }
+    
+    @objc private func openConfigFolder() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.meetingscribe"))
     }
 }
