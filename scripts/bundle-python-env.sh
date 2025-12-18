@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Bundle Python environment for MeetingScribe distribution
-# Creates a self-contained Python 3.11+ environment with all ML dependencies
+# Uses python-build-standalone for truly portable Python
+# Creates a self-contained Python 3.11 environment with all ML dependencies
 
 set -e
 
@@ -11,33 +12,27 @@ echo "🐍 Bundling Python environment for MeetingScribe..."
 BUNDLE_DIR="build/python-bundle"
 REQUIREMENTS_FILE="scripts/requirements-diarization.txt"
 
+# Python standalone builds are now from astral-sh
+# Latest release: https://github.com/astral-sh/python-build-standalone/releases
+PYTHON_VERSION="3.11.14"
+PYTHON_STANDALONE_VERSION="20251217"
+
+# Detect architecture
+ARCH=$(uname -m)
+if [ "$ARCH" = "arm64" ]; then
+    PYTHON_PLATFORM="aarch64-apple-darwin"
+else
+    PYTHON_PLATFORM="x86_64-apple-darwin"
+fi
+
+PYTHON_TARBALL="cpython-${PYTHON_VERSION}%2B${PYTHON_STANDALONE_VERSION}-${PYTHON_PLATFORM}-install_only.tar.gz"
+PYTHON_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_STANDALONE_VERSION}/${PYTHON_TARBALL}"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
-
-# Check if Python 3.9+ is available
-PYTHON_CMD=""
-for cmd in python3.11 python3.10 python3.9 python3; do
-    if command -v $cmd &> /dev/null; then
-        VERSION=$($cmd --version 2>&1 | awk '{print $2}')
-        MAJOR=$(echo $VERSION | cut -d. -f1)
-        MINOR=$(echo $VERSION | cut -d. -f2)
-        if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 9 ]; then
-            PYTHON_CMD=$cmd
-            echo -e "${GREEN}✓${NC} Found Python $VERSION at $(which $cmd)"
-            break
-        fi
-    fi
-done
-
-if [ -z "$PYTHON_CMD" ]; then
-    echo -e "${RED}✗${NC} Python 3.9+ not found"
-    echo "Please install Python 3.9 or later:"
-    echo "  brew install python@3.11"
-    exit 1
-fi
 
 # Check if requirements file exists
 if [ ! -f "$REQUIREMENTS_FILE" ]; then
@@ -54,26 +49,68 @@ fi
 # Create bundle directory
 mkdir -p "$BUNDLE_DIR"
 
-echo -e "${YELLOW}→${NC} Creating virtual environment..."
-$PYTHON_CMD -m venv "$BUNDLE_DIR"
+# Download standalone Python if not already cached
+PYTHON_CACHE="build/python-standalone-cache"
+mkdir -p "$PYTHON_CACHE"
 
-# Activate virtual environment
-source "$BUNDLE_DIR/bin/activate"
+if [ ! -f "$PYTHON_CACHE/$PYTHON_TARBALL" ]; then
+    echo -e "${YELLOW}→${NC} Downloading standalone Python ${PYTHON_VERSION} for ${PYTHON_PLATFORM}..."
+    echo "   URL: $PYTHON_URL"
+    echo "   This is a one-time download (~50MB)..."
+    
+    if command -v curl &> /dev/null; then
+        curl -L -o "$PYTHON_CACHE/$PYTHON_TARBALL" "$PYTHON_URL"
+    elif command -v wget &> /dev/null; then
+        wget -O "$PYTHON_CACHE/$PYTHON_TARBALL" "$PYTHON_URL"
+    else
+        echo -e "${RED}✗${NC} Neither curl nor wget found. Please install one:"
+        echo "  brew install curl"
+        exit 1
+    fi
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}✗${NC} Failed to download standalone Python"
+        rm -f "$PYTHON_CACHE/$PYTHON_TARBALL"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓${NC} Downloaded standalone Python"
+else
+    echo -e "${GREEN}✓${NC} Using cached standalone Python"
+fi
+
+# Extract standalone Python
+echo -e "${YELLOW}→${NC} Extracting standalone Python..."
+tar -xzf "$PYTHON_CACHE/$PYTHON_TARBALL" -C "$BUNDLE_DIR"
+
+if [ ! -f "$BUNDLE_DIR/python/bin/python3" ]; then
+    echo -e "${RED}✗${NC} Failed to extract Python"
+    exit 1
+fi
+
+echo -e "${GREEN}✓${NC} Standalone Python extracted"
+
+# The standalone Python is in $BUNDLE_DIR/python/
+# Move it up one level for cleaner structure
+mv "$BUNDLE_DIR/python"/* "$BUNDLE_DIR/"
+rmdir "$BUNDLE_DIR/python"
+
+# Make Python executable
+chmod +x "$BUNDLE_DIR/bin/python3"
+PYTHON_CMD="$BUNDLE_DIR/bin/python3"
 
 echo -e "${YELLOW}→${NC} Upgrading pip, setuptools, wheel..."
-pip install --quiet --upgrade pip setuptools wheel
+"$PYTHON_CMD" -m pip install --quiet --upgrade pip setuptools wheel
 
 echo -e "${YELLOW}→${NC} Installing ML dependencies (this may take 5-10 minutes)..."
 echo "   This will download ~2GB of packages..."
 
 # Install dependencies from requirements file
 # Use --no-cache-dir to save space
-pip install --no-cache-dir -r "$REQUIREMENTS_FILE"
+"$PYTHON_CMD" -m pip install --no-cache-dir -r "$REQUIREMENTS_FILE"
 
 echo -e "${YELLOW}→${NC} Verifying installation..."
-python3 -c "import torch; import torchaudio; import whisper; import sklearn; print('Core imports successful')"
-# Note: speechbrain import triggers backend checks that may fail with newer torchaudio
-# The module will work fine at runtime, so skip strict import check
+"$PYTHON_CMD" -c "import torch; import torchaudio; import whisper; import sklearn; print('Core imports successful')"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}✗${NC} Installation verification failed"
@@ -107,8 +144,6 @@ find "$BUNDLE_DIR/lib" -type d -name "*cuda*" -exec rm -rf {} + 2>/dev/null || t
 echo -e "${YELLOW}→${NC} Stripping debug symbols..."
 find "$BUNDLE_DIR/lib" -name "*.so" -exec strip -x {} \; 2>/dev/null || true
 find "$BUNDLE_DIR/lib" -name "*.dylib" -exec strip -x {} \; 2>/dev/null || true
-
-deactivate
 
 # Calculate bundle size
 BUNDLE_SIZE=$(du -sh "$BUNDLE_DIR" | cut -f1)

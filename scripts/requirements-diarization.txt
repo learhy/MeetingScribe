@@ -2,8 +2,9 @@
 # Install with: pip install -r requirements-diarization.txt
 
 # Core dependencies
-torch>=2.0.0
-torchaudio>=2.0.0
+# Pin to stable versions - PyTorch 2.9+ has venv compatibility issues
+torch>=2.0.0,<2.9.0
+torchaudio>=2.0.0,<2.9.0
 openai-whisper>=20231117
 
 # Fast diarization with SpeechBrain
