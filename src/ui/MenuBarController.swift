@@ -28,7 +28,7 @@ class MenuBarController {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "mic.circle", accessibilityDescription: "MeetingScribe")
+            button.image = NSImage(systemSymbolName: "message.circle", accessibilityDescription: "MeetingScribe")
         }
         
         // Create menu
@@ -141,13 +141,13 @@ class MenuBarController {
             symbolName = "exclamationmark.triangle.fill"
             color = .systemRed
         case .idle:
-            symbolName = isRecording ? "mic.circle.fill" : "mic.circle"
+            symbolName = isRecording ? "message.circle.fill" : "message.circle"
             color = .controlTextColor  // System default (transparent)
         case .recording:
-            symbolName = "mic.circle.fill"
+            symbolName = "message.circle.fill"
             color = .systemRed
         case .processing:
-            symbolName = "mic.circle.fill"
+            symbolName = "message.circle.fill"
             color = .systemOrange
         }
         
