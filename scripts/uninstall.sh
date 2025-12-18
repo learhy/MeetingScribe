@@ -31,8 +31,20 @@ if [ -d "/Applications/MeetingScribe.app" ]; then
     echo "✅ App bundle removed (system)"
 fi
 
+# Reset privacy permissions (TCC database)
+echo ""
+echo "Resetting privacy permissions..."
+BUNDLE_ID="com.meetingscribe.daemon"
+tccutil reset All "$BUNDLE_ID" 2>/dev/null || echo "⚠️  Could not reset permissions (may need manual cleanup in System Settings)"
+echo "✅ Privacy permissions reset"
+
+# Reset UserDefaults (including CLI installation prompt)
+defaults delete com.meetingscribe.daemon 2>/dev/null || true
+echo "✅ App preferences cleared"
+
 echo ""
 echo "MeetingScribe has been uninstalled"
+echo "Privacy permissions (Screen Recording, Notifications) have been reset"
 echo ""
 echo "Optional cleanup:"
 echo "  rm -rf ~/.meetingscribe              # Remove config"
