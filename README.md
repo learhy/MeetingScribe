@@ -18,10 +18,10 @@ Automated meeting transcription and notes service for macOS that automatically d
 ## Requirements
 
 - macOS 13.0+ (Ventura or later)
-- Swift 5.9+
-- Xcode Command Line Tools
 - Screen Recording permission
 - Microphone permission (optional, for local track)
+- ~2GB disk space for app bundle (includes bundled Python + ML models)
+- Additional ~500MB for ML model cache (downloaded on first use)
 
 ## Installation
 
@@ -34,9 +34,16 @@ Download the latest release from [Releases](https://github.com/your-repo/meeting
 3. Open MeetingScribe from Applications
 4. Grant permissions when prompted
 
+**That's it!** Python and all ML dependencies are bundled. On first transcription with speaker diarization, models (~500MB) will be downloaded automatically to `~/.meetingscribe/cache/`.
+
 See [DISTRIBUTION.md](DISTRIBUTION.md) for detailed installation instructions.
 
 ### For Developers
+
+**Prerequisites**:
+- Swift 5.9+
+- Xcode Command Line Tools
+- Python 3.9+ (for building bundled environment)
 
 #### 1. Build and Sign (Recommended)
 

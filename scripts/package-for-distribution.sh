@@ -20,6 +20,28 @@ if [ ! -d "$APP_BUNDLE" ]; then
     exit 1
 fi
 
+# Check if bundled Python exists
+if [ ! -f "$APP_BUNDLE/Contents/Resources/python/bin/python3" ]; then
+    echo "⚠️  Warning: Bundled Python not found in app bundle"
+    echo "   Expected: $APP_BUNDLE/Contents/Resources/python/bin/python3"
+    echo "   This means the app will require manual Python installation."
+    echo ""
+    echo "   To create a self-contained distribution:"
+    echo "   1. Run: ./scripts/bundle-python-env.sh"
+    echo "   2. Run: ./scripts/build-and-sign.sh"
+    echo "   3. Run this script again"
+    echo ""
+    read -p "Continue packaging without bundled Python? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+else
+    echo "✅ Bundled Python found in app bundle"
+    PYTHON_VERSION=$("$APP_BUNDLE/Contents/Resources/python/bin/python3" --version 2>&1)
+    echo "   Version: $PYTHON_VERSION"
+fi
+
 # Verify app bundle is signed
 if ! codesign --verify "$APP_BUNDLE" 2>/dev/null; then
     echo "⚠️  Warning: App bundle is not properly signed"
@@ -55,16 +77,27 @@ ln -s /Applications "$DMG_TEMP/Applications"
 cat > "$DMG_TEMP/README.txt" << EOF
 MeetingScribe v${VERSION}
 
+ZERO-CONFIGURATION INSTALLATION
+All dependencies (Python, ML models) are bundled. Just drag and drop!
+
 Installation:
 1. Drag MeetingScribe.app to the Applications folder
 2. Open MeetingScribe from Applications
 3. Grant permissions when prompted (Screen Recording, Microphone)
 4. Look for the microphone icon in your menu bar
 
+That's it! No manual Python setup required.
+
 Requirements:
 - macOS 13.0 (Ventura) or later
+- ~2GB disk space for app
+- ~500MB for ML model cache (downloads on first use)
 - Screen Recording permission
 - Microphone permission (optional)
+
+First Run:
+On first transcription with speaker diarization, ML models (~500MB)
+will be downloaded automatically to ~/.meetingscribe/cache/models/
 
 Configuration:
 Configuration file: ~/.meetingscribe/config.json

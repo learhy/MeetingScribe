@@ -102,10 +102,18 @@ def extract_embeddings_with_speechbrain(
         embeddings: Array of shape (num_windows, embedding_dim)
         timestamps: List of window start times
     """
+    # Use user cache directory for models (works for both bundled and development)
+    cache_dir = os.path.expanduser("~/.meetingscribe/cache/models")
+    os.makedirs(cache_dir, exist_ok=True)
+    model_dir = os.path.join(cache_dir, "spkrec-ecapa-voxceleb")
+    
     print("Loading SpeechBrain ECAPA-TDNN model...", file=sys.stderr)
+    if not os.path.exists(model_dir):
+        print(f"Downloading model to {model_dir} (first run only, ~500MB)...", file=sys.stderr)
+    
     classifier = EncoderClassifier.from_hparams(
         source="speechbrain/spkrec-ecapa-voxceleb",
-        savedir="tmp/spkrec-ecapa-voxceleb",
+        savedir=model_dir,
         run_opts={"device": "cpu"}  # SpeechBrain works best on CPU
     )
     

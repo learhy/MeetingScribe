@@ -356,13 +356,13 @@ class NotesGenerationService {
         switch notesConfig.provider {
         case "openai":
             let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: notesConfig.openai.apiKeyKeychainItem
+                forKey: "openai.apiKey"
             )
             return OpenAIProvider(apiKey: apiKey, model: notesConfig.openai.model, timeoutSeconds: timeoutSeconds)
             
         case "anthropic":
             let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: notesConfig.anthropic.apiKeyKeychainItem
+                forKey: "anthropic.apiKey"
             )
             return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model, timeoutSeconds: timeoutSeconds)
             
@@ -372,7 +372,7 @@ class NotesGenerationService {
         default:
             logger.warning("Unknown provider '\(notesConfig.provider)', falling back to Anthropic")
             let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: notesConfig.anthropic.apiKeyKeychainItem
+                forKey: "anthropic.apiKey"
             )
             return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model, timeoutSeconds: timeoutSeconds)
         }

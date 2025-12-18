@@ -7,7 +7,7 @@ This guide explains how to build, package, and distribute MeetingScribe.
 ### Installation
 
 #### Option 1: From DMG (Recommended)
-1. Download `MeetingScribe-X.X.dmg`
+1. Download `MeetingScribe-X.X.dmg` (~2GB)
 2. Open the DMG file
 3. Drag `MeetingScribe.app` to the `Applications` folder
 4. Eject the DMG
@@ -15,6 +15,8 @@ This guide explains how to build, package, and distribute MeetingScribe.
 6. Grant permissions when prompted:
    - Screen Recording (required)
    - Microphone (optional, for local audio track)
+
+**Note**: Python and all ML dependencies are bundled. No manual installation required! On first use of speaker diarization, ML models (~500MB) will be automatically downloaded to `~/.meetingscribe/cache/models/`.
 
 #### Option 2: From ZIP
 1. Download and extract `MeetingScribe-X.X.zip`
