@@ -44,6 +44,9 @@ cp scripts/requirements-diarization.txt "$APP_DIR/Contents/Resources/scripts/"
 # Copy CLI control script to Resources (for optional installation)
 cp scripts/meetingscribe-ctl.sh "$APP_DIR/Contents/Resources/scripts/"
 
+# Copy uninstall script to Resources (for clean uninstallation)
+cp scripts/uninstall.sh "$APP_DIR/Contents/Resources/scripts/"
+
 # Make bundled Python executable
 chmod +x "$APP_DIR/Contents/Resources/python/bin/python3"
 

@@ -112,6 +112,22 @@ Control Commands (after installation):
   meetingscribe-ctl start    - Start daemon
   meetingscribe-ctl restart  - Restart daemon
   meetingscribe-ctl logs     - View logs
+
+Uninstallation:
+To completely remove MeetingScribe and reset all permissions, run:
+  /Applications/MeetingScribe.app/Contents/Resources/scripts/uninstall.sh
+
+This will remove:
+- The app bundle
+- LaunchAgent daemon
+- CLI tool
+- Privacy permissions (Screen Recording, Notifications)
+- App preferences
+
+Optional cleanup after uninstall:
+  rm -rf ~/.meetingscribe              # Remove config
+  rm -rf ~/Documents/MeetingScribe     # Remove recordings
+  rm -rf ~/Library/Logs/MeetingScribe  # Remove logs
 EOF
 
 # Create DMG using hdiutil
