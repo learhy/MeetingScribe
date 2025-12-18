@@ -106,8 +106,8 @@ class TestBundledPython:
             assert result.returncode == 0, f"Failed to import {dep}: {result.stderr}"
             assert "OK" in result.stdout, f"Import {dep} did not print OK"
     
-    def test_diarization_end_to_end(self, bundle_python, tmp_path):
-        """Test full diarization pipeline with bundled Python"""
+    def test_diarization_synthetic_audio(self, bundle_python, tmp_path):
+        """Test diarization pipeline with synthetic audio (smoke test)"""
         import subprocess
         import numpy as np
         import soundfile as sf
@@ -160,6 +160,76 @@ class TestBundledPython:
         assert "segments" in data
         assert data["num_speakers"] >= 1
         assert len(data["speakers"]) >= 1
+    
+    def test_diarization_real_audio(self, bundle_python):
+        """Test full diarization pipeline with real meeting audio"""
+        import subprocess
+        import tempfile
+        
+        # Use real meeting audio fixture (30-second clip)
+        fixture_path = Path(__file__).parent / "fixtures/test_meeting_30sec.wav"
+        
+        if not fixture_path.exists():
+            pytest.skip("Real audio fixture not found. Run: make test-fixtures")
+        
+        # Run diarization on real audio
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            output_file = f.name
+        
+        try:
+            script_path = Path(__file__).parent.parent / "scripts/diarize_audio_fast.py"
+            
+            result = subprocess.run(
+                [
+                    bundle_python,
+                    str(script_path),
+                    str(fixture_path),
+                    "--whisper-model", "tiny",
+                    "--distance-threshold", "0.90",
+                    "--output", output_file
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180  # 3 minutes for 30-second real audio
+            )
+            
+            # Check it completed
+            assert result.returncode == 0, f"Diarization failed: {result.stderr}"
+            
+            # Check output file and validate content
+            with open(output_file) as f:
+                data = json.load(f)
+            
+            # Real audio should have proper structure
+            assert "num_speakers" in data
+            assert "speakers" in data
+            assert "segments" in data
+            assert "audio_file" in data
+            
+            # Should detect at least 1 speaker
+            assert data["num_speakers"] >= 1, f"No speakers detected"
+            assert len(data["speakers"]) >= 1
+            
+            # Should have transcribed segments
+            assert len(data["segments"]) > 0, "No segments in output"
+            
+            # Each segment should have required fields
+            for seg in data["segments"]:
+                assert "start" in seg
+                assert "end" in seg
+                assert "speaker" in seg
+                assert "text" in seg
+                assert seg["end"] > seg["start"], "Invalid segment timing"
+                assert len(seg["text"]) > 0, "Empty transcription"
+            
+            # Print summary for debugging
+            print(f"\n✓ Real audio test: {data['num_speakers']} speakers, {len(data['segments'])} segments")
+            
+        finally:
+            # Clean up temp file
+            import os
+            if os.path.exists(output_file):
+                os.unlink(output_file)
 
 
 class TestSwiftIntegration:
