@@ -240,14 +240,24 @@ fi
 TEMPLATE_FILE="$HOME/.meetingscribe/templates/default.md"
 if [ ! -f "$TEMPLATE_FILE" ]; then
     cat > "$TEMPLATE_FILE" << 'EOF'
-# {{title}}
+# {title}
 
-**Date:** {{date}}
-**Duration:** {{duration}}
+**Date:** {date}
+**Time:** {time}
+**Duration:** {duration}
 
-## Transcript
+## Summary
+{summary}
 
-{{transcript}}
+## Notes
+{notes}
+
+## Full Transcript
+{transcript}
+
+---
+*Generated automatically by MeetingScribe*
+*Audio: {audio_file}*
 EOF
     log "Default template created at $TEMPLATE_FILE"
 fi

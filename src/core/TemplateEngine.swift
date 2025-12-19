@@ -21,6 +21,7 @@ class TemplateEngine {
     
     func render(noteData: NoteData) throws -> String {
         let template = try loadTemplate()
+        validateTemplate(template)
         return substituteVariables(template: template, data: noteData)
     }
     
@@ -37,6 +38,34 @@ class TemplateEngine {
         } catch {
             logger.warning("Failed to load template, using default")
             return defaultTemplate
+        }
+    }
+    
+    private func validateTemplate(_ template: String) {
+        let requiredPlaceholders = ["{notes}", "{summary}"]
+        let recommendedPlaceholders = ["{title}", "{date}", "{transcript}"]
+        
+        var missingRequired: [String] = []
+        var missingRecommended: [String] = []
+        
+        for placeholder in requiredPlaceholders {
+            if !template.contains(placeholder) {
+                missingRequired.append(placeholder)
+            }
+        }
+        
+        for placeholder in recommendedPlaceholders {
+            if !template.contains(placeholder) {
+                missingRecommended.append(placeholder)
+            }
+        }
+        
+        if !missingRequired.isEmpty {
+            logger.warning("Template is missing REQUIRED placeholders: \(missingRequired.joined(separator: ", ")). Generated notes will not be included!")
+        }
+        
+        if !missingRecommended.isEmpty {
+            logger.info("Template is missing recommended placeholders: \(missingRecommended.joined(separator: ", "))")
         }
     }
     
