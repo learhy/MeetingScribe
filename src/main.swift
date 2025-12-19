@@ -12,9 +12,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = DualLogger(category: "MeetingScribe")
     private var menuBarController: MenuBarController?
     private var meetingScribeService: MeetingScribeService?
+    private var wasFirstRun = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("MeetingScribe starting...")
+        
+        // Run first-run installer if needed
+        // This handles installation from any location (DMG, Downloads, etc.)
+        if FirstRunInstaller.needsInstallation() {
+            logger.info("First run detected - running installer")
+            wasFirstRun = true
+            
+            // Run installer synchronously on first run
+            // The installer will handle moving the app if needed and setting everything up
+            let success = FirstRunInstaller.runInstaller()
+            
+            if !success {
+                logger.error("Installation failed or was cancelled")
+                // Installer will have shown appropriate error messages
+                NSApp.terminate(nil)
+                return
+            }
+            
+            logger.info("Installation completed successfully")
+            
+            // IMPORTANT: The installer starts a LaunchAgent which will launch another instance
+            // We need to exit THIS instance to avoid duplicates
+            // The LaunchAgent instance will request permissions and show completion dialog
+            logger.info("Exiting installer instance - LaunchAgent will take over")
+            
+            // Give the LaunchAgent a moment to start
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                NSApp.terminate(nil)
+            }
+            return
+        }
         
         // Activate the app so menu bar icon appears
         NSApp.setActivationPolicy(.accessory)
@@ -91,6 +123,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Permissions OK - start service
         await meetingScribeService?.run()
+        
+        // If this was a first run (LaunchAgent instance), show completion dialog now
+        // Check if this is shortly after installation
+        let installMarkerPath = "\(NSHomeDirectory())/.meetingscribe/.installed"
+        if let installDate = try? FileManager.default.attributesOfItem(atPath: installMarkerPath)[.creationDate] as? Date {
+            let secondsSinceInstall = Date().timeIntervalSince(installDate)
+            // If installed in last 30 seconds, this is the first LaunchAgent launch
+            if secondsSinceInstall < 30 {
+                logger.info("First LaunchAgent launch after installation - showing completion dialog")
+                DispatchQueue.main.async {
+                    FirstRunInstaller.showCompletionDialogPublic()
+                }
+            }
+        }
     }
     
     private func requestPermissions() {
@@ -224,6 +270,7 @@ class MeetingScribeService {
     private var micPermissionGranted = false
     private var autoRecordingEnabled = true
     private var isCancelled = false
+    private var configFileMonitor: DispatchSourceFileSystemObject?
     
     var onStateChanged: ((RecordingState) -> Void)?
     var onAutoRecordingChanged: ((Bool) -> Void)?
@@ -263,6 +310,15 @@ class MeetingScribeService {
             return
         }
         
+        // Check API key configuration
+        if !validateAPIKeyConfiguration() {
+            logger.warning("LLM provider API key not configured - entering config error state")
+            onStateChanged?(.configError)
+            // Start watching config file for changes
+            startConfigFileWatcher()
+            return
+        }
+        
         // Store mic permission status
         micPermissionGranted = perms.micGranted
 
@@ -279,6 +335,7 @@ class MeetingScribeService {
         logger.info("Service stopping...")
         isRunning = false
         audioCapture?.stopCapture()
+        stopConfigFileWatcher()
     }
     
     func startManualRecording() {
@@ -309,6 +366,75 @@ class MeetingScribeService {
         if !autoRecordingEnabled && currentRecordingStartTime != nil {
             logger.info("Cancelling current recording due to auto-recording disable")
             cancelCurrentRecording()
+        }
+    }
+    
+    private func startConfigFileWatcher() {
+        let configPath = "\(NSHomeDirectory())/.meetingscribe/config.json"
+        
+        let fileDescriptor = open(configPath, O_EVTONLY)
+        
+        if fileDescriptor == -1 {
+            logger.warning("Could not open config file for monitoring")
+            return
+        }
+        
+        let queue = DispatchQueue(label: "com.meetingscribe.config-monitor")
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fileDescriptor,
+            eventMask: .write,
+            queue: queue
+        )
+        
+        source.setEventHandler { [weak self] in
+            self?.logger.info("Config file changed - rechecking API key configuration")
+            
+            // Reload config
+            self?.config.reload()
+            
+            // Re-validate
+            if let self = self, self.validateAPIKeyConfiguration() {
+                self.logger.info("API key now configured! Starting service...")
+                
+                // Stop watching
+                self.stopConfigFileWatcher()
+                
+                // Start the service
+                Task {
+                    await self.run()
+                }
+            }
+        }
+        
+        source.setCancelHandler {
+            close(fileDescriptor)
+        }
+        
+        configFileMonitor = source
+        source.resume()
+        
+        logger.info("Started monitoring config file for changes")
+    }
+    
+    private func stopConfigFileWatcher() {
+        configFileMonitor?.cancel()
+        configFileMonitor = nil
+    }
+    
+    private func validateAPIKeyConfiguration() -> Bool {
+        let llmConfig = config.config.notes.llm
+        
+        switch llmConfig.provider {
+        case "openai":
+            return !llmConfig.openai.apiKey.isEmpty
+        case "anthropic":
+            return !llmConfig.anthropic.apiKey.isEmpty
+        case "ollama":
+            // Ollama doesn't require API key
+            return true
+        default:
+            // Unknown provider, default to anthropic validation
+            return !llmConfig.anthropic.apiKey.isEmpty
         }
     }
     

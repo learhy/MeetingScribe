@@ -31,7 +31,24 @@ print_usage() {
 check_installed() {
     if [ ! -f "$PLIST" ]; then
         echo -e "${RED}❌ MeetingScribe is not installed${NC}"
-        echo "Run: ./scripts/install.sh"
+        echo ""
+        echo "Installation options:"
+        echo "  1. Launch MeetingScribe.app from /Applications (recommended)"
+        echo "     The first-run installer will set everything up automatically."
+        echo ""
+        echo "  2. Or manually run from source:"
+        echo "     cd /path/to/meeting-scribe && ./scripts/install.sh"
+        echo ""
+        
+        # Check if app exists and suggest launching it
+        if [ -d "/Applications/MeetingScribe.app" ]; then
+            echo "App found at: /Applications/MeetingScribe.app"
+            echo "Run: open /Applications/MeetingScribe.app"
+        elif [ -d "$HOME/Applications/MeetingScribe.app" ]; then
+            echo "App found at: $HOME/Applications/MeetingScribe.app"
+            echo "Run: open '$HOME/Applications/MeetingScribe.app'"
+        fi
+        
         exit 1
     fi
 }

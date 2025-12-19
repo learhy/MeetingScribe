@@ -17,7 +17,20 @@ Instead of a wall of undifferentiated text.
 
 ## Requirements
 
-### 1. Python 3.9 or Later
+### For End Users (Distribution Version)
+
+**No manual setup required!** If you installed MeetingScribe from a DMG/release:
+- Python 3.11 and all ML dependencies are bundled in the app
+- ML models (~500MB) download automatically on first use to `~/.meetingscribe/cache/models/`
+- Just enable diarization in your config and it works!
+
+Skip to the [Configuration](#configuration) section below.
+
+### For Developers (Building from Source)
+
+If you're building MeetingScribe from source:
+
+#### 1. Python 3.9 or Later
 
 Check if you have Python installed:
 
@@ -31,21 +44,22 @@ If not installed, download from [python.org](https://www.python.org/downloads/) 
 brew install python3
 ```
 
-### 2. Install Python Dependencies
+#### 2. Build Python Bundle
 
-Navigate to the MeetingScribe directory and install the required packages:
+The build script automatically creates a bundled Python environment:
 
 ```bash
-cd ~/My\ Drive/software_projects/meeting-scribe
-pip3 install -r scripts/requirements-diarization.txt
+./scripts/bundle-python-env.sh  # Creates build/python-bundle/
+./scripts/build-and-sign.sh      # Bundles Python into app
 ```
 
-This will install:
+This installs:
 - PyTorch (with Mac Metal/MPS support)
-- pyannote.audio (speaker diarization models)
+- SpeechBrain (speaker embeddings)
+- scikit-learn (clustering)
 - openai-whisper (speech recognition)
 
-**Note:** The initial installation downloads several GB of models. Be patient!
+**Note:** Initial bundle creation takes 5-10 minutes and downloads ~2GB of packages.
 
 ### 3. HuggingFace Account Setup
 

@@ -168,4 +168,20 @@ class ConfigManager {
         let expandedPath = nsPath.expandingTildeInPath
         return URL(fileURLWithPath: expandedPath)
     }
+    
+    // MARK: - Bundled Python Detection
+    
+    /// Returns the path to bundled Python if it exists in the app bundle
+    var bundledPythonPath: String? {
+        guard let resourcePath = Bundle.main.resourcePath else { return nil }
+        let pythonPath = "\(resourcePath)/python/bin/python3"
+        return FileManager.default.fileExists(atPath: pythonPath) ? pythonPath : nil
+    }
+    
+    /// Returns the path to bundled diarization script if it exists in the app bundle
+    var bundledScriptPath: String? {
+        guard let resourcePath = Bundle.main.resourcePath else { return nil }
+        let scriptPath = "\(resourcePath)/scripts/diarize_audio_fast.py"
+        return FileManager.default.fileExists(atPath: scriptPath) ? scriptPath : nil
+    }
 }

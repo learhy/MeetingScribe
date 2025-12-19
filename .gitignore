@@ -50,9 +50,24 @@ config.local.json
 # Recordings and transcripts (large files)
 recordings/
 *.wav
+# BUT keep test fixtures
+!tests/fixtures/*.wav
 *.txt
 *.md.bak
 
 # macOS specific
 *.xcworkspace
-DISTRIBUTION.md
+
+# Internal documentation (dev/QA only, not for end users)
+**/INTERNAL*.md
+*.md.old
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Keep user-facing docs but exclude these internal ones:
+# tests/README.md is tracked (for integration team)
+# BUNDLED_PYTHON.md is tracked (for developers)
+# But exclude working notes and old versions

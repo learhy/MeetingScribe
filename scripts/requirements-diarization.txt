@@ -1,16 +1,21 @@
-# Requirements for speaker diarization
+# Speaker Diarization Requirements for MeetingScribe
 # Install with: pip install -r requirements-diarization.txt
 
-# PyTorch - Use official installation command for your platform
-# For Mac with Metal (MPS): pip3 install torch torchvision torchaudio
-# For CUDA GPU: See https://pytorch.org/get-started/locally/
-torch>=2.0.0
+# Core dependencies
+# Pin to stable versions - PyTorch 2.9+ has compatibility issues
+torch>=2.0.0,<2.9.0
+torchaudio>=2.0.0,<2.9.0
+openai-whisper>=20231117
 
-# Speaker diarization
-pyannote.audio>=3.1.0
+# Fast diarization with SpeechBrain
+speechbrain>=1.0.0
+scikit-learn>=1.0.0
 
-# Speech recognition
-openai-whisper>=20230314
+# Audio backend for standalone Python (soundfile provides audio loading)
+soundfile>=0.12.0
 
-# Audio processing (required by pyannote)
-torchaudio>=2.0.0
+# HuggingFace Hub - pin to <1.0 for speechbrain 1.0.x compatibility
+huggingface-hub>=0.19.0,<1.0
+
+# Audio processing
+numpy>=1.20.0

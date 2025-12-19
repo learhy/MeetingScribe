@@ -305,8 +305,25 @@ class TranscriptionService {
     func transcribeWithDiarization(audioFileURL: URL) async throws -> DiarizedTranscript {
         let diarizationConfig = config.config.transcription.diarization
         
-        let pythonPath = diarizationConfig.pythonPath
-        let scriptPath = config.expandPath(diarizationConfig.scriptPath)
+        // Try bundled Python first, fall back to config
+        let pythonPath: String
+        if let bundled = config.bundledPythonPath {
+            pythonPath = bundled
+            logger.info("Using bundled Python at: \(bundled)")
+        } else {
+            pythonPath = diarizationConfig.pythonPath
+            logger.info("Using system Python: \(pythonPath)")
+        }
+        
+        // Try bundled script first, fall back to config
+        let scriptPath: URL
+        if let bundled = config.bundledScriptPath {
+            scriptPath = URL(fileURLWithPath: bundled)
+            logger.info("Using bundled diarization script")
+        } else {
+            scriptPath = config.expandPath(diarizationConfig.scriptPath)
+            logger.info("Using diarization script from config: \(scriptPath.path)")
+        }
         
         // Verify script exists
         guard FileManager.default.fileExists(atPath: scriptPath.path) else {

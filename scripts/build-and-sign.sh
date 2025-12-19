@@ -22,6 +22,49 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp .build/release/meetingscribe "$APP_DIR/Contents/MacOS/meetingscribe"
 cp Info.plist "$APP_DIR/Contents/Info.plist"
 
+# Copy app icon
+if [ -f "resources/AppIcon.icns" ]; then
+    cp resources/AppIcon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
+    echo "✅ App icon copied"
+else
+    echo "⚠️  Warning: AppIcon.icns not found at resources/AppIcon.icns"
+fi
+
+# Bundle Python environment
+echo "Bundling Python environment..."
+if [ ! -d "build/python-bundle" ]; then
+    echo "Python bundle not found, creating it (this may take 5-10 minutes)..."
+    ./scripts/bundle-python-env.sh
+else
+    echo "Using existing Python bundle (run ./scripts/bundle-python-env.sh to rebuild)"
+fi
+
+# Copy Python bundle to app Resources
+echo "Copying Python bundle to app..."
+mkdir -p "$APP_DIR/Contents/Resources"
+cp -R build/python-bundle "$APP_DIR/Contents/Resources/python"
+
+# Copy diarization script to Resources
+mkdir -p "$APP_DIR/Contents/Resources/scripts"
+cp scripts/diarize_audio_fast.py "$APP_DIR/Contents/Resources/scripts/"
+cp scripts/requirements-diarization.txt "$APP_DIR/Contents/Resources/scripts/"
+
+# Copy CLI control script to Resources (for optional installation)
+cp scripts/meetingscribe-ctl.sh "$APP_DIR/Contents/Resources/scripts/"
+
+# Copy uninstall script to Resources (for clean uninstallation)
+cp scripts/uninstall.sh "$APP_DIR/Contents/Resources/scripts/"
+
+# Copy reset-permissions script
+cp scripts/reset-permissions.sh "$APP_DIR/Contents/Resources/scripts/"
+
+# Embed first-run installer and all supporting scripts
+echo "Embedding first-run installer..."
+./scripts/embed-installer.sh "$APP_DIR"
+
+# Make bundled Python executable
+chmod +x "$APP_DIR/Contents/Resources/python/bin/python3"
+
 echo "✅ Build complete: build/meetingscribe"
 echo "✅ App bundle ready: $APP_DIR"
 

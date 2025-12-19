@@ -355,15 +355,17 @@ class NotesGenerationService {
         
         switch notesConfig.provider {
         case "openai":
-            let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: notesConfig.openai.apiKeyKeychainItem
-            )
+            let apiKey = notesConfig.openai.apiKey
+            guard !apiKey.isEmpty else {
+                throw NotesGenerationError.apiError("OpenAI API key not configured in ~/.meetingscribe/config.json")
+            }
             return OpenAIProvider(apiKey: apiKey, model: notesConfig.openai.model, timeoutSeconds: timeoutSeconds)
             
         case "anthropic":
-            let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: notesConfig.anthropic.apiKeyKeychainItem
-            )
+            let apiKey = notesConfig.anthropic.apiKey
+            guard !apiKey.isEmpty else {
+                throw NotesGenerationError.apiError("Anthropic API key not configured in ~/.meetingscribe/config.json")
+            }
             return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model, timeoutSeconds: timeoutSeconds)
             
         case "ollama":
@@ -371,9 +373,10 @@ class NotesGenerationService {
             
         default:
             logger.warning("Unknown provider '\(notesConfig.provider)', falling back to Anthropic")
-            let apiKey = try SecretsManager.shared.retrieveSecret(
-                forKey: notesConfig.anthropic.apiKeyKeychainItem
-            )
+            let apiKey = notesConfig.anthropic.apiKey
+            guard !apiKey.isEmpty else {
+                throw NotesGenerationError.apiError("Anthropic API key not configured in ~/.meetingscribe/config.json")
+            }
             return AnthropicProvider(apiKey: apiKey, model: notesConfig.anthropic.model, timeoutSeconds: timeoutSeconds)
         }
     }
