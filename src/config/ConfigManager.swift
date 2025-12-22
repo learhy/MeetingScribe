@@ -102,6 +102,9 @@ class ConfigManager {
     private let configPath: URL
     private(set) var config: AppConfiguration
     
+    /// Callback triggered when configuration is saved
+    var onConfigChanged: (() -> Void)?
+    
     private init() {
         // Config file path
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
@@ -156,6 +159,7 @@ class ConfigManager {
     func save() {
         Self.saveConfig(config, to: configPath)
         logger.info("Configuration saved")
+        onConfigChanged?()
     }
     
     func updateAutoRecordingEnabled(_ enabled: Bool) {
@@ -183,5 +187,40 @@ class ConfigManager {
         guard let resourcePath = Bundle.main.resourcePath else { return nil }
         let scriptPath = "\(resourcePath)/scripts/diarize_audio_fast.py"
         return FileManager.default.fileExists(atPath: scriptPath) ? scriptPath : nil
+    }
+    
+    // MARK: - Validation Helpers
+    
+    /// Check if at least one LLM provider has a valid API key
+    func hasValidLLMProvider() -> Bool {
+        switch config.notes.llm.provider {
+        case "openai":
+            return !config.notes.llm.openai.apiKey.isEmpty
+        case "anthropic":
+            return !config.notes.llm.anthropic.apiKey.isEmpty
+        case "ollama":
+            return !config.notes.llm.ollama.endpoint.isEmpty
+        default:
+            return false
+        }
+    }
+    
+    /// Get the currently active LLM provider configuration
+    func getActiveLLMProvider() -> (name: String, hasKey: Bool) {
+        let provider = config.notes.llm.provider
+        let hasKey: Bool
+        
+        switch provider {
+        case "openai":
+            hasKey = !config.notes.llm.openai.apiKey.isEmpty
+        case "anthropic":
+            hasKey = !config.notes.llm.anthropic.apiKey.isEmpty
+        case "ollama":
+            hasKey = !config.notes.llm.ollama.endpoint.isEmpty
+        default:
+            hasKey = false
+        }
+        
+        return (provider, hasKey)
     }
 }
