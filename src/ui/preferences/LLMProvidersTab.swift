@@ -126,6 +126,9 @@ class LLMProvidersTab: BasePreferencesTab {
         
         anthropicModelPopup = NSPopUpButton(frame: NSRect(x: 90, y: yPos - 2, width: 250, height: 25), pullsDown: false)
         anthropicModelPopup.addItems(withTitles: [
+            "claude-3-7-sonnet-latest",
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
             "claude-opus-4-20250514",
             "claude-sonnet-4-5-20250514",
             "claude-3-7-sonnet-20250219",
@@ -164,11 +167,12 @@ class LLMProvidersTab: BasePreferencesTab {
         
         openaiModelPopup = NSPopUpButton(frame: NSRect(x: 90, y: yPos - 2, width: 250, height: 25), pullsDown: false)
         openaiModelPopup.addItems(withTitles: [
+            "gpt-4o-latest",
+            "gpt-4o-mini-latest",
             "gpt-4o",
             "gpt-4o-mini",
             "gpt-4-turbo",
-            "gpt-4",
-            "gpt-3.5-turbo"
+            "gpt-4"
         ])
         openaiModelPopup.target = self
         openaiModelPopup.action = #selector(fieldChanged)
