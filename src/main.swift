@@ -15,12 +15,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var wasFirstRun = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        logger.info("MeetingScribe starting...")
+        let processId = ProcessInfo.processInfo.processIdentifier
+        let bundlePath = Bundle.main.bundlePath
+        logger.info("MeetingScribe starting... (PID: \(processId), Path: \(bundlePath))")
         
         // Run first-run installer if needed
         // This handles installation from any location (DMG, Downloads, etc.)
-        if FirstRunInstaller.needsInstallation() {
-            logger.info("First run detected - running installer")
+        let needsInstall = FirstRunInstaller.needsInstallation()
+        logger.info("Installation check: needsInstallation=\(needsInstall)")
+        
+        if needsInstall {
+            logger.info("First run detected - running installer (PID: \(processId))")
             wasFirstRun = true
             
             // Run installer synchronously on first run
@@ -28,23 +33,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let success = FirstRunInstaller.runInstaller()
             
             if !success {
-                logger.error("Installation failed or was cancelled")
+                logger.error("Installation failed or was cancelled (PID: \(processId))")
                 // Installer will have shown appropriate error messages
                 NSApp.terminate(nil)
                 return
             }
             
-            logger.info("Installation completed successfully")
+            logger.info("Installation completed successfully (PID: \(processId))")
+            logger.info("LaunchAgent has been bootstrapped and will start new instance")
             
             // IMPORTANT: The installer starts a LaunchAgent which will launch another instance
             // We need to exit THIS instance immediately to avoid showing duplicate dialogs
             // The LaunchAgent instance will request permissions and show completion dialog
-            logger.info("Exiting installer instance immediately - LaunchAgent will take over")
+            logger.info("Exiting installer instance immediately (PID: \(processId)) - LaunchAgent will take over")
             
             // Use exit() instead of NSApp.terminate() to ensure immediate termination
             // NSApp.terminate() is asynchronous and may allow code to continue
+            logger.info("Calling exit(0) now...")
             exit(0)
         }
+        
+        // This is the LaunchAgent instance (not the installer)
+        logger.info("Proceeding with normal startup (LaunchAgent instance, PID: \(processId))")
         
         // Activate the app so menu bar icon appears
         NSApp.setActivationPolicy(.accessory)
@@ -105,8 +115,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startWithPermissionCheck() async {
+        let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("startWithPermissionCheck() called (PID: \(processId))")
+        
         let permissionChecker = PermissionChecker()
         let perms = await permissionChecker.checkPermissions()
+        logger.info("Permission check result: screenGranted=\(perms.screenGranted), micGranted=\(perms.microphoneGranted)")
         
         if !perms.screenGranted {
             logger.warning("Screen recording permission not granted - entering disabled state")
@@ -125,15 +139,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If this was a first run (LaunchAgent instance), show completion dialog now
         // Check if this is shortly after installation
         let installMarkerPath = "\(NSHomeDirectory())/.meetingscribe/.installed"
-        if let installDate = try? FileManager.default.attributesOfItem(atPath: installMarkerPath)[.creationDate] as? Date {
-            let secondsSinceInstall = Date().timeIntervalSince(installDate)
-            // If installed in last 30 seconds, this is the first LaunchAgent launch
-            if secondsSinceInstall < 30 {
-                logger.info("First LaunchAgent launch after installation - showing completion dialog")
-                DispatchQueue.main.async {
-                    FirstRunInstaller.showCompletionDialogPublic()
+        logger.info("Checking if completion dialog should be shown...")
+        
+        if FileManager.default.fileExists(atPath: installMarkerPath) {
+            if let installDate = try? FileManager.default.attributesOfItem(atPath: installMarkerPath)[.creationDate] as? Date {
+                let secondsSinceInstall = Date().timeIntervalSince(installDate)
+                logger.info("Install marker found, created \(secondsSinceInstall) seconds ago")
+                
+                // If installed in last 30 seconds, this is the first LaunchAgent launch
+                if secondsSinceInstall < 30 {
+                    logger.info("First LaunchAgent launch after installation (PID: \(processId)) - showing completion dialog")
+                    DispatchQueue.main.async {
+                        FirstRunInstaller.showCompletionDialogPublic()
+                    }
+                } else {
+                    logger.info("Install marker is too old (\(secondsSinceInstall)s), not showing completion dialog")
                 }
+            } else {
+                logger.warning("Could not read install marker creation date")
             }
+        } else {
+            logger.info("No install marker found at \(installMarkerPath)")
         }
     }
     

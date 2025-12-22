@@ -9,33 +9,44 @@ class FirstRunInstaller {
     
     /// Check if the first-run installer needs to run
     static func needsInstallation() -> Bool {
+        let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("[PID \(processId)] needsInstallation() called")
+        logger.info("[PID \(processId)] Checking for marker at: \(installMarkerPath)")
+        
         // Check if installation marker exists
         if FileManager.default.fileExists(atPath: installMarkerPath) {
+            logger.info("[PID \(processId)] Installation marker found")
             // Check if app location has changed
             if let installedPath = try? String(contentsOfFile: installMarkerPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) {
                 let currentPath = Bundle.main.bundlePath
+                logger.info("[PID \(processId)] Installed path: \(installedPath)")
+                logger.info("[PID \(processId)] Current path: \(currentPath)")
                 if installedPath != currentPath {
-                    logger.info("App location changed from \(installedPath) to \(currentPath)")
+                    logger.info("[PID \(processId)] App location changed - installation needed")
                     return true
                 }
+                logger.info("[PID \(processId)] App location unchanged - no installation needed")
             }
             return false
         }
         
-        logger.info("First run detected - installation marker not found")
+        logger.info("[PID \(processId)] Installation marker not found - first run detected")
         return true
     }
     
     /// Run the first-run installer script
     /// Returns true if installation completed successfully or was already done
     static func runInstaller() -> Bool {
+        let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("[PID \(processId)] runInstaller() called")
+        
         // Check if we actually need to install
         if !needsInstallation() {
-            logger.info("Installation not needed - already installed")
+            logger.info("[PID \(processId)] Installation not needed - already installed")
             return true
         }
         
-        logger.info("Running first-run installer...")
+        logger.info("[PID \(processId)] Running first-run installer...")
         
         let bundlePath = Bundle.main.bundlePath
         
@@ -204,6 +215,9 @@ class FirstRunInstaller {
     }
     
     private static func showCompletionDialog() {
+        let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("[PID \(processId)] showCompletionDialog() called - displaying Installation Complete dialog")
+        
         // This is called after permissions are granted
         let alert = NSAlert()
         alert.messageText = "✅ Installation Complete!"
