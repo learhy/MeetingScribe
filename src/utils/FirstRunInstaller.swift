@@ -86,20 +86,45 @@ class FirstRunInstaller {
             try process.run()
             process.waitUntilExit()
             
-            // Log output
+            // Log output (always log, even if empty)
             if let outputData = try? outputPipe.fileHandleForReading.readToEnd(),
                let output = String(data: outputData, encoding: .utf8) {
-                logger.info("Installer output: \(output)")
+                if !output.isEmpty {
+                    logger.info("Installer output: \(output)")
+                } else {
+                    logger.warning("Installer produced no stdout output")
+                }
             }
             
             if let errorData = try? errorPipe.fileHandleForReading.readToEnd(),
-               let errorOutput = String(data: errorData, encoding: .utf8),
-               !errorOutput.isEmpty {
-                logger.warning("Installer stderr: \(errorOutput)")
+               let errorOutput = String(data: errorData, encoding: .utf8) {
+                if !errorOutput.isEmpty {
+                    logger.warning("Installer stderr: \(errorOutput)")
+                } else {
+                    logger.info("Installer produced no stderr output")
+                }
             }
             
             if process.terminationStatus == 0 {
                 logger.info("Installer completed successfully")
+                
+                // Verify installation artifacts exist
+                let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/com.meetingscribe.daemon.plist"
+                let configPath = "\(NSHomeDirectory())/.meetingscribe/config.json"
+                
+                if !FileManager.default.fileExists(atPath: plistPath) {
+                    logger.error("Installation verification failed: plist not found at \(plistPath)")
+                    showError("Installation incomplete: LaunchAgent plist file was not created. Please check logs and try again.")
+                    return false
+                }
+                
+                if !FileManager.default.fileExists(atPath: configPath) {
+                    logger.error("Installation verification failed: config not found at \(configPath)")
+                    showError("Installation incomplete: Configuration file was not created. Please check logs and try again.")
+                    return false
+                }
+                
+                logger.info("Installation verification passed")
                 // Don't show completion dialog here - wait for permissions first
                 // The service will show it after permissions are granted
                 return true

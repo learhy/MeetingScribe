@@ -5,6 +5,7 @@
 # It handles the complete installation: permissions, LaunchAgent, CLI tools, etc.
 
 set -e
+set -o pipefail  # Ensure piped commands propagate failures
 
 BUNDLE_ID="com.meetingscribe.daemon"
 APP_PATH="$1"  # Passed by the main binary
@@ -180,6 +181,13 @@ cat > "$PLIST" << EOF
 EOF
 
 chmod 644 "$PLIST"
+
+# Verify plist was created successfully
+if [ ! -f "$PLIST" ]; then
+    log "ERROR: Failed to create plist file at $PLIST"
+    exit 1
+fi
+
 log "LaunchAgent plist created at $PLIST"
 
 #
@@ -278,19 +286,46 @@ log "Step 7: Starting MeetingScribe daemon..."
 
 # Bootstrap the LaunchAgent
 DOMAIN="gui/$(id -u)"
-launchctl bootstrap "$DOMAIN" "$PLIST" 2>&1 | logger -t "MeetingScribe"
+log "Bootstrapping LaunchAgent to domain $DOMAIN"
+
+if launchctl bootstrap "$DOMAIN" "$PLIST" 2>&1 | tee >(logger -t "MeetingScribe") ; then
+    log "LaunchAgent bootstrapped successfully"
+else
+    BOOTSTRAP_EXIT=$?
+    log "WARNING: launchctl bootstrap failed with exit code $BOOTSTRAP_EXIT (may already be loaded)"
+    # Try to kickstart it anyway in case it's already loaded
+fi
 
 # Give it a moment to start
 sleep 2
 
 # Kickstart to ensure it's running
-launchctl kickstart -k "$DOMAIN/com.meetingscribe.daemon" 2>&1 | logger -t "MeetingScribe"
+log "Kickstarting daemon"
+if launchctl kickstart -k "$DOMAIN/com.meetingscribe.daemon" 2>&1 | tee >(logger -t "MeetingScribe") ; then
+    log "Daemon kickstarted successfully"
+else
+    log "WARNING: launchctl kickstart returned error (daemon may still be starting)"
+fi
 
 log "Daemon started"
 
 #
-# Step 8: Write installation marker
+# Step 8: Verify installation and write marker
 #
+log "Verifying installation..."
+
+# Verify critical files exist
+if [ ! -f "$PLIST" ]; then
+    log "ERROR: Installation verification failed - plist not found at $PLIST"
+    exit 1
+fi
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    log "ERROR: Installation verification failed - config not found at $CONFIG_FILE"
+    exit 1
+fi
+
+log "Installation verification passed"
 echo "$APP_PATH" > "$INSTALL_MARKER"
 log "Installation marker written to $INSTALL_MARKER"
 
