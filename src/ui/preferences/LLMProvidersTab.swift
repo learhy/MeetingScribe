@@ -242,26 +242,93 @@ class LLMProvidersTab: BasePreferencesTab {
     }
     
     @objc private func testAnthropic() {
-        showTestResult(message: "Testing Anthropic API connection...")
-        // TODO: Implement actual API test
+        let apiKey = anthropicApiKeyField.stringValue
+        let model = anthropicModelPopup.titleOfSelectedItem ?? "claude-3-5-sonnet-20241022"
+        
+        guard !apiKey.isEmpty else {
+            showTestResult(success: false, message: "Please enter an API key first")
+            return
+        }
+        
+        // Disable button during test
+        anthropicTestButton.isEnabled = false
+        anthropicTestButton.title = "Testing..."
+        
+        Task {
+            let result = await testAnthropicAPI(apiKey: apiKey, model: model)
+            DispatchQueue.main.async { [weak self] in
+                self?.anthropicTestButton.isEnabled = true
+                self?.anthropicTestButton.title = "Test API"
+                self?.showTestResult(success: result.success, message: result.message)
+            }
+        }
     }
     
     @objc private func testOpenAI() {
-        showTestResult(message: "Testing OpenAI API connection...")
-        // TODO: Implement actual API test
+        let apiKey = openaiApiKeyField.stringValue
+        let model = openaiModelPopup.titleOfSelectedItem ?? "gpt-4o"
+        
+        guard !apiKey.isEmpty else {
+            showTestResult(success: false, message: "Please enter an API key first")
+            return
+        }
+        
+        // Disable button during test
+        openaiTestButton.isEnabled = false
+        openaiTestButton.title = "Testing..."
+        
+        Task {
+            let result = await testOpenAIAPI(apiKey: apiKey, model: model)
+            DispatchQueue.main.async { [weak self] in
+                self?.openaiTestButton.isEnabled = true
+                self?.openaiTestButton.title = "Test API"
+                self?.showTestResult(success: result.success, message: result.message)
+            }
+        }
     }
     
     @objc private func testOllama() {
-        showTestResult(message: "Testing Ollama connection...")
-        // TODO: Implement actual API test
+        let endpoint = ollamaEndpointField.stringValue
+        let model = ollamaModelField.stringValue
+        
+        guard !endpoint.isEmpty else {
+            showTestResult(success: false, message: "Please enter an endpoint URL first")
+            return
+        }
+        
+        guard !model.isEmpty else {
+            showTestResult(success: false, message: "Please enter a model name first")
+            return
+        }
+        
+        // Disable button during test
+        ollamaTestButton.isEnabled = false
+        ollamaTestButton.title = "Testing..."
+        
+        Task {
+            let result = await testOllamaAPI(endpoint: endpoint, model: model)
+            DispatchQueue.main.async { [weak self] in
+                self?.ollamaTestButton.isEnabled = true
+                self?.ollamaTestButton.title = "Test API"
+                self?.showTestResult(success: result.success, message: result.message)
+            }
+        }
     }
     
-    private func showTestResult(message: String) {
+    private func showTestResult(success: Bool?, message: String) {
         let alert = NSAlert()
-        alert.messageText = "API Test"
+        
+        if let success = success {
+            alert.messageText = success ? "✅ API Test Successful" : "❌ API Test Failed"
+            alert.alertStyle = success ? .informational : .warning
+        } else {
+            alert.messageText = "Testing API..."
+            alert.alertStyle = .informational
+        }
+        
         alert.informativeText = message
-        alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
+        
         if let window = self.window {
             alert.beginSheetModal(for: window)
         }
@@ -334,5 +401,128 @@ class LLMProvidersTab: BasePreferencesTab {
         // Ollama
         config.notes.llm.ollama.endpoint = ollamaEndpointField.stringValue
         config.notes.llm.ollama.model = ollamaModelField.stringValue
+    }
+    
+    // MARK: - API Testing
+    
+    private func testAnthropicAPI(apiKey: String, model: String) async -> (success: Bool, message: String) {
+        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 10,
+            "messages": [
+                ["role": "user", "content": "test"]
+            ]
+        ]
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return (false, "Invalid response from server")
+            }
+            
+            if httpResponse.statusCode == 200 {
+                return (true, "Successfully connected to Anthropic API\nModel: \(model)")
+            } else if httpResponse.statusCode == 401 {
+                return (false, "Authentication failed\nPlease check your API key")
+            } else if httpResponse.statusCode == 404 {
+                return (false, "Model not found: \(model)\nPlease check the model name")
+            } else {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? [String: Any],
+                   let message = error["message"] as? String {
+                    return (false, "Error \(httpResponse.statusCode): \(message)")
+                }
+                return (false, "HTTP error \(httpResponse.statusCode)")
+            }
+        } catch {
+            return (false, "Network error: \(error.localizedDescription)")
+        }
+    }
+    
+    private func testOpenAIAPI(apiKey: String, model: String) async -> (success: Bool, message: String) {
+        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 10,
+            "messages": [
+                ["role": "user", "content": "test"]
+            ]
+        ]
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return (false, "Invalid response from server")
+            }
+            
+            if httpResponse.statusCode == 200 {
+                return (true, "Successfully connected to OpenAI API\nModel: \(model)")
+            } else if httpResponse.statusCode == 401 {
+                return (false, "Authentication failed\nPlease check your API key")
+            } else if httpResponse.statusCode == 404 {
+                return (false, "Model not found: \(model)\nPlease check the model name")
+            } else {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = json["error"] as? [String: Any],
+                   let message = error["message"] as? String {
+                    return (false, "Error \(httpResponse.statusCode): \(message)")
+                }
+                return (false, "HTTP error \(httpResponse.statusCode)")
+            }
+        } catch {
+            return (false, "Network error: \(error.localizedDescription)")
+        }
+    }
+    
+    private func testOllamaAPI(endpoint: String, model: String) async -> (success: Bool, message: String) {
+        // First test if Ollama is running by checking /api/tags
+        guard let baseURL = URL(string: endpoint) else {
+            return (false, "Invalid endpoint URL")
+        }
+        
+        let tagsURL = baseURL.appendingPathComponent("api/tags")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: tagsURL)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return (false, "Invalid response from server")
+            }
+            
+            if httpResponse.statusCode == 200 {
+                // Check if model exists
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let models = json["models"] as? [[String: Any]] {
+                    let modelNames = models.compactMap { $0["name"] as? String }
+                    if modelNames.contains(where: { $0.starts(with: model) }) {
+                        return (true, "Successfully connected to Ollama\nModel \(model) is available\nEndpoint: \(endpoint)")
+                    } else {
+                        let available = modelNames.prefix(5).joined(separator: ", ")
+                        return (false, "Model '\(model)' not found on this Ollama instance\n\nAvailable models: \(available)\n\nRun: ollama pull \(model)")
+                    }
+                }
+                return (true, "Successfully connected to Ollama\nEndpoint: \(endpoint)")
+            } else {
+                return (false, "HTTP error \(httpResponse.statusCode)\nIs Ollama running?")
+            }
+        } catch {
+            return (false, "Could not connect to Ollama\n\(error.localizedDescription)\n\nMake sure Ollama is running:\n  ollama serve")
+        }
     }
 }
