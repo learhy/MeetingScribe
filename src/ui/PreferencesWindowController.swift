@@ -53,8 +53,15 @@ class PreferencesWindowController: NSWindowController {
         tabView.autoresizingMask = [.width, .height]
         contentView.addSubview(tabView)
         
-        // Create tabs (placeholders for now, will be implemented in next phases)
-        // We'll add them as we build each tab
+        // Create and add all tabs
+        addTab(GeneralTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(AudioTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(DetectionTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(TranscriptionTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(NotesTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(LLMProvidersTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(TemplateEditorTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(LogViewerTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         
         // Bottom bar with buttons
         let buttonBar = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 50))
@@ -134,16 +141,16 @@ class PreferencesWindowController: NSWindowController {
         
         if !allErrors.isEmpty {
             // Show validation errors
-            let errorMessages = allErrors.map { "• \\($0.field): \\($0.message)" }.joined(separator: "\\n")
+            let errorMessages = allErrors.map { error in "• \(error.field): \(error.message)" }.joined(separator: "\n")
             
             let alert = NSAlert()
             alert.messageText = "Configuration Errors"
-            alert.informativeText = "Please fix the following errors:\\n\\n\\(errorMessages)"
+            alert.informativeText = "Please fix the following errors:\n\n\(errorMessages)"
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")
-            alert.runModal()
+            _ = alert.runModal()
             
-            logger.warning("Validation failed with \\(allErrors.count) errors")
+            logger.warning("Validation failed with \(allErrors.count) errors")
             
             // TODO: Switch to first tab containing error
             return
@@ -151,8 +158,7 @@ class PreferencesWindowController: NSWindowController {
         
         // Validation passed - save configuration
         logger.info("Validation passed, saving configuration")
-        config.config = newConfig
-        config.save()
+        config.updateAndSave(newConfig)
         
         // Reset dirty states
         for tab in tabs {
@@ -184,5 +190,17 @@ class PreferencesWindowController: NSWindowController {
         tabView.addTabViewItem(tabViewItem)
         
         logger.info("Added tab: \\(tab.tabName)")
+    }
+    
+    /// Select a tab by name
+    func selectTab(named name: String) {
+        for (index, item) in tabView.tabViewItems.enumerated() {
+            if item.label == name {
+                tabView.selectTabViewItem(at: index)
+                logger.info("Selected tab: \\(name)")
+                return
+            }
+        }
+        logger.warning("Tab not found: \\(name)")
     }
 }

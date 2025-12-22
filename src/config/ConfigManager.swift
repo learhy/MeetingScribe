@@ -162,6 +162,11 @@ class ConfigManager {
         onConfigChanged?()
     }
     
+    func updateAndSave(_ newConfig: AppConfiguration) {
+        self.config = newConfig
+        save()
+    }
+    
     func updateAutoRecordingEnabled(_ enabled: Bool) {
         config.ui.autoRecordingEnabled = enabled
         save()
