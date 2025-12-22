@@ -120,7 +120,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let permissionChecker = PermissionChecker()
         let perms = await permissionChecker.checkPermissions()
-        logger.info("Permission check result: screenGranted=\(perms.screenGranted), micGranted=\(perms.microphoneGranted)")
+        logger.info("Permission check result: screenGranted=\(perms.screenGranted), micGranted=\(perms.micGranted)")
         
         if !perms.screenGranted {
             logger.warning("Screen recording permission not granted - entering disabled state")
@@ -137,18 +137,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         await meetingScribeService?.run()
         
         // If this was a first run (LaunchAgent instance), show completion dialog now
-        // Check if this is shortly after installation
+        // Check if this is shortly after installation and dialog hasn't been shown yet
         let installMarkerPath = "\(NSHomeDirectory())/.meetingscribe/.installed"
+        let completionDialogShownPath = "\(NSHomeDirectory())/.meetingscribe/.completion_shown"
         logger.info("Checking if completion dialog should be shown...")
         
-        if FileManager.default.fileExists(atPath: installMarkerPath) {
+        // Check if we've already shown the dialog
+        if FileManager.default.fileExists(atPath: completionDialogShownPath) {
+            logger.info("Completion dialog already shown, skipping")
+        } else if FileManager.default.fileExists(atPath: installMarkerPath) {
             if let installDate = try? FileManager.default.attributesOfItem(atPath: installMarkerPath)[.creationDate] as? Date {
                 let secondsSinceInstall = Date().timeIntervalSince(installDate)
                 logger.info("Install marker found, created \(secondsSinceInstall) seconds ago")
                 
-                // If installed in last 30 seconds, this is the first LaunchAgent launch
-                if secondsSinceInstall < 30 {
+                // If installed in last 60 seconds, this is the first LaunchAgent launch
+                if secondsSinceInstall < 60 {
                     logger.info("First LaunchAgent launch after installation (PID: \(processId)) - showing completion dialog")
+                    
+                    // Write flag to prevent showing dialog again
+                    try? "shown".write(toFile: completionDialogShownPath, atomically: true, encoding: .utf8)
+                    logger.info("Wrote completion dialog flag to \(completionDialogShownPath)")
+                    
                     DispatchQueue.main.async {
                         FirstRunInstaller.showCompletionDialogPublic()
                     }

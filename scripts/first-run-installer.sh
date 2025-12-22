@@ -139,7 +139,7 @@ tccutil reset All "$BUNDLE_ID" 2>/dev/null || log "Could not reset TCC permissio
 defaults delete "$BUNDLE_ID" 2>/dev/null || true
 
 #
-# Step 2: Create necessary directories
+# Step 2: Create necessary directories and clean up state files
 #
 log "Step 2: Creating directories..."
 
@@ -148,6 +148,10 @@ mkdir -p "$HOME/.meetingscribe/templates"
 mkdir -p "$HOME/.meetingscribe/cache/models"
 mkdir -p "$HOME/Documents/MeetingScribe"
 mkdir -p "$HOME/Library/Logs/MeetingScribe"
+
+# Remove completion dialog flag so it can be shown again on reinstall
+rm -f "$HOME/.meetingscribe/.completion_shown"
+log "Cleaned up previous installation state files"
 
 #
 # Step 3: Install LaunchAgent
