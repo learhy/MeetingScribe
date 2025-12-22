@@ -23,8 +23,8 @@ struct AppConfiguration: Codable {
         }
         
         struct Local: Codable {
-            var modelPath: String = "~/My Drive/software_projects/whisper.cpp/models/ggml-base.en.bin"
-            var whisperBinaryPath: String = "~/My Drive/software_projects/whisper.cpp/main"
+            var modelPath: String = ""
+            var whisperBinaryPath: String = ""
         }
         
         struct Diarization: Codable {
@@ -33,7 +33,7 @@ struct AppConfiguration: Codable {
             var maxSpeakers: Int? = nil
             var hfToken: String = ""  // No longer required for fast diarization
             var pythonPath: String = "python3"
-            var scriptPath: String = "~/My Drive/software_projects/meeting-scribe/scripts/diarize_audio_fast.py"
+            var scriptPath: String = "/Applications/MeetingScribe.app/Contents/Resources/scripts/diarize_audio_fast.py"
             var whisperModel: String = "base"  // tiny, base, small, medium, large
             var distanceThreshold: Double = 0.90  // Agglomerative clustering threshold (0.85-0.95)
         }
