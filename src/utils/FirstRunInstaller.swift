@@ -227,14 +227,12 @@ class FirstRunInstaller {
         
         ⚠️ REQUIRED: Configure your LLM provider API key
         
-        1. Edit ~/.meetingscribe/config.json
-        2. Add your API key for your chosen provider:
-           • Anthropic (Claude)
-           • OpenAI (GPT)
-           • Ollama (local, no key needed)
-        3. Restart: meetingscribe-ctl restart
+        The Preferences window will open where you can:
+        • Add your API key (Anthropic, OpenAI, or Ollama)
+        • Configure transcription settings
+        • Customize notifications and templates
         
-        The configuration folder will open when you click OK.
+        You can access Preferences anytime from the menu bar.
         
         CLI Commands:
           meetingscribe-ctl status   - Check status
@@ -242,11 +240,12 @@ class FirstRunInstaller {
           meetingscribe-ctl logs     - View logs
         """
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Open Config Folder")
+        alert.addButton(withTitle: "Open Preferences")
         alert.runModal()
         
-        // Open the configuration folder in Finder
-        let configPath = "\(NSHomeDirectory())/.meetingscribe"
-        NSWorkspace.shared.open(URL(fileURLWithPath: configPath))
+        // Open the Preferences window
+        DispatchQueue.main.async {
+            PreferencesWindowController.show()
+        }
     }
 }

@@ -204,6 +204,12 @@ class MenuBarController {
         
         menu.addItem(NSMenuItem.separator())
         
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         let quitItem = NSMenuItem(title: "Quit MeetingScribe", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -212,15 +218,19 @@ class MenuBarController {
     private func buildConfigErrorMenu() {
         menu.removeAllItems()
         
-        let configItem = NSMenuItem(title: "⚠️  LLM Provider Key Required", action: #selector(openConfigFolder), keyEquivalent: "")
+        let configItem = NSMenuItem(title: "⚠️  LLM Provider Key Required", action: nil, keyEquivalent: "")
         configItem.target = self
         menu.addItem(configItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        let prefsItem = NSMenuItem(title: "Open Configuration Folder", action: #selector(openConfigFolder), keyEquivalent: "")
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
         prefsItem.target = self
         menu.addItem(prefsItem)
+        
+        let openConfigItem = NSMenuItem(title: "Open Configuration Folder", action: #selector(openConfigFolder), keyEquivalent: "")
+        openConfigItem.target = self
+        menu.addItem(openConfigItem)
         
         menu.addItem(NSMenuItem.separator())
         
