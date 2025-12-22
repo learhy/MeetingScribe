@@ -19,6 +19,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let bundlePath = Bundle.main.bundlePath
         logger.info("MeetingScribe starting... (PID: \(processId), Path: \(bundlePath))")
         
+        // Set up standard Edit menu for keyboard shortcuts (Cmd+C, Cmd+V, etc.)
+        setupEditMenu()
+        
         // Run first-run installer if needed
         // This handles installation from any location (DMG, Downloads, etc.)
         let needsInstall = FirstRunInstaller.needsInstallation()
@@ -112,6 +115,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         logger.info("MeetingScribe terminating...")
         meetingScribeService?.stop()
+    }
+    
+    private func setupEditMenu() {
+        // Create main menu bar if it doesn't exist
+        if NSApp.mainMenu == nil {
+            NSApp.mainMenu = NSMenu()
+        }
+        
+        // Create Edit menu
+        let editMenu = NSMenu(title: "Edit")
+        
+        // Add standard Edit menu items
+        editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        
+        // Add Edit menu to menu bar
+        let editMenuItem = NSMenuItem()
+        editMenuItem.submenu = editMenu
+        NSApp.mainMenu?.addItem(editMenuItem)
     }
     
     private func startWithPermissionCheck() async {

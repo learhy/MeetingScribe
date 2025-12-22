@@ -28,7 +28,7 @@ class LogViewerTab: BasePreferencesTab {
     }
     
     private func setupUI() {
-        var yPos = 400
+        var yPos = 370
         
         // Control bar
         searchField = NSTextField(frame: NSRect(x: 20, y: yPos, width: 200, height: 22))

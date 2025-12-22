@@ -126,6 +126,7 @@ class LLMProvidersTab: BasePreferencesTab {
         
         anthropicModelPopup = NSPopUpButton(frame: NSRect(x: 90, y: yPos - 2, width: 250, height: 25), pullsDown: false)
         anthropicModelPopup.addItems(withTitles: [
+            "claude-opus-4-20250514",
             "claude-3-5-sonnet-20241022",
             "claude-3-5-haiku-20241022",
             "claude-3-opus-20240229",

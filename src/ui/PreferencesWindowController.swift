@@ -165,14 +165,6 @@ class PreferencesWindowController: NSWindowController {
             tab.resetDirtyState()
         }
         
-        // Show success message (optional)
-        let alert = NSAlert()
-        alert.messageText = "Preferences Saved"
-        alert.informativeText = "Your configuration has been saved successfully."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-        
         logger.info("Configuration saved successfully, closing window")
         window?.close()
         PreferencesWindowController.sharedInstance = nil

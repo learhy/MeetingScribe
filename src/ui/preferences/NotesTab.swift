@@ -128,7 +128,10 @@ class NotesTab: BasePreferencesTab {
     }
     
     override func loadConfig(_ config: AppConfiguration) {
-        backendPopup.selectItem(withTitle: config.notes.backend)
+        // Backend popup - capitalize first letter to match menu item
+        let backendTitle = config.notes.backend.prefix(1).uppercased() + config.notes.backend.dropFirst()
+        backendPopup.selectItem(withTitle: backendTitle)
+        
         tagsField.stringValue = config.notes.bear.tags.joined(separator: ", ")
         templatePathField.stringValue = config.notes.templateFile
         fallbackDirectoryField.stringValue = config.notes.bear.fallbackDirectory
@@ -142,7 +145,7 @@ class NotesTab: BasePreferencesTab {
     }
     
     override func collectChanges(into config: inout AppConfiguration) {
-        config.notes.backend = backendPopup.titleOfSelectedItem ?? "bear"
+        config.notes.backend = (backendPopup.titleOfSelectedItem ?? "Bear").lowercased()
         
         // Parse comma-separated tags
         let tagString = tagsField.stringValue
