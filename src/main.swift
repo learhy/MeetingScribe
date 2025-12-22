@@ -41,9 +41,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // The LaunchAgent instance will request permissions and show completion dialog
             logger.info("Exiting installer instance immediately - LaunchAgent will take over")
             
-            // Exit immediately - don't wait
-            NSApp.terminate(nil)
-            return
+            // Use exit() instead of NSApp.terminate() to ensure immediate termination
+            // NSApp.terminate() is asynchronous and may allow code to continue
+            exit(0)
         }
         
         // Activate the app so menu bar icon appears
