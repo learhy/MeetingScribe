@@ -82,8 +82,7 @@ class MenuBarController {
     }
     
     @objc private func openPreferences() {
-        // TODO: Open preferences window
-        NSWorkspace.shared.open(URL(fileURLWithPath: NSHomeDirectory() + "/.meetingscribe"))
+        PreferencesWindowController.show()
     }
     
     @objc private func quit() {
