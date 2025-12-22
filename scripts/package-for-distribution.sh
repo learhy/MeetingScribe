@@ -138,6 +138,15 @@ EOF
 # Create DMG using hdiutil
 echo "Building DMG image..."
 
+# Unmount any existing MeetingScribe volumes from previous runs
+echo "Cleaning up any mounted DMG volumes..."
+for vol in "/Volumes/$APP_NAME"*; do
+    if [ -d "$vol" ]; then
+        echo "Unmounting: $vol"
+        hdiutil detach "$vol" 2>/dev/null || true
+    fi
+done
+
 # First create a writable DMG to customize it
 TEMP_DMG="$OUTPUT_DIR/${APP_NAME}-temp.dmg"
 rm -f "$TEMP_DMG"
@@ -149,14 +158,29 @@ hdiutil create -volname "$APP_NAME" \
 
 # Mount the temporary DMG
 echo "Customizing DMG appearance..."
-DEVICE=$(hdiutil attach -readwrite -noverify "$TEMP_DMG" | egrep '^/dev/' | sed 1q | awk '{print $1}')
+DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" | egrep '^/dev/' | sed 1q | awk '{print $1}')
 VOLUME_PATH="/Volumes/$APP_NAME"
 
-# Wait for mount
-sleep 2
+if [ -z "$DEVICE" ]; then
+    echo "ERROR: Failed to mount DMG"
+    exit 1
+fi
+
+echo "Mounted at: $DEVICE -> $VOLUME_PATH"
+
+# Wait for mount and verify
+sleep 3
+
+if [ ! -d "$VOLUME_PATH" ]; then
+    echo "ERROR: Volume not found at $VOLUME_PATH"
+    hdiutil detach "$DEVICE" 2>/dev/null || true
+    exit 1
+fi
+
+echo "Volume mounted successfully, customizing..."
 
 # Set icon positions and appearance using AppleScript
-osascript <<EOF
+if ! osascript <<EOF
 tell application "Finder"
     tell disk "$APP_NAME"
         open
@@ -183,6 +207,12 @@ tell application "Finder"
     end tell
 end tell
 EOF
+then
+    echo "WARNING: AppleScript customization failed, continuing anyway..."
+    echo "DMG will be created without custom appearance"
+else
+    echo "DMG appearance customized successfully"
+fi
 
 # Unmount
 sync
