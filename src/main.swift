@@ -37,14 +37,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logger.info("Installation completed successfully")
             
             // IMPORTANT: The installer starts a LaunchAgent which will launch another instance
-            // We need to exit THIS instance to avoid duplicates
+            // We need to exit THIS instance immediately to avoid showing duplicate dialogs
             // The LaunchAgent instance will request permissions and show completion dialog
-            logger.info("Exiting installer instance - LaunchAgent will take over")
+            logger.info("Exiting installer instance immediately - LaunchAgent will take over")
             
-            // Give the LaunchAgent a moment to start
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                NSApp.terminate(nil)
-            }
+            // Exit immediately - don't wait
+            NSApp.terminate(nil)
             return
         }
         
