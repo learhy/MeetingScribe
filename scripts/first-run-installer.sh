@@ -280,9 +280,32 @@ PERMISSIONS_MSG="MeetingScribe needs permissions to work:\\n\\n• Screen Record
 show_dialog "$PERMISSIONS_MSG"
 
 #
-# Step 7: Start the daemon
+# Step 7: Verify installation and write marker BEFORE starting daemon
 #
-log "Step 7: Starting MeetingScribe daemon..."
+log "Step 7: Verifying installation..."
+
+# Verify critical files exist
+if [ ! -f "$PLIST" ]; then
+    log "ERROR: Installation verification failed - plist not found at $PLIST"
+    exit 1
+fi
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    log "ERROR: Installation verification failed - config not found at $CONFIG_FILE"
+    exit 1
+fi
+
+log "Installation verification passed"
+echo "$APP_PATH" > "$INSTALL_MARKER"
+log "Installation marker written to $INSTALL_MARKER"
+
+#
+# Step 8: Start the daemon
+#
+log "Step 8: Starting MeetingScribe daemon..."
+
+# IMPORTANT: Marker must be written BEFORE bootstrapping LaunchAgent
+# Otherwise the LaunchAgent instance will see no marker and show welcome dialog again
 
 # Bootstrap the LaunchAgent
 DOMAIN="gui/$(id -u)"
@@ -308,26 +331,6 @@ else
 fi
 
 log "Daemon started"
-
-#
-# Step 8: Verify installation and write marker
-#
-log "Verifying installation..."
-
-# Verify critical files exist
-if [ ! -f "$PLIST" ]; then
-    log "ERROR: Installation verification failed - plist not found at $PLIST"
-    exit 1
-fi
-
-if [ ! -f "$CONFIG_FILE" ]; then
-    log "ERROR: Installation verification failed - config not found at $CONFIG_FILE"
-    exit 1
-fi
-
-log "Installation verification passed"
-echo "$APP_PATH" > "$INSTALL_MARKER"
-log "Installation marker written to $INSTALL_MARKER"
 
 #
 # Step 9: Installation complete
