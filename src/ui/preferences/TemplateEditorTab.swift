@@ -18,7 +18,7 @@ class TemplateEditorTab: BasePreferencesTab {
     }
     
     private func setupUI() {
-        var yPos = 350
+        var yPos = 330
         
         // Path display (read-only)
         let pathTitleLabel = NSTextField(labelWithString: "Template File:")
@@ -35,7 +35,7 @@ class TemplateEditorTab: BasePreferencesTab {
         yPos -= 30
         
         // Text editor with scroll view sized to bounds
-        let scrollHeight = max(100, self.bounds.height - 80)
+        let scrollHeight = max(100, self.bounds.height - 100)
         scrollView = NSScrollView(frame: NSRect(x: 20, y: 20, width: 560, height: scrollHeight))
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false

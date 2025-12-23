@@ -10,7 +10,9 @@ class TranscriptionTab: BasePreferencesTab {
     // Local provider fields
     private var localContainer: NSView!
     private var whisperBinaryField: NSTextField!
+    private var whisperBrowseButton: NSButton!
     private var modelPathField: NSTextField!
+    private var modelBrowseButton: NSButton!
     
     // OpenAI provider fields
     private var openaiContainer: NSView!
@@ -96,11 +98,16 @@ class TranscriptionTab: BasePreferencesTab {
         binaryLabel.alignment = .right
         localContainer.addSubview(binaryLabel)
         
-        whisperBinaryField = NSTextField(frame: NSRect(x: 130, y: yPos, width: 350, height: 22))
+        whisperBinaryField = NSTextField(frame: NSRect(x: 130, y: yPos, width: 300, height: 22))
         whisperBinaryField.placeholderString = "/path/to/whisper"
         whisperBinaryField.target = self
         whisperBinaryField.action = #selector(fieldChanged)
         localContainer.addSubview(whisperBinaryField)
+        
+        whisperBrowseButton = NSButton(title: "Browse...", target: self, action: #selector(browseWhisper))
+        whisperBrowseButton.frame = NSRect(x: 440, y: yPos - 2, width: 90, height: 25)
+        whisperBrowseButton.bezelStyle = .rounded
+        localContainer.addSubview(whisperBrowseButton)
         yPos -= 30
         
         let modelLabel = NSTextField(labelWithString: "Model Path:")
@@ -108,11 +115,16 @@ class TranscriptionTab: BasePreferencesTab {
         modelLabel.alignment = .right
         localContainer.addSubview(modelLabel)
         
-        modelPathField = NSTextField(frame: NSRect(x: 130, y: yPos, width: 350, height: 22))
+        modelPathField = NSTextField(frame: NSRect(x: 130, y: yPos, width: 300, height: 22))
         modelPathField.placeholderString = "/path/to/model.bin"
         modelPathField.target = self
         modelPathField.action = #selector(fieldChanged)
         localContainer.addSubview(modelPathField)
+        
+        modelBrowseButton = NSButton(title: "Browse...", target: self, action: #selector(browseModel))
+        modelBrowseButton.frame = NSRect(x: 440, y: yPos - 2, width: 90, height: 25)
+        modelBrowseButton.bezelStyle = .rounded
+        localContainer.addSubview(modelBrowseButton)
     }
     
     private func setupOpenAIFields() {
@@ -251,6 +263,46 @@ class TranscriptionTab: BasePreferencesTab {
     
     @objc private func fieldChanged() {
         markDirty()
+    }
+    
+    @objc private func browseWhisper() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select whisper.cpp binary"
+        let defaultDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".meetingscribe")
+        if FileManager.default.fileExists(atPath: defaultDir.path) {
+            panel.directoryURL = defaultDir
+        }
+        if let window = self.window {
+            panel.beginSheetModal(for: window) { [weak self] response in
+                if response == .OK, let url = panel.url {
+                    self?.whisperBinaryField.stringValue = url.path
+                    self?.markDirty()
+                }
+            }
+        }
+    }
+    
+    @objc private func browseModel() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select model file"
+        let defaultDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".meetingscribe")
+        if FileManager.default.fileExists(atPath: defaultDir.path) {
+            panel.directoryURL = defaultDir
+        }
+        if let window = self.window {
+            panel.beginSheetModal(for: window) { [weak self] response in
+                if response == .OK, let url = panel.url {
+                    self?.modelPathField.stringValue = url.path
+                    self?.markDirty()
+                }
+            }
+        }
     }
     
     override func loadConfig(_ config: AppConfiguration) {

@@ -1,28 +1,50 @@
 import AppKit
 
-class PreferencesWindowController: NSWindowController {
+private class LoggingButton: NSButton {
+    private let logger = DualLogger(category: "PreferencesWindow.Button")
+    var onClick: (() -> Void)?
+    override func mouseDown(with event: NSEvent) {
+        logger.info("mouseDown title=\(self.title) state=enabled:\(isEnabled)")
+        super.mouseDown(with: event)
+        if event.type == .leftMouseDown {
+            logger.info("invoking onClick for \(self.title)")
+            onClick?()
+        }
+    }
+}
+
+class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private let logger = DualLogger(category: "PreferencesWindow")
     private let config = ConfigManager.shared
-    private let instanceId = UUID()
+    let instanceId = UUID()
     
     private var tabView: NSTabView!
-    private var saveButton: NSButton!
-    private var cancelButton: NSButton!
+    private var saveButton: LoggingButton!
+    private var cancelButton: LoggingButton!
     private var tabs: [PreferencesTab] = []
     
     // Single instance management
     static private weak var sharedInstance: PreferencesWindowController?
+    private static var priorPolicy: NSApplication.ActivationPolicy = .accessory
     
     static func show() {
         if let existing = sharedInstance {
             existing.logger.info("show() using existing instance \(existing.instanceId)")
             existing.window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            existing.logger.info("attachedSheet existing=\(String(describing: existing.window?.attachedSheet))")
         } else {
             let controller = PreferencesWindowController()
             controller.logger.info("show() creating new instance \(controller.instanceId)")
             sharedInstance = controller
+            priorPolicy = NSApp.activationPolicy()
+            NSApp.setActivationPolicy(.regular)
             controller.showWindow(nil)
+            controller.window?.makeKeyAndOrderFront(nil)
+            controller.window?.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
+            controller.window?.makeFirstResponder(controller.cancelButton)
+            controller.logger.info("attachedSheet new=\(String(describing: controller.window?.attachedSheet))")
         }
     }
     
@@ -34,12 +56,15 @@ class PreferencesWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
+        super.init(window: window)
+        window.delegate = self
         logger.info("init PreferencesWindowController instance=\(instanceId)")
+        logger.info("attachedSheet at init=\(String(describing: window.attachedSheet))")
         window.title = "MeetingScribe Preferences"
         window.minSize = NSSize(width: 600, height: 500)
         window.center()
         
-        super.init(window: window)
+        // super.init moved above to allow delegate assignment
         
         setupUI()
         loadConfiguration()
@@ -73,21 +98,26 @@ class PreferencesWindowController: NSWindowController {
         contentView.addSubview(buttonBar)
         
         // Cancel button
-        cancelButton = NSButton(frame: NSRect(x: 420, y: 10, width: 80, height: 32))
+        cancelButton = LoggingButton(frame: NSRect(x: 420, y: 10, width: 80, height: 32))
         cancelButton.title = "Cancel"
         cancelButton.bezelStyle = .rounded
-        cancelButton.target = self
-        cancelButton.action = #selector(cancelClicked)
+        cancelButton.isEnabled = true
+        let controller = self
+        cancelButton.onClick = { controller.cancelClicked() }
         buttonBar.addSubview(cancelButton)
         
         // Save button
-        saveButton = NSButton(frame: NSRect(x: 510, y: 10, width: 80, height: 32))
+        saveButton = LoggingButton(frame: NSRect(x: 510, y: 10, width: 80, height: 32))
         saveButton.title = "Save"
         saveButton.bezelStyle = .rounded
         saveButton.keyEquivalent = "\\r" // Return key
-        saveButton.target = self
-        saveButton.action = #selector(saveClicked)
+        saveButton.isEnabled = true
+        saveButton.onClick = { controller.saveClicked() }
         buttonBar.addSubview(saveButton)
+        
+        // Ensure responder chain includes controller for nil targets
+        contentView.nextResponder = self
+        window?.makeFirstResponder(cancelButton)
         
         logger.info("Preferences window UI initialized")
     }
@@ -98,6 +128,7 @@ class PreferencesWindowController: NSWindowController {
             tab.loadConfig(currentConfig)
         }
         logger.info("Configuration loaded into tabs")
+        logger.info("window isKey=\(window?.isKeyWindow ?? false) isMain=\(window?.isMainWindow ?? false) attachedSheet=\(String(describing: window?.attachedSheet))")
     }
     
     @objc private func cancelClicked() {
@@ -122,7 +153,9 @@ class PreferencesWindowController: NSWindowController {
         logger.info("Preferences cancelled, closing window")
         DispatchQueue.main.async { [weak self] in
             self?.window?.close()
-            self?.logger.info("Window closed after cancel instance=\(self?.instanceId ?? UUID()) visible=\(self?.window?.isVisible ?? false)")
+            if let self = self {
+                self.logger.info("Window closed after cancel instance=\(self.instanceId) visible=\(self.window?.isVisible ?? false)")
+            }
             PreferencesWindowController.sharedInstance = nil
         }
     }
@@ -160,7 +193,6 @@ class PreferencesWindowController: NSWindowController {
             
             logger.warning("Validation failed with \(allErrors.count) errors")
             
-            // TODO: Switch to first tab containing error
             return
         }
         
@@ -176,9 +208,19 @@ class PreferencesWindowController: NSWindowController {
         logger.info("Configuration saved successfully, closing window")
         DispatchQueue.main.async { [weak self] in
             self?.window?.close()
-            self?.logger.info("Window closed after save instance=\(self?.instanceId ?? UUID()) visible=\(self?.window?.isVisible ?? false)")
+            if let self = self {
+                self.logger.info("Window closed after save instance=\(self.instanceId) visible=\(self.window?.isVisible ?? false)")
+            }
             PreferencesWindowController.sharedInstance = nil
+            // restore activation policy
+            NSApp.setActivationPolicy(PreferencesWindowController.priorPolicy)
         }
+    }
+    
+    func windowWillClose(_ notification: Notification) {
+        logger.info("windowWillClose instance=\(instanceId)")
+        NSApp.setActivationPolicy(PreferencesWindowController.priorPolicy)
+        PreferencesWindowController.sharedInstance = nil
     }
     
     // MARK: - Tab Management
@@ -192,7 +234,7 @@ class PreferencesWindowController: NSWindowController {
         tabViewItem.view = tab
         tabView.addTabViewItem(tabViewItem)
         
-        logger.info("Added tab: \\(tab.tabName)")
+        logger.info("Added tab: \(tab.tabName)")
     }
     
     /// Select a tab by name
@@ -200,7 +242,7 @@ class PreferencesWindowController: NSWindowController {
         for (index, item) in tabView.tabViewItems.enumerated() {
             if item.label == name {
                 tabView.selectTabViewItem(at: index)
-                logger.info("Selected tab: \\(name)")
+                logger.info("Selected tab: \(name)")
                 return
             }
         }

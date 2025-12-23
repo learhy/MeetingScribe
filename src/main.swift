@@ -379,6 +379,9 @@ class MeetingScribeService {
         // Store mic permission status
         micPermissionGranted = perms.micGranted
 
+        // Now that config is valid, update state to idle
+        onStateChanged?(.idle)
+
         // Warm up notifications (so permission prompts don't happen mid-flow).
         if config.config.ui.showNotifications {
             await NotificationManager.shared.warmup()
