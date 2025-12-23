@@ -234,6 +234,12 @@ class LLMProvidersTab: BasePreferencesTab {
         panel.allowedContentTypes = [.text, .plainText]
         panel.message = "Select system prompt file"
         
+        // Default to ~/.meetingscribe/ directory
+        let defaultDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".meetingscribe")
+        if FileManager.default.fileExists(atPath: defaultDir.path) {
+            panel.directoryURL = defaultDir
+        }
+        
         if let window = self.window {
             panel.beginSheetModal(for: window) { [weak self] response in
                 if response == .OK, let url = panel.url {

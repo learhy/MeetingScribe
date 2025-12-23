@@ -18,7 +18,7 @@ class TemplateEditorTab: BasePreferencesTab {
     }
     
     private func setupUI() {
-        var yPos = 400
+        var yPos = 370
         
         // Path display (read-only)
         let pathTitleLabel = NSTextField(labelWithString: "Template File:")
