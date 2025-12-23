@@ -236,9 +236,8 @@ class LLMProvidersTab: BasePreferencesTab {
         
         // Default to ~/.meetingscribe/ directory
         let defaultDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".meetingscribe")
-        if FileManager.default.fileExists(atPath: defaultDir.path) {
-            panel.directoryURL = defaultDir
-        }
+        try? FileManager.default.createDirectory(at: defaultDir, withIntermediateDirectories: true)
+        panel.directoryURL = defaultDir
         
         if let window = self.window {
             panel.beginSheetModal(for: window) { [weak self] response in

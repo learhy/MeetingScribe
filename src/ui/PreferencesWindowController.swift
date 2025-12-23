@@ -3,6 +3,7 @@ import AppKit
 class PreferencesWindowController: NSWindowController {
     private let logger = DualLogger(category: "PreferencesWindow")
     private let config = ConfigManager.shared
+    private let instanceId = UUID()
     
     private var tabView: NSTabView!
     private var saveButton: NSButton!
@@ -14,10 +15,12 @@ class PreferencesWindowController: NSWindowController {
     
     static func show() {
         if let existing = sharedInstance {
+            existing.logger.info("show() using existing instance \(existing.instanceId)")
             existing.window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
         } else {
             let controller = PreferencesWindowController()
+            controller.logger.info("show() creating new instance \(controller.instanceId)")
             sharedInstance = controller
             controller.showWindow(nil)
         }
@@ -31,6 +34,7 @@ class PreferencesWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
+        logger.info("init PreferencesWindowController instance=\(instanceId)")
         window.title = "MeetingScribe Preferences"
         window.minSize = NSSize(width: 600, height: 500)
         window.center()
@@ -97,6 +101,7 @@ class PreferencesWindowController: NSWindowController {
     }
     
     @objc private func cancelClicked() {
+        logger.info("cancelClicked start instance=\(instanceId) visible=\(window?.isVisible ?? false)")
         // Check if dirty
         let isDirty = tabs.contains { $0.isDirty }
         
@@ -115,12 +120,15 @@ class PreferencesWindowController: NSWindowController {
         }
         
         logger.info("Preferences cancelled, closing window")
-        window?.close()
-        PreferencesWindowController.sharedInstance = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.window?.close()
+            self?.logger.info("Window closed after cancel instance=\(self?.instanceId ?? UUID()) visible=\(self?.window?.isVisible ?? false)")
+            PreferencesWindowController.sharedInstance = nil
+        }
     }
     
     @objc private func saveClicked() {
-        logger.info("Save clicked, validating configuration...")
+        logger.info("saveClicked start instance=\(instanceId) visible=\(window?.isVisible ?? false)")
         
         // Collect all changes into a temporary config
         var newConfig = config.config
@@ -166,8 +174,11 @@ class PreferencesWindowController: NSWindowController {
         }
         
         logger.info("Configuration saved successfully, closing window")
-        window?.close()
-        PreferencesWindowController.sharedInstance = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.window?.close()
+            self?.logger.info("Window closed after save instance=\(self?.instanceId ?? UUID()) visible=\(self?.window?.isVisible ?? false)")
+            PreferencesWindowController.sharedInstance = nil
+        }
     }
     
     // MARK: - Tab Management
