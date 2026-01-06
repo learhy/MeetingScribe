@@ -255,8 +255,15 @@ class NotesGenerationService {
         self.config = config
     }
     
-    func generateNotes(transcript: String) async throws -> String {
-        let systemPrompt = try loadSystemPrompt()
+    func generateNotes(transcript: String, participantContext: String? = nil) async throws -> String {
+        var systemPrompt = try loadSystemPrompt()
+        
+        // Inject participant context if available
+        if let context = participantContext, !context.isEmpty {
+            systemPrompt = systemPrompt + "\n\n" + context
+            logger.info("Injected participant context into system prompt")
+        }
+        
         let provider = try createProvider()
 
         let start = Date()

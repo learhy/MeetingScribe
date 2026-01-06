@@ -38,6 +38,24 @@ Download the latest release from [Releases](https://github.com/your-repo/meeting
 
 See [DISTRIBUTION.md](DISTRIBUTION.md) for detailed installation instructions.
 
+### Upgrading
+
+When upgrading to a new version:
+
+1. **Stop the running daemon** (optional but recommended):
+   ```bash
+   meetingscribe-ctl stop
+   ```
+
+2. **Replace the app**: Drag the new `MeetingScribe.app` from the DMG to `/Applications`, replacing the old version
+
+3. **Launch the upgraded app**: Open MeetingScribe from Applications
+   - The app will detect the version change and automatically reinstall the LaunchAgent
+   - You'll see a brief setup process, then the app will exit
+   - The LaunchAgent will start the new version automatically with proper log file redirection
+
+**Important**: Always launch the app after upgrading. The version detection ensures the LaunchAgent is properly configured for the new version. If you just replace the app without launching it, logs may not be written correctly.
+
 ### For Developers
 
 **Prerequisites**:
@@ -302,7 +320,8 @@ meeting-scribe/
 │   │   ├── NotificationManager.swift   # UserNotifications (macOS 11+)
 │   │   ├── PermissionChecker.swift     # TCC permission handling
 │   │   ├── DualLogger.swift            # Unified+stderr logging
-│   │   └── WAVStreamWriter.swift       # Audio file output
+│   │   ├── WAVStreamWriter.swift       # Audio file output
+│   │   └── CalendarParticipantResolver.swift  # Outlook calendar integration
 │   ├── plugins/           # Notes backend plugins
 │   │   ├── NotesPlugin.swift
 │   │   └── BearPlugin.swift            # Bear.app integration
@@ -342,6 +361,7 @@ meeting-scribe/
 
 ## Recent Improvements
 
+- ✅ **Participant name resolution** - Automatically extracts meeting participant names from Outlook calendar to help LLM identify speakers
 - ✅ **Fast speaker diarization** - 60% faster using SpeechBrain (2:26 vs 4+ min for 26-min audio), no HF token required
 - ✅ **Speaker diarization (Phase 1)** - Identify different speakers with SPEAKER_00, SPEAKER_01 labels
 - ✅ **Local Whisper.cpp integration** - No API costs for transcription
@@ -356,8 +376,8 @@ meeting-scribe/
 
 - [ ] Zoom call detection improvements (window count threshold tuning)
 - [ ] Additional notes backend plugins (Notion, Obsidian)
-- [ ] Speaker diarization Phase 2 (local vs remote speaker detection)
-- [ ] Speaker diarization Phase 3 (actual speaker names via voice profiles)
+- [ ] Speaker diarization Phase 2 (local vs remote speaker detection via voice enrollment)
+- [ ] Voice profile enrollment for automatic speaker-to-name mapping
 - [ ] Add Silero VAD for noise filtering in diarization
 - [ ] Action item extraction
 - [ ] Encryption at rest

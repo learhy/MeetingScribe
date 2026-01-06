@@ -326,15 +326,62 @@ Then restart MeetingScribe:
 meetingscribe-ctl restart
 ```
 
+## Participant Name Resolution (NEW)
+
+MeetingScribe now automatically extracts participant names from your Outlook calendar to help the LLM identify speakers in meeting notes.
+
+### How It Works
+
+1. When a recording ends, MeetingScribe queries your local Outlook database
+2. It finds calendar events that overlap with the recording time window
+3. Extracts attendee emails from the calendar event
+4. Derives first names from email addresses (e.g., `Pradeep.Sekar1@ibm.com` → "Pradeep")
+5. Passes this context to the LLM: "Meeting participants: Dan (me), Pradeep, Tim..."
+6. The LLM uses conversation context to attribute statements to the correct person
+
+### Configuration
+
+Participant resolution is **enabled by default** for Outlook users. Add this to your config to customize:
+
+```json
+{
+  "participants": {
+    "enabled": true,
+    "outlookDatabasePath": "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
+  }
+}
+```
+
+### Requirements
+
+- Microsoft Outlook for Mac (with active Exchange account)
+- Calendar events with attendees for your meetings
+
+### Limitations
+
+- Only works with Outlook (not Apple Calendar or Google Calendar)
+- Cannot automatically map SPEAKER_XX labels to specific names (requires voice enrollment)
+- Derives first names from email patterns; display names are not available in local cache
+
+### Disabling
+
+To disable participant resolution:
+
+```json
+{
+  "participants": {
+    "enabled": false
+  }
+}
+```
+
 ## Next Steps: Phase 2
 
-Phase 1 provides generic speaker labels (SPEAKER_00, SPEAKER_01, etc.).
+Phase 1 provides generic speaker labels (SPEAKER_00, SPEAKER_01, etc.) with participant context.
 
 Phase 2 will add:
-- **Local vs Remote detection:** Label "ME" for your voice vs "SPEAKER_00" for others
-- **Actual speaker names:** Extract from meeting context or voice enrollment
-
-Stay tuned for Phase 2 documentation!
+- **Voice profile enrollment:** Record a short sample of your voice to automatically identify "ME" vs others
+- **Automatic speaker mapping:** Map SPEAKER_XX labels to actual names using voice signatures
 
 ## Getting Help
 

@@ -5,6 +5,7 @@ import AppKit
 /// This ensures proper setup even if user drags from DMG and runs directly
 class FirstRunInstaller {
     private static let installMarkerPath = "\(NSHomeDirectory())/.meetingscribe/.installed"
+    private static let versionMarkerPath = "\(NSHomeDirectory())/.meetingscribe/.version"
     private static let logger = DualLogger(category: "FirstRunInstaller")
     
     /// Check if the first-run installer needs to run
@@ -13,9 +14,29 @@ class FirstRunInstaller {
         logger.info("[PID \(processId)] needsInstallation() called")
         logger.info("[PID \(processId)] Checking for marker at: \(installMarkerPath)")
         
+        // Get current app version
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let currentBuild = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        let currentVersionString = "\(currentVersion) (\(currentBuild))"
+        
         // Check if installation marker exists
         if FileManager.default.fileExists(atPath: installMarkerPath) {
             logger.info("[PID \(processId)] Installation marker found")
+            
+            // Check installed version
+            var needsReinstall = false
+            if let installedVersion = try? String(contentsOfFile: versionMarkerPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) {
+                logger.info("[PID \(processId)] Installed version: \(installedVersion)")
+                logger.info("[PID \(processId)] Current version: \(currentVersionString)")
+                if installedVersion != currentVersionString {
+                    logger.info("[PID \(processId)] Version changed - reinstallation needed")
+                    needsReinstall = true
+                }
+            } else {
+                logger.info("[PID \(processId)] No version marker found - reinstallation needed")
+                needsReinstall = true
+            }
+            
             // Check if app location has changed
             if let installedPath = try? String(contentsOfFile: installMarkerPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) {
                 let currentPath = Bundle.main.bundlePath
@@ -25,8 +46,13 @@ class FirstRunInstaller {
                     logger.info("[PID \(processId)] App location changed - installation needed")
                     return true
                 }
-                logger.info("[PID \(processId)] App location unchanged - no installation needed")
             }
+            
+            if needsReinstall {
+                return true
+            }
+            
+            logger.info("[PID \(processId)] App location and version unchanged - no installation needed")
             return false
         }
         

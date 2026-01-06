@@ -28,7 +28,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logger.info("Installation check: needsInstallation=\(needsInstall)")
         
         if needsInstall {
-            logger.info("First run detected - running installer (PID: \(processId))")
+            // Check if this is an upgrade (marker exists but version changed)
+            let isUpgrade = FileManager.default.fileExists(atPath: "\(NSHomeDirectory())/.meetingscribe/.installed")
+            
+            if isUpgrade {
+                logger.info("Upgrade detected - running installer (PID: \(processId))")
+            } else {
+                logger.info("First run detected - running installer (PID: \(processId))")
+            }
+            
             wasFirstRun = true
             
             // Run installer synchronously on first run
@@ -319,6 +327,7 @@ class MeetingScribeService {
     private let notesService: NotesGenerationService
     private let templateEngine: TemplateEngine
     private let notesPlugin: NotesPlugin
+    private let participantResolver: CalendarParticipantResolver
     
     private var audioCapture: StreamHandler?
     private var isRunning = false
@@ -341,6 +350,7 @@ class MeetingScribeService {
         self.notesService = NotesGenerationService()
         self.templateEngine = TemplateEngine()
         self.notesPlugin = BearPlugin()
+        self.participantResolver = CalendarParticipantResolver()
         
         // Set up call detection callbacks
         callDetector.onCallStarted = { [weak self] callInfo in
@@ -592,15 +602,28 @@ class MeetingScribeService {
         logger.info("Processing audio file: \(audioFilePath)")
         
         do {
-            // 1. Transcribe
+            // 1. Resolve meeting participants from calendar
+            let recordingEnd = Date()
+            var participantContext: String? = nil
+            if let participants = participantResolver.resolveParticipants(
+                recordingStart: startTime,
+                recordingEnd: recordingEnd
+            ) {
+                participantContext = participants.formatForLLMContext()
+                logger.info("Resolved \(participants.attendeeFirstNames.count + 1) meeting participants")
+            } else {
+                logger.info("No participant context available for this recording")
+            }
+            
+            // 2. Transcribe
             logger.info("Starting transcription...")
             let audioURL = URL(fileURLWithPath: audioFilePath)
             let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
             
-            // 2. Generate notes
+            // 3. Generate notes with participant context
             logger.info("Generating notes...")
-            let generatedNotes = try await notesService.generateNotes(transcript: transcript)
+            let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
             logger.info("Notes generation complete")
             
             // 3. Split notes to get summary

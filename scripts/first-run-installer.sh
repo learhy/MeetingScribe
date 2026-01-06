@@ -11,6 +11,7 @@ BUNDLE_ID="com.meetingscribe.daemon"
 APP_PATH="$1"  # Passed by the main binary
 NO_DIALOGS="${2:-}"  # Optional --no-dialogs flag
 INSTALL_MARKER="$HOME/.meetingscribe/.installed"
+VERSION_MARKER="$HOME/.meetingscribe/.version"
 
 # Function to log messages
 log() {
@@ -302,6 +303,14 @@ fi
 log "Installation verification passed"
 echo "$APP_PATH" > "$INSTALL_MARKER"
 log "Installation marker written to $INSTALL_MARKER"
+
+# Write version marker
+# Extract version from Info.plist
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "unknown")
+BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "unknown")
+VERSION_STRING="$VERSION ($BUILD)"
+echo "$VERSION_STRING" > "$VERSION_MARKER"
+log "Version marker written: $VERSION_STRING"
 
 #
 # Step 8: Start the daemon

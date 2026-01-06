@@ -87,12 +87,18 @@ struct AppConfiguration: Codable {
         var autoRecordingEnabled: Bool = true
     }
     
+    struct Participants: Codable {
+        var enabled: Bool = true
+        var outlookDatabasePath: String = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
+    }
+    
     var version: String = "1.0"
     var detection: Detection = Detection()
     var audio: Audio = Audio()
     var transcription: Transcription = Transcription()
     var notes: Notes = Notes()
     var ui: UI = UI()
+    var participants: Participants = Participants()
 }
 
 class ConfigManager {
