@@ -45,115 +45,49 @@ struct CalendarEvent {
     let attendeeCount: Int
 }
 
-// MARK: - Calendar Participant Resolver
+// MARK: - Protocols for Dependency Injection
 
-class CalendarParticipantResolver {
-    private let logger = DualLogger(category: "CalendarParticipantResolver")
-    private let config: ConfigManager
+/// Protocol for database operations - allows mocking in tests
+protocol OutlookDatabaseProtocol {
+    func getUserEmail() -> String?
+    func findCalendarEvent(overlapping start: Date, end: Date) -> CalendarEvent?
+}
+
+/// Protocol for file operations - allows mocking in tests  
+protocol EventFileReaderProtocol {
+    func extractAttendeeEmails(fromEventFile path: String) -> [String]
+}
+
+// MARK: - Production Implementations
+
+/// Real SQLite database reader for Outlook
+class OutlookSQLiteDatabase: OutlookDatabaseProtocol {
+    private let databasePath: String
     
-    // Default Outlook database path
-    private static let defaultOutlookPath = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
-    
-    init(config: ConfigManager = .shared) {
-        self.config = config
+    init(databasePath: String) {
+        self.databasePath = databasePath
     }
     
-    /// Resolve meeting participants for a recording time window
-    func resolveParticipants(recordingStart: Date, recordingEnd: Date) -> MeetingParticipants? {
-        guard config.config.participants.enabled else {
-            logger.info("Participant resolution disabled in config")
-            return nil
-        }
-        
-        let databasePath = getDatabasePath()
-        
-        // Get user's email first
-        guard let myEmail = getUserEmail(databasePath: databasePath) else {
-            logger.warning("Could not determine user email from Outlook")
-            return nil
-        }
-        
-        logger.info("User email: \(myEmail)")
-        
-        // Find matching calendar event
-        guard let event = findMatchingCalendarEvent(
-            recordingStart: recordingStart,
-            recordingEnd: recordingEnd,
-            databasePath: databasePath
-        ) else {
-            logger.info("No matching calendar event found for recording window")
-            return nil
-        }
-        
-        logger.info("Found matching event with \(event.attendeeCount) attendees")
-        
-        // Extract attendee emails from event file
-        let eventFilePath = databasePath + event.pathToDataFile
-        let attendeeEmails = extractAttendeesFromEventFile(path: eventFilePath)
-        
-        if attendeeEmails.isEmpty {
-            logger.warning("Could not extract attendee emails from event file")
-            return nil
-        }
-        
-        logger.info("Extracted \(attendeeEmails.count) attendee emails")
-        
-        // Filter out "me" and derive first names
-        let otherEmails = attendeeEmails.filter { $0.lowercased() != myEmail.lowercased() }
-        let otherNames = otherEmails.map { Self.deriveFirstName(from: $0) }
-        let myFirstName = Self.deriveFirstName(from: myEmail)
-        
-        return MeetingParticipants(
-            myEmail: myEmail,
-            myFirstName: myFirstName,
-            attendeeEmails: otherEmails,
-            attendeeFirstNames: otherNames
-        )
-    }
-    
-    // MARK: - Database Operations
-    
-    private func getDatabasePath() -> String {
-        let configPath = config.config.participants.outlookDatabasePath
-        if !configPath.isEmpty {
-            let expanded = (configPath as NSString).expandingTildeInPath
-            return expanded.hasSuffix("/") ? expanded : expanded + "/"
-        }
-        return (Self.defaultOutlookPath as NSString).expandingTildeInPath
-    }
-    
-    private func getUserEmail(databasePath: String) -> String? {
+    func getUserEmail() -> String? {
         let dbPath = databasePath + "Outlook.sqlite"
         
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            logger.error("Failed to open Outlook database at \(dbPath)")
             return nil
         }
         defer { sqlite3_close(db) }
         
-        let query = "SELECT Record_AccountUID FROM AccountsExchange LIMIT 1"
+        // Query all columns to get email at index 5
+        let query = "SELECT * FROM AccountsExchange LIMIT 1"
         var statement: OpaquePointer?
         
         guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK else {
-            logger.error("Failed to prepare user email query")
             return nil
         }
         defer { sqlite3_finalize(statement) }
         
-        // The AccountsExchange table has the email as one of the columns
-        // Based on our research, column index 5 contains the email
-        let altQuery = "SELECT * FROM AccountsExchange LIMIT 1"
-        var altStatement: OpaquePointer?
-        
-        guard sqlite3_prepare_v2(db, altQuery, -1, &altStatement, nil) == SQLITE_OK else {
-            return nil
-        }
-        defer { sqlite3_finalize(altStatement) }
-        
-        if sqlite3_step(altStatement) == SQLITE_ROW {
-            // Column 5 contains the email based on our research
-            if let emailCString = sqlite3_column_text(altStatement, 5) {
+        if sqlite3_step(statement) == SQLITE_ROW {
+            if let emailCString = sqlite3_column_text(statement, 5) {
                 return String(cString: emailCString)
             }
         }
@@ -161,20 +95,18 @@ class CalendarParticipantResolver {
         return nil
     }
     
-    private func findMatchingCalendarEvent(recordingStart: Date, recordingEnd: Date, databasePath: String) -> CalendarEvent? {
+    func findCalendarEvent(overlapping start: Date, end: Date) -> CalendarEvent? {
         let dbPath = databasePath + "Outlook.sqlite"
         
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            logger.error("Failed to open Outlook database")
             return nil
         }
         defer { sqlite3_close(db) }
         
-        // Query for events that overlap with the recording window
         // Outlook stores dates as Mac Absolute Time (seconds since Jan 1, 2001)
-        let macAbsoluteStart = recordingStart.timeIntervalSinceReferenceDate
-        let macAbsoluteEnd = recordingEnd.timeIntervalSinceReferenceDate
+        let macAbsoluteStart = start.timeIntervalSinceReferenceDate
+        let macAbsoluteEnd = end.timeIntervalSinceReferenceDate
         
         // Allow 5 minute buffer on either side for detection delays
         let buffer: TimeInterval = 5 * 60
@@ -193,7 +125,6 @@ class CalendarParticipantResolver {
         
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK else {
-            logger.error("Failed to prepare calendar query")
             return nil
         }
         defer { sqlite3_finalize(statement) }
@@ -222,16 +153,24 @@ class CalendarParticipantResolver {
         
         return nil
     }
+}
+
+/// Real file reader that uses /usr/bin/strings to extract emails from binary event files
+class OutlookEventFileReader: EventFileReaderProtocol {
+    private let basePath: String
     
-    private func extractAttendeesFromEventFile(path: String) -> [String] {
-        let expandedPath = (path as NSString).expandingTildeInPath
+    init(basePath: String) {
+        self.basePath = basePath
+    }
+    
+    func extractAttendeeEmails(fromEventFile relativePath: String) -> [String] {
+        let fullPath = basePath + relativePath
+        let expandedPath = (fullPath as NSString).expandingTildeInPath
         
         guard FileManager.default.fileExists(atPath: expandedPath) else {
-            logger.warning("Event file not found: \(expandedPath)")
             return []
         }
         
-        // Use `strings` command to extract readable strings from binary file
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
         process.arguments = [expandedPath]
@@ -249,11 +188,93 @@ class CalendarParticipantResolver {
                 return []
             }
             
-            return Self.extractEmails(from: output)
+            return CalendarParticipantResolver.extractEmails(from: output)
         } catch {
-            logger.error("Failed to extract strings from event file: \(error.localizedDescription)")
             return []
         }
+    }
+}
+
+// MARK: - Calendar Participant Resolver
+
+class CalendarParticipantResolver {
+    private let logger = DualLogger(category: "CalendarParticipantResolver")
+    private let database: OutlookDatabaseProtocol
+    private let fileReader: EventFileReaderProtocol
+    private let isEnabled: Bool
+    
+    // Default Outlook database path
+    static let defaultOutlookPath = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
+    
+    /// Production initializer using ConfigManager
+    convenience init(config: ConfigManager = .shared) {
+        let configPath = config.config.participants.outlookDatabasePath
+        let databasePath: String
+        if !configPath.isEmpty {
+            let expanded = (configPath as NSString).expandingTildeInPath
+            databasePath = expanded.hasSuffix("/") ? expanded : expanded + "/"
+        } else {
+            databasePath = (Self.defaultOutlookPath as NSString).expandingTildeInPath
+        }
+        
+        self.init(
+            database: OutlookSQLiteDatabase(databasePath: databasePath),
+            fileReader: OutlookEventFileReader(basePath: databasePath),
+            isEnabled: config.config.participants.enabled
+        )
+    }
+    
+    /// Testable initializer with dependency injection
+    init(database: OutlookDatabaseProtocol, fileReader: EventFileReaderProtocol, isEnabled: Bool = true) {
+        self.database = database
+        self.fileReader = fileReader
+        self.isEnabled = isEnabled
+    }
+    
+    /// Resolve meeting participants for a recording time window
+    func resolveParticipants(recordingStart: Date, recordingEnd: Date) -> MeetingParticipants? {
+        guard isEnabled else {
+            logger.info("Participant resolution disabled in config")
+            return nil
+        }
+        
+        // Get user's email first
+        guard let myEmail = database.getUserEmail() else {
+            logger.warning("Could not determine user email from Outlook")
+            return nil
+        }
+        
+        logger.info("User email: \(myEmail)")
+        
+        // Find matching calendar event
+        guard let event = database.findCalendarEvent(overlapping: recordingStart, end: recordingEnd) else {
+            logger.info("No matching calendar event found for recording window")
+            return nil
+        }
+        
+        logger.info("Found matching event with \(event.attendeeCount) attendees")
+        
+        // Extract attendee emails from event file
+        let attendeeEmails = fileReader.extractAttendeeEmails(fromEventFile: event.pathToDataFile)
+        
+        if attendeeEmails.isEmpty {
+            logger.warning("Could not extract attendee emails from event file")
+            return nil
+        }
+        
+        logger.info("Extracted \(attendeeEmails.count) attendee emails")
+        
+        // Filter out "me" and derive first names
+        let otherEmails = attendeeEmails.filter { $0.lowercased() != myEmail.lowercased() }
+        let otherNames = otherEmails.map { Self.deriveFirstName(from: $0) }
+        let myFirstName = Self.deriveFirstName(from: myEmail)
+        
+        return MeetingParticipants(
+            myEmail: myEmail,
+            myFirstName: myFirstName,
+            attendeeEmails: otherEmails,
+            attendeeFirstNames: otherNames
+        )
     }
     
     // MARK: - Static Helper Methods (exposed for testing)
