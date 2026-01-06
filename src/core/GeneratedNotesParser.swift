@@ -64,6 +64,79 @@ struct GeneratedNotesParser {
             .split(separator: "\n", omittingEmptySubsequences: false)
             .map(String.init)
 
+        // First, strip any LLM preamble text (e.g., "Generated meeting notes:", "Here are the meeting notes:", etc.)
+        // Keep stripping until we find real content
+        let preamblePatterns = [
+            "generated meeting notes",
+            "here are the meeting notes",
+            "here are your meeting notes",
+            "meeting notes:",
+            "**meeting date:**",
+            "meeting date:",
+            "[date fr"  // Incomplete date patterns
+        ]
+        
+        while let firstNonEmptyIndex = lines.firstIndex(where: {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) {
+            let trimmed = lines[firstNonEmptyIndex].trimmingCharacters(in: .whitespaces).lowercased()
+            
+            let isPreamble = preamblePatterns.contains { pattern in
+                trimmed.contains(pattern)
+            }
+            
+            if isPreamble {
+                lines.remove(at: firstNonEmptyIndex)
+                continue
+            }
+            
+            break
+        }
+
+        // Remove duplicate headers and preamble content anywhere in the document
+        var indicesToRemove: Set<Int> = []
+        var lastHeadingIndex: Int? = nil
+        var lastHeadingText: String? = nil
+        
+        for (i, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            
+            if trimmed.hasPrefix("#") {
+                let (_, headingText) = parseHeadingLine(trimmed)
+                let normalizedHeading = headingText.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if let lastIdx = lastHeadingIndex,
+                   let lastText = lastHeadingText,
+                   normalizedHeading == lastText {
+                    // Found duplicate heading - mark the earlier occurrence and content between for removal
+                    for j in lastIdx..<i {
+                        indicesToRemove.insert(j)
+                    }
+                }
+                
+                lastHeadingIndex = i
+                lastHeadingText = normalizedHeading
+            } else if !trimmed.isEmpty {
+                // Check if this line is preamble content that should be removed
+                let isStillPreamble = preamblePatterns.contains { pattern in
+                    trimmed.lowercased().contains(pattern)
+                }
+                
+                if isStillPreamble {
+                    // Mark preamble line for removal
+                    indicesToRemove.insert(i)
+                } else {
+                    // Real content found - stop tracking heading for duplicates
+                    lastHeadingIndex = nil
+                    lastHeadingText = nil
+                }
+            }
+        }
+        
+        // Remove marked lines
+        lines = lines.enumerated().filter { !indicesToRemove.contains($0.offset) }.map { $0.element }
+
+        // Then, handle markdown heading titles as before
         guard let firstNonEmptyIndex = lines.firstIndex(where: {
             !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }) else {
@@ -72,7 +145,7 @@ struct GeneratedNotesParser {
 
         let trimmed = lines[firstNonEmptyIndex].trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("#") else {
-            return raw
+            return lines.joined(separator: "\n")
         }
 
         let (_, headingText) = parseHeadingLine(trimmed)
@@ -88,7 +161,7 @@ struct GeneratedNotesParser {
             return lines.joined(separator: "\n")
         }
 
-        return raw
+        return lines.joined(separator: "\n")
     }
 
     private static func findHeading(named name: String, in lines: [String]) -> (index: Int, level: Int)? {
