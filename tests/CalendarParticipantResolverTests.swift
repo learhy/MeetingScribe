@@ -398,3 +398,182 @@ final class CalendarParticipantResolverTests: XCTestCase {
         return Calendar.current.date(from: components)!
     }
 }
+
+// MARK: - Test Fixture Helper
+
+/// Helper to get the path to test fixtures
+func getFixturePath() -> String {
+    // #file gives us the path to this source file
+    // We need to go from tests/CalendarParticipantResolverTests.swift to tests/fixtures/outlook/
+    let currentFile = #file
+    let testsDir = (currentFile as NSString).deletingLastPathComponent
+    let fixturePath = testsDir + "/fixtures/outlook/"
+    return fixturePath
+}
+
+// MARK: - Real SQLite Database Tests
+
+/// Tests that verify the actual SQLite implementation works correctly
+/// These tests use a fixture database in tests/fixtures/outlook/
+final class OutlookSQLiteDatabaseTests: XCTestCase {
+    
+    var fixturePath: String!
+    
+    override func setUp() {
+        super.setUp()
+        fixturePath = getFixturePath()
+    }
+    
+    func testGetUserEmail_ReturnsEmailFromDatabase() {
+        let db = OutlookSQLiteDatabase(databasePath: fixturePath)
+        
+        let email = db.getUserEmail()
+        
+        XCTAssertNotNil(email, "Should find user email in test database")
+        XCTAssertEqual(email, "test.user@company.com")
+    }
+    
+    func testGetUserEmail_ReturnsNilForMissingDatabase() {
+        let db = OutlookSQLiteDatabase(databasePath: "/nonexistent/path/")
+        
+        let email = db.getUserEmail()
+        
+        XCTAssertNil(email)
+    }
+    
+    func testFindCalendarEvent_ReturnsMatchingEvent() {
+        let db = OutlookSQLiteDatabase(databasePath: fixturePath)
+        
+        // The fixture has an event from 788954400 to 788958000 (Jan 6, 2026 10:00-11:00 UTC)
+        // Query with a time window that overlaps
+        let start = Date(timeIntervalSinceReferenceDate: 788954400 + 300)  // 10:05
+        let end = Date(timeIntervalSinceReferenceDate: 788954400 + 1800)   // 10:30
+        
+        let event = db.findCalendarEvent(overlapping: start, end: end)
+        
+        XCTAssertNotNil(event, "Should find overlapping calendar event")
+        XCTAssertEqual(event?.pathToDataFile, "Events/123/test-meeting.olk15Event")
+        XCTAssertEqual(event?.attendeeCount, 3)
+    }
+    
+    func testFindCalendarEvent_ReturnsNilForNonOverlappingTime() {
+        let db = OutlookSQLiteDatabase(databasePath: fixturePath)
+        
+        // Query with a time window that doesn't overlap (way in the future)
+        let start = Date(timeIntervalSinceReferenceDate: 800000000)
+        let end = Date(timeIntervalSinceReferenceDate: 800003600)
+        
+        let event = db.findCalendarEvent(overlapping: start, end: end)
+        
+        XCTAssertNil(event, "Should not find event outside time window")
+    }
+    
+    func testFindCalendarEvent_IgnoresEventsWithNoAttendees() {
+        let db = OutlookSQLiteDatabase(databasePath: fixturePath)
+        
+        // The fixture has a solo event (0 attendees) at the same time as the meeting
+        // The query should return the meeting (3 attendees), not the solo event
+        let start = Date(timeIntervalSinceReferenceDate: 788954400 + 300)
+        let end = Date(timeIntervalSinceReferenceDate: 788954400 + 1800)
+        
+        let event = db.findCalendarEvent(overlapping: start, end: end)
+        
+        XCTAssertNotNil(event)
+        XCTAssertGreaterThan(event?.attendeeCount ?? 0, 0, "Should only return events with attendees")
+    }
+}
+
+// MARK: - Real Event File Reader Tests
+
+/// Tests that verify the actual file reader extracts emails from binary files
+final class OutlookEventFileReaderTests: XCTestCase {
+    
+    var fixturePath: String!
+    
+    override func setUp() {
+        super.setUp()
+        fixturePath = getFixturePath()
+    }
+    
+    func testExtractAttendeeEmails_ExtractsEmailsFromBinaryFile() {
+        let reader = OutlookEventFileReader(basePath: fixturePath)
+        
+        let emails = reader.extractAttendeeEmails(fromEventFile: "Events/123/test-meeting.olk15Event")
+        
+        XCTAssertGreaterThan(emails.count, 0, "Should extract emails from fixture file")
+        XCTAssertTrue(emails.contains("test.user@company.com"))
+        XCTAssertTrue(emails.contains("alice.smith@company.com"))
+        XCTAssertTrue(emails.contains("bob.jones@company.com"))
+    }
+    
+    func testExtractAttendeeEmails_ReturnsEmptyForMissingFile() {
+        let reader = OutlookEventFileReader(basePath: fixturePath)
+        
+        let emails = reader.extractAttendeeEmails(fromEventFile: "Events/nonexistent.olk15Event")
+        
+        XCTAssertEqual(emails.count, 0)
+    }
+}
+
+// MARK: - Full End-to-End Integration Test
+
+/// Tests the complete flow with real SQLite database and real file reader
+final class CalendarParticipantResolverIntegrationTests: XCTestCase {
+    
+    var fixturePath: String!
+    
+    override func setUp() {
+        super.setUp()
+        fixturePath = getFixturePath()
+    }
+    
+    func testResolveParticipants_EndToEnd_WithRealFixtures() {
+        // Use real implementations with fixture data
+        let db = OutlookSQLiteDatabase(databasePath: fixturePath)
+        let fileReader = OutlookEventFileReader(basePath: fixturePath)
+        
+        let resolver = CalendarParticipantResolver(
+            database: db,
+            fileReader: fileReader,
+            isEnabled: true
+        )
+        
+        // Query with time that overlaps the fixture event
+        let start = Date(timeIntervalSinceReferenceDate: 788954400 + 300)  // 10:05
+        let end = Date(timeIntervalSinceReferenceDate: 788954400 + 1800)   // 10:30
+        
+        let result = resolver.resolveParticipants(recordingStart: start, recordingEnd: end)
+        
+        XCTAssertNotNil(result, "Should resolve participants from fixture data")
+        XCTAssertEqual(result?.myEmail, "test.user@company.com")
+        XCTAssertEqual(result?.myFirstName, "Test")
+        
+        // Should have 2 other attendees (excluding "me")
+        XCTAssertEqual(result?.attendeeEmails.count, 2)
+        XCTAssertTrue(result?.attendeeEmails.contains("alice.smith@company.com") ?? false)
+        XCTAssertTrue(result?.attendeeEmails.contains("bob.jones@company.com") ?? false)
+        
+        // Verify derived names
+        XCTAssertTrue(result?.attendeeFirstNames.contains("Alice") ?? false)
+        XCTAssertTrue(result?.attendeeFirstNames.contains("Bob") ?? false)
+    }
+    
+    func testResolveParticipants_EndToEnd_NoMatchingEvent() {
+        let db = OutlookSQLiteDatabase(databasePath: fixturePath)
+        let fileReader = OutlookEventFileReader(basePath: fixturePath)
+        
+        let resolver = CalendarParticipantResolver(
+            database: db,
+            fileReader: fileReader,
+            isEnabled: true
+        )
+        
+        // Query with time that doesn't overlap any fixture event
+        let start = Date(timeIntervalSinceReferenceDate: 800000000)
+        let end = Date(timeIntervalSinceReferenceDate: 800003600)
+        
+        let result = resolver.resolveParticipants(recordingStart: start, recordingEnd: end)
+        
+        XCTAssertNil(result, "Should return nil when no matching event")
+    }
+}
