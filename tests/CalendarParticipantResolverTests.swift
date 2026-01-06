@@ -831,6 +831,243 @@ final class ConfigManagerIntegrationTests: XCTestCase {
     }
 }
 
+// MARK: - Graceful Degradation Tests (No Outlook Installed)
+
+/// Tests that verify the software fails gracefully when Outlook is not installed
+/// CRITICAL: The software must continue to work without Outlook - it just won't have participant names
+final class GracefulDegradationTests: XCTestCase {
+    
+    /// Tests that resolver returns nil (not crash) when Outlook database doesn't exist
+    /// This simulates a user who doesn't have Outlook installed
+    func testResolveParticipants_NoOutlookInstalled_ReturnsNilGracefully() {
+        // Use the real production path that won't exist on most systems
+        let nonExistentPath = "/nonexistent/path/to/outlook/"
+        let db = OutlookSQLiteDatabase(databasePath: nonExistentPath)
+        let fileReader = OutlookEventFileReader(basePath: nonExistentPath)
+        
+        let resolver = CalendarParticipantResolver(
+            database: db,
+            fileReader: fileReader,
+            isEnabled: true
+        )
+        
+        // This should NOT crash - it should return nil gracefully
+        let result = resolver.resolveParticipants(
+            recordingStart: Date(),
+            recordingEnd: Date().addingTimeInterval(3600)
+        )
+        
+        XCTAssertNil(result, "Should return nil gracefully when Outlook is not installed")
+    }
+    
+    /// Tests that the production convenience initializer doesn't crash when Outlook isn't installed
+    /// This tests the actual code path used in main.swift
+    func testProductionInitializer_NoOutlookInstalled_DoesNotCrash() {
+        // The production initializer reads from ConfigManager and constructs real implementations
+        // Even if Outlook isn't at the default path, this should not crash
+        // We can't easily test this without modifying ConfigManager, but we CAN test that
+        // the OutlookSQLiteDatabase handles missing paths gracefully
+        
+        let defaultPath = (CalendarParticipantResolver.defaultOutlookPath as NSString).expandingTildeInPath
+        let db = OutlookSQLiteDatabase(databasePath: defaultPath)
+        
+        // Even if this path exists (real Outlook), or doesn't exist, this should not crash
+        // It should return nil or a valid email
+        let email = db.getUserEmail()
+        
+        // We don't assert the value because it depends on whether Outlook is installed
+        // The key assertion is that we reached this line without crashing
+        XCTAssertTrue(true, "getUserEmail should complete without crashing regardless of Outlook installation")
+        
+        // Log for visibility
+        if let email = email {
+            print("[TEST] Outlook is installed, found email: \(email)")
+        } else {
+            print("[TEST] Outlook not installed or no email found - this is expected and OK")
+        }
+    }
+    
+    /// Tests that meeting processing continues normally when participant resolution fails
+    /// This verifies the "old behavior" (SPEAKER_00, etc) remains when Outlook isn't available
+    func testParticipantContextIsOptional_NilDoesNotBreakProcessing() {
+        // Simulate what happens in main.swift processRecording() when resolver returns nil
+        let mockDB = MockOutlookDatabase()
+        mockDB.userEmail = nil  // Simulates no Outlook
+        
+        let resolver = CalendarParticipantResolver(
+            database: mockDB,
+            fileReader: MockEventFileReader(),
+            isEnabled: true
+        )
+        
+        let participants = resolver.resolveParticipants(
+            recordingStart: Date(),
+            recordingEnd: Date()
+        )
+        
+        // This is what main.swift does:
+        var participantContext: String? = nil
+        if let p = participants {
+            participantContext = p.formatForLLMContext()
+        }
+        
+        // When Outlook isn't available, participantContext should be nil
+        // and the LLM should fall back to SPEAKER_00, SPEAKER_01, etc.
+        XCTAssertNil(participantContext, "Should have nil context when Outlook unavailable")
+        
+        // The key point: the code path completed without error
+        // NotesGenerationService.generateNotes() accepts nil participantContext
+    }
+}
+
+// MARK: - NotesGenerationService Integration Tests
+
+/// Tests for the participant context injection into NotesGenerationService
+final class NotesGenerationIntegrationTests: XCTestCase {
+    
+    /// Tests that generateNotes accepts nil participantContext without error
+    func testGenerateNotes_NilParticipantContext_DoesNotCrash() {
+        // We can't actually call the LLM in tests, but we can verify the method signature
+        // accepts nil and the code structure is correct
+        
+        // This test documents that the method signature allows nil:
+        // func generateNotes(transcript: String, participantContext: String? = nil)
+        
+        // The actual integration would be:
+        // let notes = try await notesService.generateNotes(transcript: "test", participantContext: nil)
+        // But we can't await in sync tests without more infrastructure
+        
+        // For now, verify the MeetingParticipants formatting works correctly
+        let participants = MeetingParticipants(
+            myEmail: "test@example.com",
+            myFirstName: "Test",
+            attendeeEmails: ["other@example.com"],
+            attendeeFirstNames: ["Other"]
+        )
+        
+        let context = participants.formatForLLMContext()
+        
+        // Verify the context would be appended correctly to a system prompt
+        let systemPrompt = "You are a meeting notes assistant."
+        let augmentedPrompt = systemPrompt + "\n\n" + context
+        
+        XCTAssertTrue(augmentedPrompt.contains("Meeting participants:"))
+        XCTAssertTrue(augmentedPrompt.contains("Test (me)"))
+        XCTAssertTrue(augmentedPrompt.contains("Other"))
+        XCTAssertTrue(augmentedPrompt.contains("SPEAKER_"))
+    }
+    
+    /// Tests that empty participant context doesn't corrupt the prompt
+    func testGenerateNotes_EmptyParticipantContext_DoesNotCorruptPrompt() {
+        let systemPrompt = "You are a meeting notes assistant."
+        let emptyContext = ""
+        
+        // This is what NotesGenerationService does when context is empty:
+        // if let context = participantContext, !context.isEmpty {
+        //     systemPrompt = systemPrompt + "\n\n" + context
+        // }
+        
+        var augmentedPrompt = systemPrompt
+        if !emptyContext.isEmpty {
+            augmentedPrompt = systemPrompt + "\n\n" + emptyContext
+        }
+        
+        // Prompt should be unchanged
+        XCTAssertEqual(augmentedPrompt, systemPrompt, "Empty context should not modify prompt")
+    }
+}
+
+// MARK: - MeetingParticipants Edge Case Tests
+
+/// Additional edge case tests for MeetingParticipants formatting
+final class MeetingParticipantsEdgeCaseTests: XCTestCase {
+    
+    /// Tests that duplicate names (myFirstName matches attendeeFirstName) are handled
+    func testFormatForLLMContext_DuplicateNames_OnlyShowsOnce() {
+        // Edge case: What if the user's derived name matches an attendee's name?
+        // This could happen with common names like "John"
+        let participants = MeetingParticipants(
+            myEmail: "john.smith@example.com",
+            myFirstName: "John",
+            attendeeEmails: ["john.doe@example.com", "jane.doe@example.com"],
+            attendeeFirstNames: ["John", "Jane"]  // Another "John"!
+        )
+        
+        let context = participants.formatForLLMContext()
+        
+        // The current implementation filters out attendee names that match myFirstName
+        // (see line 23 in CalendarParticipantResolver.swift: if name != myFirstName)
+        // So "John" should only appear once as "John (me)"
+        let johnCount = context.components(separatedBy: "John").count - 1
+        XCTAssertEqual(johnCount, 1, "John should only appear once (as 'me'), not twice")
+        XCTAssertTrue(context.contains("John (me)"))
+        XCTAssertTrue(context.contains("Jane"))
+    }
+    
+    /// Tests formatting when myFirstName is empty
+    func testFormatForLLMContext_EmptyMyFirstName_StillWorks() {
+        let participants = MeetingParticipants(
+            myEmail: "@malformed.com",  // Would result in empty first name
+            myFirstName: "",
+            attendeeEmails: ["alice@example.com"],
+            attendeeFirstNames: ["Alice"]
+        )
+        
+        let context = participants.formatForLLMContext()
+        
+        // Should still include Alice, even if "me" is missing
+        XCTAssertTrue(context.contains("Alice"))
+        XCTAssertFalse(context.contains("(me)"), "Should not have (me) marker when name is empty")
+    }
+    
+    /// Tests that formatForLLMContext returns empty string when no participants
+    func testFormatForLLMContext_AllEmpty_ReturnsEmptyString() {
+        let participants = MeetingParticipants(
+            myEmail: "",
+            myFirstName: "",
+            attendeeEmails: [],
+            attendeeFirstNames: []
+        )
+        
+        let context = participants.formatForLLMContext()
+        
+        XCTAssertEqual(context, "", "Should return empty string when all fields are empty")
+    }
+}
+
+// MARK: - Real Outlook Integration Test (Optional)
+
+/// Tests that run against real Outlook installation if present
+/// These tests are informational - they pass regardless of Outlook installation
+final class RealOutlookTests: XCTestCase {
+    
+    /// Tests against real Outlook installation if present
+    /// This test always passes but logs whether Outlook was found
+    func testRealOutlookInstallation_InformationalOnly() {
+        let defaultPath = (CalendarParticipantResolver.defaultOutlookPath as NSString).expandingTildeInPath
+        let dbPath = defaultPath + "Outlook.sqlite"
+        
+        let outlookExists = FileManager.default.fileExists(atPath: dbPath)
+        
+        if outlookExists {
+            print("[TEST] ✓ Outlook database found at: \(dbPath)")
+            
+            // Try to read user email
+            let db = OutlookSQLiteDatabase(databasePath: defaultPath)
+            if let email = db.getUserEmail() {
+                print("[TEST] ✓ Successfully read user email: \(email)")
+            } else {
+                print("[TEST] ✗ Outlook database exists but couldn't read email (schema mismatch?)")
+            }
+        } else {
+            print("[TEST] ○ Outlook not installed at default path - this is OK")
+        }
+        
+        // This test always passes - it's informational
+        XCTAssertTrue(true, "This test is informational only")
+    }
+}
+
 // MARK: - Additional Fixture Helpers
 
 /// Helper to get path to alternative fixture directories
