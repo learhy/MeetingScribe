@@ -47,8 +47,23 @@ if [ -f "$INSTALL_MARKER" ]; then
         # Show dialog about reinstallation
         show_dialog "MeetingScribe has moved to a new location.\\n\\nReinstalling from:\\n$APP_PATH"
     else
-        # Already installed at correct location
-        exit 0
+        # Check if version changed (upgrade scenario)
+        CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "unknown")
+        CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "unknown")
+        CURRENT_VERSION_STRING="$CURRENT_VERSION ($CURRENT_BUILD)"
+        
+        if [ -f "$VERSION_MARKER" ]; then
+            INSTALLED_VERSION=$(cat "$VERSION_MARKER")
+            if [ "$CURRENT_VERSION_STRING" = "$INSTALLED_VERSION" ]; then
+                # Already installed at correct location with same version
+                log "Already installed at correct location with same version - skipping"
+                exit 0
+            else
+                log "Version changed from $INSTALLED_VERSION to $CURRENT_VERSION_STRING - upgrading"
+            fi
+        else
+            log "No version marker found - performing upgrade installation"
+        fi
     fi
 else
     log "First run detected"
