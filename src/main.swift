@@ -17,7 +17,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let processId = ProcessInfo.processInfo.processIdentifier
         let bundlePath = Bundle.main.bundlePath
-        logger.info("MeetingScribe starting... (PID: \(processId), Path: \(bundlePath))")
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        logger.info("========================================")
+        logger.info("🚀 MEETINGSCRIBE DAEMON STARTING")
+        logger.info("   Version: \(version)")
+        logger.info("   PID: \(processId)")
+        logger.info("   Path: \(bundlePath)")
+        logger.info("========================================")
         
         // Set up standard Edit menu for keyboard shortcuts (Cmd+C, Cmd+V, etc.)
         setupEditMenu()
@@ -121,7 +127,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        logger.info("MeetingScribe terminating...")
+        let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("========================================")
+        logger.info("🛑 MEETINGSCRIBE DAEMON STOPPING")
+        logger.info("   PID: \(processId)")
+        logger.info("========================================")
         meetingScribeService?.stop()
     }
     
@@ -457,7 +467,9 @@ class MeetingScribeService {
         )
         
         source.setEventHandler { [weak self] in
-            self?.logger.info("Config file changed - rechecking API key configuration")
+            self?.logger.info("========================================")
+            self?.logger.info("🔄 CONFIG FILE CHANGED - RELOADING")
+            self?.logger.info("========================================")
             
             // Reload config
             self?.config.reload()
