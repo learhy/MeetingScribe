@@ -104,14 +104,16 @@ class OutlookSQLiteDatabase: OutlookDatabaseProtocol {
         }
         defer { sqlite3_close(db) }
         
-        // Outlook stores dates as Mac Absolute Time (seconds since Jan 1, 2001)
-        let macAbsoluteStart = start.timeIntervalSinceReferenceDate
-        let macAbsoluteEnd = end.timeIntervalSinceReferenceDate
+        // Outlook stores dates as minutes since OLE epoch (Jan 1, 1601)
+        // Convert Swift Date to OLE minutes
+        let oleEpoch = Date(timeIntervalSince1970: -11644473600) // Jan 1, 1601 in Unix time
+        let oleMinutesStart = start.timeIntervalSince(oleEpoch) / 60.0
+        let oleMinutesEnd = end.timeIntervalSince(oleEpoch) / 60.0
         
         // Allow 5 minute buffer on either side for detection delays
-        let buffer: TimeInterval = 5 * 60
-        let adjustedStart = macAbsoluteStart - buffer
-        let adjustedEnd = macAbsoluteEnd + buffer
+        let bufferMinutes: Double = 5.0
+        let adjustedStart = oleMinutesStart - bufferMinutes
+        let adjustedEnd = oleMinutesEnd + bufferMinutes
         
         let query = """
             SELECT Record_RecordID, PathToDataFile, Calendar_StartDateUTC, Calendar_EndDateUTC, Calendar_AttendeeCount
@@ -135,12 +137,13 @@ class OutlookSQLiteDatabase: OutlookDatabaseProtocol {
         if sqlite3_step(statement) == SQLITE_ROW {
             let recordId = Int(sqlite3_column_int(statement, 0))
             let pathToDataFile = String(cString: sqlite3_column_text(statement, 1))
-            let startTimestamp = sqlite3_column_double(statement, 2)
-            let endTimestamp = sqlite3_column_double(statement, 3)
+            let startOleMinutes = sqlite3_column_double(statement, 2)
+            let endOleMinutes = sqlite3_column_double(statement, 3)
             let attendeeCount = Int(sqlite3_column_int(statement, 4))
             
-            let startDate = Date(timeIntervalSinceReferenceDate: startTimestamp)
-            let endDate = Date(timeIntervalSinceReferenceDate: endTimestamp)
+            // Convert OLE minutes back to Date
+            let startDate = oleEpoch.addingTimeInterval(startOleMinutes * 60.0)
+            let endDate = oleEpoch.addingTimeInterval(endOleMinutes * 60.0)
             
             return CalendarEvent(
                 recordId: recordId,

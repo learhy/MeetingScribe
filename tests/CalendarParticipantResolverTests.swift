@@ -400,7 +400,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
     }
 }
 
-// MARK: - Test Fixture Helper
+// MARK: - Test Fixture Helpers
 
 /// Helper to get the path to test fixtures
 func getFixturePath() -> String {
@@ -410,6 +410,14 @@ func getFixturePath() -> String {
     let testsDir = (currentFile as NSString).deletingLastPathComponent
     let fixturePath = testsDir + "/fixtures/outlook/"
     return fixturePath
+}
+
+/// Convert OLE minutes (minutes since Jan 1, 1601) to Date
+/// Outlook stores calendar timestamps in this format
+func dateFromOleMinutes(_ oleMinutes: Double) -> Date {
+    // OLE epoch is Jan 1, 1601 which is -11644473600 seconds from Unix epoch
+    let oleEpoch = Date(timeIntervalSince1970: -11644473600)
+    return oleEpoch.addingTimeInterval(oleMinutes * 60.0)
 }
 
 // MARK: - Real SQLite Database Tests
@@ -445,10 +453,10 @@ final class OutlookSQLiteDatabaseTests: XCTestCase {
     func testFindCalendarEvent_ReturnsMatchingEvent() {
         let db = OutlookSQLiteDatabase(databasePath: fixturePath)
         
-        // The fixture has an event from 788954400 to 788958000 (Jan 6, 2026 10:00-11:00 UTC)
-        // Query with a time window that overlaps
-        let start = Date(timeIntervalSinceReferenceDate: 788954400 + 300)  // 10:05
-        let end = Date(timeIntervalSinceReferenceDate: 788954400 + 1800)   // 10:30
+        // The fixture has an event at OLE minutes 223528920-223528980 (Jan 1, 2026 10:00-11:00 UTC)
+        // Query with a time window that overlaps (10:05 - 10:30)
+        let start = createDateFromOleMinutes(223528920 + 5)   // 10:05
+        let end = createDateFromOleMinutes(223528920 + 30)    // 10:30
         
         let event = db.findCalendarEvent(overlapping: start, end: end)
         
@@ -461,8 +469,8 @@ final class OutlookSQLiteDatabaseTests: XCTestCase {
         let db = OutlookSQLiteDatabase(databasePath: fixturePath)
         
         // Query with a time window that doesn't overlap (way in the future)
-        let start = Date(timeIntervalSinceReferenceDate: 800000000)
-        let end = Date(timeIntervalSinceReferenceDate: 800003600)
+        let start = createDateFromOleMinutes(230000000)  // ~2038
+        let end = createDateFromOleMinutes(230000060)    // 1 hour later
         
         let event = db.findCalendarEvent(overlapping: start, end: end)
         
@@ -474,13 +482,22 @@ final class OutlookSQLiteDatabaseTests: XCTestCase {
         
         // The fixture has a solo event (0 attendees) at the same time as the meeting
         // The query should return the meeting (3 attendees), not the solo event
-        let start = Date(timeIntervalSinceReferenceDate: 788954400 + 300)
-        let end = Date(timeIntervalSinceReferenceDate: 788954400 + 1800)
+        let start = createDateFromOleMinutes(223528920 + 5)   // 10:05
+        let end = createDateFromOleMinutes(223528920 + 30)    // 10:30
         
         let event = db.findCalendarEvent(overlapping: start, end: end)
         
         XCTAssertNotNil(event)
         XCTAssertGreaterThan(event?.attendeeCount ?? 0, 0, "Should only return events with attendees")
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Create a Date from OLE minutes (minutes since Jan 1, 1601)
+    private func createDateFromOleMinutes(_ oleMinutes: Double) -> Date {
+        // OLE epoch is Jan 1, 1601 which is -11644473600 seconds from Unix epoch
+        let oleEpoch = Date(timeIntervalSince1970: -11644473600)
+        return oleEpoch.addingTimeInterval(oleMinutes * 60.0)
     }
 }
 
@@ -539,9 +556,9 @@ final class CalendarParticipantResolverIntegrationTests: XCTestCase {
             isEnabled: true
         )
         
-        // Query with time that overlaps the fixture event
-        let start = Date(timeIntervalSinceReferenceDate: 788954400 + 300)  // 10:05
-        let end = Date(timeIntervalSinceReferenceDate: 788954400 + 1800)   // 10:30
+        // Query with time that overlaps the fixture event (OLE minutes 223528920-223528980)
+        let start = dateFromOleMinutes(223528920 + 5)   // 10:05
+        let end = dateFromOleMinutes(223528920 + 30)    // 10:30
         
         let result = resolver.resolveParticipants(recordingStart: start, recordingEnd: end)
         
@@ -569,9 +586,9 @@ final class CalendarParticipantResolverIntegrationTests: XCTestCase {
             isEnabled: true
         )
         
-        // Query with time that doesn't overlap any fixture event
-        let start = Date(timeIntervalSinceReferenceDate: 800000000)
-        let end = Date(timeIntervalSinceReferenceDate: 800003600)
+        // Query with time that doesn't overlap any fixture event (far in the future)
+        let start = dateFromOleMinutes(230000000)  // ~2038
+        let end = dateFromOleMinutes(230000060)    // 1 hour later
         
         let result = resolver.resolveParticipants(recordingStart: start, recordingEnd: end)
         
@@ -600,19 +617,19 @@ final class SQLQueryEdgeCaseTests: XCTestCase {
     func testFindCalendarEvent_FiveMinuteBuffer_FindsEventStartingAfterRecordingEnds() {
         let db = OutlookSQLiteDatabase(databasePath: fixturePath)
         
-        // "just-inside-buffer" event: starts at 788958100, ends at 788961700, 2 attendees
+        // "just-inside-buffer" event: OLE minutes 223528982-223529042, 2 attendees
         // 
-        // Query a recording that ends 100 seconds BEFORE the event starts:
-        // Recording: 788957900 - 788958000
-        // adjustedEnd = 788958000 + 300 = 788958300
+        // Query a recording that ends 2 minutes BEFORE the event starts:
+        // Recording: 223528978 - 223528980
+        // adjustedEnd = 223528980 + 5 = 223528985
         // 
-        // Event matches if: event.start (788958100) <= adjustedEnd (788958300)  ✓
-        //                   event.end (788961700) >= adjustedStart (788957600)  ✓
+        // Event matches if: event.start (223528982) <= adjustedEnd (223528985)  ✓
+        //                   event.end (223529042) >= adjustedStart (223528973)  ✓
         //
-        // However, the main event (788954400-788958000, 3 attendees) also matches and has more attendees.
+        // The main event (223528920-223528980, 3 attendees) also matches and has more attendees.
         // So this test verifies that SOME event is found when the buffer is in play.
-        let recordingStart = Date(timeIntervalSinceReferenceDate: 788957900)
-        let recordingEnd = Date(timeIntervalSinceReferenceDate: 788958000)
+        let recordingStart = dateFromOleMinutes(223528978)
+        let recordingEnd = dateFromOleMinutes(223528980)
         
         let event = db.findCalendarEvent(overlapping: recordingStart, end: recordingEnd)
         
@@ -623,28 +640,11 @@ final class SQLQueryEdgeCaseTests: XCTestCase {
     func testFindCalendarEvent_FiveMinuteBuffer_DoesNotFindDistantEvent() {
         let db = OutlookSQLiteDatabase(databasePath: fixturePath)
         
-        // "just-outside-buffer" event: starts at 788960000, ends at 788963600
-        //
-        // Query a recording that ends more than 5 minutes before event starts:
-        // Recording: 788959000 - 788959500 (500 seconds before event starts)
-        // adjustedEnd = 788959500 + 300 = 788959800
-        // 
-        // Event would need: event.start (788960000) <= adjustedEnd (788959800)  ✗ FAILS
-        // So this event should NOT match.
-        //
-        // But we need to make sure no OTHER events match either.
-        // The "just-inside-buffer" event ends at 788961700, starts at 788958100
-        // Check: 788958100 <= 788959800? Yes! So just-inside-buffer might match.
-        //
-        // Let's pick a time window between events where nothing should match:
-        // After just-inside-buffer ends (788961700) and before just-outside-buffer + overlap events
-        // Actually just-outside-buffer starts at 788960000 which is BEFORE just-inside-buffer ends.
-        // 
-        // Let's query way after all the early events but before the overlap events (789000000):
-        // Recording: 788970000 - 788975000
-        // No events in this range, so should return nil
-        let recordingStart = Date(timeIntervalSinceReferenceDate: 788970000)
-        let recordingEnd = Date(timeIntervalSinceReferenceDate: 788975000)
+        // Query a recording well outside any fixture events
+        // All fixture events are between OLE minutes 223528000-223529100
+        // Query way after that range
+        let recordingStart = dateFromOleMinutes(223540000)
+        let recordingEnd = dateFromOleMinutes(223540060)
         
         let event = db.findCalendarEvent(overlapping: recordingStart, end: recordingEnd)
         
@@ -656,11 +656,11 @@ final class SQLQueryEdgeCaseTests: XCTestCase {
     func testFindCalendarEvent_MultipleOverlapping_ReturnsHighestAttendeeCount() {
         let db = OutlookSQLiteDatabase(databasePath: fixturePath)
         
-        // Fixture has two overlapping events at 789000000-789003600:
-        // - small-meeting with 2 attendees
-        // - large-meeting with 8 attendees
-        let recordingStart = Date(timeIntervalSinceReferenceDate: 789000500)
-        let recordingEnd = Date(timeIntervalSinceReferenceDate: 789003000)
+        // Fixture has two overlapping events at OLE minutes 223529000-223529060:
+        // - small-meeting (record 6) with 2 attendees
+        // - large-meeting (record 7) with 8 attendees
+        let recordingStart = dateFromOleMinutes(223529010)
+        let recordingEnd = dateFromOleMinutes(223529050)
         
         let event = db.findCalendarEvent(overlapping: recordingStart, end: recordingEnd)
         
