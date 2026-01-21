@@ -20,6 +20,18 @@ if [ ! -d "$APP_BUNDLE" ]; then
     exit 1
 fi
 
+# Update version in Info.plist
+echo "Updating version to ${VERSION} in Info.plist..."
+INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
+if [ ! -f "$INFO_PLIST" ]; then
+    echo "❌ Info.plist not found at $INFO_PLIST"
+    exit 1
+fi
+
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST"
+echo "✅ Version updated in Info.plist"
+
 # Check if bundled Python exists
 if [ ! -f "$APP_BUNDLE/Contents/Resources/python/bin/python3" ]; then
     echo "⚠️  Warning: Bundled Python not found in app bundle"
@@ -113,6 +125,7 @@ https://github.com/your-repo/meeting-scribe
 
 Control Commands (after installation):
   meetingscribe-ctl status   - Check daemon status
+  meetingscribe-ctl version  - Show installed version
   meetingscribe-ctl stop     - Stop daemon
   meetingscribe-ctl start    - Start daemon
   meetingscribe-ctl restart  - Restart daemon

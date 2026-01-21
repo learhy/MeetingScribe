@@ -3,11 +3,19 @@ import SQLite3
 
 // MARK: - Data Models
 
+struct Participant {
+    let email: String
+    let firstName: String
+    let isMe: Bool
+    let inferredRole: String?  // "remote", "local", or nil if uncertain
+}
+
 struct MeetingParticipants {
     let myEmail: String
     let myFirstName: String
     let attendeeEmails: [String]
     let attendeeFirstNames: [String]
+    let participants: [Participant]  // Enhanced mapping with roles
     
     /// Format participant information for LLM context injection
     func formatForLLMContext() -> String {
@@ -30,9 +38,53 @@ struct MeetingParticipants {
         }
         
         let participantList = parts.joined(separator: ", ")
+        
+        // Build diarization guidance based on participant count and roles
+        var diarizationGuidance = ""
+        
+        // Find "me" and "remote" participants
+        let meParticipant = participants.first { $0.isMe }
+        let remoteParticipants = participants.filter { !$0.isMe }
+        
+        if participants.count == 2, let me = meParticipant, let remote = remoteParticipants.first {
+            // 1:1 call - provide explicit mapping guidance
+            diarizationGuidance = """
+            
+            
+            Diarization speaker mapping guidance:
+            - This appears to be a 1:1 conversation between \(me.firstName) (local user) and \(remote.firstName) (remote participant).
+            - Attempt to intelligently infer which diarized speaker (SPEAKER_00, SPEAKER_01, etc.) corresponds to the local user based on context clues in the conversation.
+            - DO NOT assume SPEAKER_00 is always the local user - this varies by audio setup.
+            - Look for context like "I think...", "from my perspective...", or references that indicate the speaker's role.
+            - Once you've identified which speaker is likely the local user, map: \(me.firstName) = that speaker, \(remote.firstName) = the other speaker.
+            """
+        } else if participants.count > 2 {
+            // Group call - provide general guidance
+            diarizationGuidance = """
+            
+            
+            Diarization speaker mapping guidance:
+            - This is a group conversation with \(participants.count) participants including \(meParticipant?.firstName ?? "the local user") (local) and \(remoteParticipants.count) remote participant(s).
+            - Attempt to map diarized speakers (SPEAKER_00, SPEAKER_01, etc.) to actual participants based on conversation context.
+            - DO NOT assume SPEAKER_00 is the local user - analyze the content to infer speaker identity.
+            - If you cannot confidently map a speaker, you may provide likely mappings with a caveat about uncertainty.
+            - Participant list with emails for reference: \(participants.map { "\($0.firstName) <\($0.email)>\(($0.isMe ? " (me)" : ""))" }.joined(separator: ", ")).
+            """
+        } else if let me = meParticipant {
+            // Solo meeting (only local user detected)
+            diarizationGuidance = """
+            
+            
+            Diarization speaker mapping guidance:
+            - Only the local user (\(me.firstName)) was detected in the calendar event.
+            - Any diarized speakers are likely all \(me.firstName), unless other voices are present in the audio.
+            """
+        }
+        
         return """
-        Meeting participants: \(participantList).
-        When you see speaker labels like SPEAKER_00, SPEAKER_01, etc., try to identify who is speaking based on conversation context and attribute statements to the correct person when possible.
+        Meeting participants: \(participantList).\(diarizationGuidance)
+        
+        When you see speaker labels like SPEAKER_00, SPEAKER_01, etc., use the guidance above to identify who is speaking and attribute statements to the correct person when possible.
         """
     }
 }
@@ -161,6 +213,7 @@ class OutlookSQLiteDatabase: OutlookDatabaseProtocol {
 /// Real file reader that uses /usr/bin/strings to extract emails from binary event files
 class OutlookEventFileReader: EventFileReaderProtocol {
     private let basePath: String
+    private let logger = DualLogger(category: "OutlookEventFileReader")
     
     init(basePath: String) {
         self.basePath = basePath
@@ -171,12 +224,35 @@ class OutlookEventFileReader: EventFileReaderProtocol {
         let expandedPath = (fullPath as NSString).expandingTildeInPath
         
         guard FileManager.default.fileExists(atPath: expandedPath) else {
+            logger.warning("Event file does not exist: \(expandedPath)")
             return []
         }
         
+        // Check file size for sanity
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: expandedPath),
+           let fileSize = attributes[.size] as? UInt64 {
+            if fileSize == 0 {
+                logger.warning("Event file is empty (0 bytes): \(expandedPath)")
+                return []
+            }
+        }
+        
+        // Try standard strings extraction first
+        var emails = runStringsCommand(path: expandedPath, arguments: [expandedPath])
+        
+        // If empty, retry with more aggressive options
+        if emails.isEmpty {
+            logger.debug("Standard strings extraction returned empty, retrying with -a -n 4")
+            emails = runStringsCommand(path: expandedPath, arguments: ["-a", "-n", "4", expandedPath])
+        }
+        
+        return emails
+    }
+    
+    private func runStringsCommand(path: String, arguments: [String]) -> [String] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
-        process.arguments = [expandedPath]
+        process.arguments = arguments
         
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -188,11 +264,13 @@ class OutlookEventFileReader: EventFileReaderProtocol {
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let output = String(data: data, encoding: .utf8) else {
+                logger.warning("Failed to decode strings output as UTF-8")
                 return []
             }
             
             return CalendarParticipantResolver.extractEmails(from: output)
         } catch {
+            logger.error("Failed to run strings command: \(error.localizedDescription)")
             return []
         }
     }
@@ -205,6 +283,7 @@ class CalendarParticipantResolver {
     private let database: OutlookDatabaseProtocol
     private let fileReader: EventFileReaderProtocol
     private let isEnabled: Bool
+    private let debugLogging: Bool
     
     // Default Outlook database path
     static let defaultOutlookPath = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
@@ -223,15 +302,17 @@ class CalendarParticipantResolver {
         self.init(
             database: OutlookSQLiteDatabase(databasePath: databasePath),
             fileReader: OutlookEventFileReader(basePath: databasePath),
-            isEnabled: config.config.participants.enabled
+            isEnabled: config.config.participants.enabled,
+            debugLogging: config.config.participants.debugLogging
         )
     }
     
     /// Testable initializer with dependency injection
-    init(database: OutlookDatabaseProtocol, fileReader: EventFileReaderProtocol, isEnabled: Bool = true) {
+    init(database: OutlookDatabaseProtocol, fileReader: EventFileReaderProtocol, isEnabled: Bool = true, debugLogging: Bool = false) {
         self.database = database
         self.fileReader = fileReader
         self.isEnabled = isEnabled
+        self.debugLogging = debugLogging
     }
     
     /// Resolve meeting participants for a recording time window
@@ -243,40 +324,82 @@ class CalendarParticipantResolver {
         
         // Get user's email first
         guard let myEmail = database.getUserEmail() else {
-            logger.warning("Could not determine user email from Outlook")
+            logger.warning("Could not determine user email from Outlook database")
             return nil
         }
         
-        logger.info("User email: \(myEmail)")
+        logger.info("✓ Successfully retrieved user email from Outlook")
+        if debugLogging {
+            logger.debug("User email: \(myEmail)")
+        }
         
         // Find matching calendar event
         guard let event = database.findCalendarEvent(overlapping: recordingStart, end: recordingEnd) else {
-            logger.info("No matching calendar event found for recording window")
+            logger.info("No matching calendar event found for recording window (\(Self.formatDate(recordingStart)) - \(Self.formatDate(recordingEnd)))")
             return nil
         }
         
-        logger.info("Found matching event with \(event.attendeeCount) attendees")
+        logger.info("✓ Found matching calendar event (recordId=\(event.recordId), attendeeCount=\(event.attendeeCount))")
+        if debugLogging {
+            logger.debug("Event details: start=\(Self.formatDate(event.startDateUTC)), end=\(Self.formatDate(event.endDateUTC)), path=\(event.pathToDataFile)")
+        }
         
-        // Extract attendee emails from event file
+        // Extract attendee emails from event file with timing
+        let extractionStart = Date()
         let attendeeEmails = fileReader.extractAttendeeEmails(fromEventFile: event.pathToDataFile)
+        let extractionDuration = Date().timeIntervalSince(extractionStart)
         
         if attendeeEmails.isEmpty {
-            logger.warning("Could not extract attendee emails from event file")
+            logger.warning("✗ Could not extract attendee emails from event file (\(event.pathToDataFile)) after \(String(format: "%.2f", extractionDuration))s")
             return nil
         }
         
-        logger.info("Extracted \(attendeeEmails.count) attendee emails")
+        logger.info("✓ Extracted \(attendeeEmails.count) attendee email(s) in \(String(format: "%.2f", extractionDuration))s")
+        if debugLogging {
+            logger.debug("Extracted emails: \(attendeeEmails.joined(separator: ", "))")
+        }
         
-        // Filter out "me" and derive first names
-        let otherEmails = attendeeEmails.filter { $0.lowercased() != myEmail.lowercased() }
-        let otherNames = otherEmails.map { Self.deriveFirstName(from: $0) }
+        // Build participant mapping with isMe and inferredRole
         let myFirstName = Self.deriveFirstName(from: myEmail)
+        var participants: [Participant] = []
+        
+        // Add "me" participant
+        participants.append(Participant(
+            email: myEmail,
+            firstName: myFirstName,
+            isMe: true,
+            inferredRole: "local"
+        ))
+        
+        // Add other participants
+        let otherEmails = attendeeEmails.filter { $0.lowercased() != myEmail.lowercased() }
+        let otherParticipants = otherEmails.map { email -> Participant in
+            let firstName = Self.deriveFirstName(from: email)
+            // In 1:1 meetings, mark the other participant as "remote"
+            let role: String? = (otherEmails.count == 1) ? "remote" : nil
+            return Participant(email: email, firstName: firstName, isMe: false, inferredRole: role)
+        }
+        
+        participants.append(contentsOf: otherParticipants)
+        
+        if debugLogging {
+            logger.debug("Participant mapping:")
+            for p in participants {
+                logger.debug("  - \(p.firstName) <\(p.email)>: isMe=\(p.isMe), role=\(p.inferredRole ?? "uncertain")")
+            }
+        }
+        
+        // Derive names for backward compatibility with attendeeFirstNames array
+        let otherNames = otherParticipants.map { $0.firstName }
+        
+        logger.info("✓ Successfully resolved \(participants.count) participant(s): \(myFirstName) (me) + \(otherNames.joined(separator: ", "))")
         
         return MeetingParticipants(
             myEmail: myEmail,
             myFirstName: myFirstName,
             attendeeEmails: otherEmails,
-            attendeeFirstNames: otherNames
+            attendeeFirstNames: otherNames,
+            participants: participants
         )
     }
     
@@ -332,5 +455,12 @@ class CalendarParticipantResolver {
     static func timeWindowsOverlap(recordingStart: Date, recordingEnd: Date, eventStart: Date, eventEnd: Date) -> Bool {
         // Two intervals overlap if: start1 < end2 AND start2 < end1
         return recordingStart < eventEnd && eventStart < recordingEnd
+    }
+    
+    /// Format a date for logging (HH:mm:ss)
+    private static func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
     }
 }

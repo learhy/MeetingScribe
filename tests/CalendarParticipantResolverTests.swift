@@ -89,6 +89,17 @@ final class CalendarParticipantResolverTests: XCTestCase {
         XCTAssertTrue(result?.attendeeFirstNames.contains("Pradeep") ?? false)
         XCTAssertTrue(result?.attendeeFirstNames.contains("Tim") ?? false)
         
+        // Verify new participant mapping structure
+        XCTAssertEqual(result?.participants.count, 3)  // me + 2 others
+        let meParticipant = result?.participants.first { $0.isMe }
+        XCTAssertNotNil(meParticipant)
+        XCTAssertEqual(meParticipant?.email, "dan.rohan@ibm.com")
+        XCTAssertEqual(meParticipant?.firstName, "Dan")
+        XCTAssertEqual(meParticipant?.inferredRole, "local")
+        
+        let otherParticipants = result?.participants.filter { !$0.isMe } ?? []
+        XCTAssertEqual(otherParticipants.count, 2)
+        
         // Verify mocks were called correctly
         XCTAssertEqual(mockDB.getUserEmailCallCount, 1)
         XCTAssertEqual(mockDB.findCalendarEventCallCount, 1)
@@ -189,6 +200,48 @@ final class CalendarParticipantResolverTests: XCTestCase {
         
         XCTAssertNil(result)
         XCTAssertEqual(mockFileReader.extractCallCount, 1)
+    }
+    
+    /// Tests that in a 1:1 meeting, the other participant is correctly marked as "remote"
+    func testResolveParticipants_OneOnOneMeeting_MarksRemoteParticipant() {
+        let mockDB = MockOutlookDatabase()
+        mockDB.userEmail = "dan.rohan@ibm.com"
+        mockDB.calendarEvent = CalendarEvent(
+            recordId: 1,
+            pathToDataFile: "Events/123/test.olk15Event",
+            startDateUTC: createDate(hour: 10, minute: 0),
+            endDateUTC: createDate(hour: 11, minute: 0),
+            attendeeCount: 2
+        )
+        
+        let mockFileReader = MockEventFileReader()
+        mockFileReader.attendeeEmails = [
+            "dan.rohan@ibm.com",
+            "pradeep.sekar1@ibm.com"  // Only one other person
+        ]
+        
+        let resolver = CalendarParticipantResolver(
+            database: mockDB,
+            fileReader: mockFileReader,
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 10, minute: 5),
+            recordingEnd: createDate(hour: 10, minute: 35)
+        )
+        
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.participants.count, 2)  // me + 1 other
+        
+        let meParticipant = result?.participants.first { $0.isMe }
+        XCTAssertNotNil(meParticipant)
+        XCTAssertEqual(meParticipant?.inferredRole, "local")
+        
+        let remoteParticipant = result?.participants.first { !$0.isMe }
+        XCTAssertNotNil(remoteParticipant)
+        XCTAssertEqual(remoteParticipant?.firstName, "Pradeep")
+        XCTAssertEqual(remoteParticipant?.inferredRole, "remote")  // Should be marked as remote in 1:1
     }
     
     /// Tests that "me" is correctly filtered out of attendee list
@@ -297,32 +350,70 @@ final class CalendarParticipantResolverTests: XCTestCase {
     // MARK: - MeetingParticipants Formatting Tests
     
     func testMeetingParticipants_FormatsContextCorrectly() {
-        let participants = MeetingParticipants(
+        let participants = [
+            Participant(email: "dan.rohan@ibm.com", firstName: "Dan", isMe: true, inferredRole: "local"),
+            Participant(email: "pradeep.sekar1@ibm.com", firstName: "Pradeep", isMe: false, inferredRole: nil),
+            Participant(email: "tim.messier@ibm.com", firstName: "Tim", isMe: false, inferredRole: nil)
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
             myEmail: "dan.rohan@ibm.com",
             myFirstName: "Dan",
             attendeeEmails: ["pradeep.sekar1@ibm.com", "tim.messier@ibm.com"],
-            attendeeFirstNames: ["Pradeep", "Tim"]
+            attendeeFirstNames: ["Pradeep", "Tim"],
+            participants: participants
         )
         
-        let context = participants.formatForLLMContext()
+        let context = meetingParticipants.formatForLLMContext()
         
         XCTAssertTrue(context.contains("Dan (me)"))
         XCTAssertTrue(context.contains("Pradeep"))
         XCTAssertTrue(context.contains("Tim"))
         XCTAssertTrue(context.contains("Meeting participants:"))
         XCTAssertTrue(context.contains("SPEAKER_"))
+        XCTAssertTrue(context.contains("group conversation"))
+        XCTAssertTrue(context.contains("DO NOT assume SPEAKER_00"))
+    }
+    
+    func testMeetingParticipants_OneOnOne_ProvidesDiarizationGuidance() {
+        let participants = [
+            Participant(email: "dan.rohan@ibm.com", firstName: "Dan", isMe: true, inferredRole: "local"),
+            Participant(email: "pradeep.sekar1@ibm.com", firstName: "Pradeep", isMe: false, inferredRole: "remote")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
+            myEmail: "dan.rohan@ibm.com",
+            myFirstName: "Dan",
+            attendeeEmails: ["pradeep.sekar1@ibm.com"],
+            attendeeFirstNames: ["Pradeep"],
+            participants: participants
+        )
+        
+        let context = meetingParticipants.formatForLLMContext()
+        
+        XCTAssertTrue(context.contains("1:1 conversation"))
+        XCTAssertTrue(context.contains("Dan (local user)"))
+        XCTAssertTrue(context.contains("Pradeep (remote participant)"))
+        XCTAssertTrue(context.contains("DO NOT assume SPEAKER_00 is always the local user"))
+        XCTAssertTrue(context.contains("intelligently infer"))
     }
     
     func testMeetingParticipants_SoloMeeting() {
-        let participants = MeetingParticipants(
+        let participants = [
+            Participant(email: "dan.rohan@ibm.com", firstName: "Dan", isMe: true, inferredRole: "local")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
             myEmail: "dan.rohan@ibm.com",
             myFirstName: "Dan",
             attendeeEmails: [],
-            attendeeFirstNames: []
+            attendeeFirstNames: [],
+            participants: participants
         )
         
-        let context = participants.formatForLLMContext()
+        let context = meetingParticipants.formatForLLMContext()
         XCTAssertTrue(context.contains("Dan (me)"))
+        XCTAssertTrue(context.contains("Only the local user"))
     }
     
     // MARK: - Time Window Overlap Tests
@@ -938,14 +1029,20 @@ final class NotesGenerationIntegrationTests: XCTestCase {
         // But we can't await in sync tests without more infrastructure
         
         // For now, verify the MeetingParticipants formatting works correctly
-        let participants = MeetingParticipants(
+        let participantsList = [
+            Participant(email: "test@example.com", firstName: "Test", isMe: true, inferredRole: "local"),
+            Participant(email: "other@example.com", firstName: "Other", isMe: false, inferredRole: "remote")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
             myEmail: "test@example.com",
             myFirstName: "Test",
             attendeeEmails: ["other@example.com"],
-            attendeeFirstNames: ["Other"]
+            attendeeFirstNames: ["Other"],
+            participants: participantsList
         )
         
-        let context = participants.formatForLLMContext()
+        let context = meetingParticipants.formatForLLMContext()
         
         // Verify the context would be appended correctly to a system prompt
         let systemPrompt = "You are a meeting notes assistant."
@@ -986,34 +1083,45 @@ final class MeetingParticipantsEdgeCaseTests: XCTestCase {
     func testFormatForLLMContext_DuplicateNames_OnlyShowsOnce() {
         // Edge case: What if the user's derived name matches an attendee's name?
         // This could happen with common names like "John"
-        let participants = MeetingParticipants(
+        let participantsList = [
+            Participant(email: "john.smith@example.com", firstName: "John", isMe: true, inferredRole: "local"),
+            Participant(email: "john.doe@example.com", firstName: "John", isMe: false, inferredRole: nil),
+            Participant(email: "jane.doe@example.com", firstName: "Jane", isMe: false, inferredRole: nil)
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
             myEmail: "john.smith@example.com",
             myFirstName: "John",
             attendeeEmails: ["john.doe@example.com", "jane.doe@example.com"],
-            attendeeFirstNames: ["John", "Jane"]  // Another "John"!
+            attendeeFirstNames: ["John", "Jane"],
+            participants: participantsList
         )
         
-        let context = participants.formatForLLMContext()
+        let context = meetingParticipants.formatForLLMContext()
         
-        // The current implementation filters out attendee names that match myFirstName
-        // (see line 23 in CalendarParticipantResolver.swift: if name != myFirstName)
-        // So "John" should only appear once as "John (me)"
-        let johnCount = context.components(separatedBy: "John").count - 1
-        XCTAssertEqual(johnCount, 1, "John should only appear once (as 'me'), not twice")
-        XCTAssertTrue(context.contains("John (me)"))
+        // The current implementation filters out attendee names that match myFirstName in the participant list
+        // In the "Meeting participants:" line, "John" should only appear once as "John (me)", not as plain "John"
+        XCTAssertTrue(context.contains("Meeting participants: John (me), Jane"))
+        XCTAssertFalse(context.contains("John, John"), "Should not have duplicate John in participant list")
         XCTAssertTrue(context.contains("Jane"))
     }
     
     /// Tests formatting when myFirstName is empty
     func testFormatForLLMContext_EmptyMyFirstName_StillWorks() {
-        let participants = MeetingParticipants(
-            myEmail: "@malformed.com",  // Would result in empty first name
+        let participantsList = [
+            Participant(email: "@malformed.com", firstName: "", isMe: true, inferredRole: "local"),
+            Participant(email: "alice@example.com", firstName: "Alice", isMe: false, inferredRole: "remote")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
+            myEmail: "@malformed.com",
             myFirstName: "",
             attendeeEmails: ["alice@example.com"],
-            attendeeFirstNames: ["Alice"]
+            attendeeFirstNames: ["Alice"],
+            participants: participantsList
         )
         
-        let context = participants.formatForLLMContext()
+        let context = meetingParticipants.formatForLLMContext()
         
         // Should still include Alice, even if "me" is missing
         XCTAssertTrue(context.contains("Alice"))
@@ -1022,14 +1130,15 @@ final class MeetingParticipantsEdgeCaseTests: XCTestCase {
     
     /// Tests that formatForLLMContext returns empty string when no participants
     func testFormatForLLMContext_AllEmpty_ReturnsEmptyString() {
-        let participants = MeetingParticipants(
+        let meetingParticipants = MeetingParticipants(
             myEmail: "",
             myFirstName: "",
             attendeeEmails: [],
-            attendeeFirstNames: []
+            attendeeFirstNames: [],
+            participants: []
         )
         
-        let context = participants.formatForLLMContext()
+        let context = meetingParticipants.formatForLLMContext()
         
         XCTAssertEqual(context, "", "Should return empty string when all fields are empty")
     }

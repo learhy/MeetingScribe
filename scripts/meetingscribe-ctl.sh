@@ -17,7 +17,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 print_usage() {
-    echo "Usage: meetingscribe-ctl {start|stop|restart|status|logs}"
+    echo "Usage: meetingscribe-ctl {start|stop|restart|status|logs|version}"
     echo ""
     echo "Commands:"
     echo "  start    - Start the MeetingScribe daemon"
@@ -25,6 +25,7 @@ print_usage() {
     echo "  restart  - Restart the MeetingScribe daemon"
     echo "  status   - Check if daemon is running"
     echo "  logs     - View daemon logs (tail -f)"
+    echo "  version  - Show installed version"
     exit 1
 }
 
@@ -135,6 +136,38 @@ daemon_logs() {
     tail -f "$LOG_FILE"
 }
 
+show_version() {
+    # Find the installed app bundle
+    APP_PATH=""
+    if [ -d "/Applications/MeetingScribe.app" ]; then
+        APP_PATH="/Applications/MeetingScribe.app"
+    elif [ -d "$HOME/Applications/MeetingScribe.app" ]; then
+        APP_PATH="$HOME/Applications/MeetingScribe.app"
+    fi
+    
+    if [ -z "$APP_PATH" ]; then
+        echo -e "${RED}❌ MeetingScribe.app not found in /Applications or ~/Applications${NC}"
+        exit 1
+    fi
+    
+    # Read version from Info.plist
+    INFO_PLIST="$APP_PATH/Contents/Info.plist"
+    if [ ! -f "$INFO_PLIST" ]; then
+        echo -e "${RED}❌ Info.plist not found at $INFO_PLIST${NC}"
+        exit 1
+    fi
+    
+    VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null)
+    
+    if [ -z "$VERSION" ]; then
+        echo -e "${RED}❌ Could not read version from Info.plist${NC}"
+        exit 1
+    fi
+    
+    echo "MeetingScribe $VERSION"
+    echo "Location: $APP_PATH"
+}
+
 # Main command dispatcher
 case "${1:-}" in
     start)
@@ -151,6 +184,9 @@ case "${1:-}" in
         ;;
     logs)
         daemon_logs
+        ;;
+    version)
+        show_version
         ;;
     *)
         print_usage

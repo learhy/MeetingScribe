@@ -90,6 +90,7 @@ struct AppConfiguration: Codable {
     struct Participants: Codable {
         var enabled: Bool = true
         var outlookDatabasePath: String = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
+        var debugLogging: Bool = false
     }
     
     var version: String = "1.0"

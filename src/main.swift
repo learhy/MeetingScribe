@@ -2,6 +2,13 @@ import Foundation
 import AppKit
 import ScreenCaptureKit
 
+// Handle --version flag before initializing GUI app
+if CommandLine.arguments.contains("--version") || CommandLine.arguments.contains("-v") {
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+    print("MeetingScribe \(version)")
+    exit(0)
+}
+
 // Entry point
 let app = NSApplication.shared
 let delegate = AppDelegate()
