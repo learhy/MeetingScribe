@@ -11,6 +11,7 @@ struct Participant {
 }
 
 struct MeetingParticipants {
+    let meetingTitle: String?  // Calendar event title (nil if not available)
     let myEmail: String
     let myFirstName: String
     let attendeeEmails: [String]
@@ -280,8 +281,10 @@ class OutlookEventFileReader: EventFileReaderProtocol {
 
 class CalendarParticipantResolver {
     private let logger = DualLogger(category: "CalendarParticipantResolver")
-    private let database: OutlookDatabaseProtocol
-    private let fileReader: EventFileReaderProtocol
+    private let database: OutlookDatabaseProtocol?
+    private let fileReader: EventFileReaderProtocol?
+    private let eventKitReader: EventKitCalendarReaderProtocol?
+    private let calendarSource: String
     private let isEnabled: Bool
     private let debugLogging: Bool
     
@@ -290,27 +293,58 @@ class CalendarParticipantResolver {
     
     /// Production initializer using ConfigManager
     convenience init(config: ConfigManager = .shared) {
-        let configPath = config.config.participants.outlookDatabasePath
-        let databasePath: String
-        if !configPath.isEmpty {
-            let expanded = (configPath as NSString).expandingTildeInPath
-            databasePath = expanded.hasSuffix("/") ? expanded : expanded + "/"
-        } else {
-            databasePath = (Self.defaultOutlookPath as NSString).expandingTildeInPath
+        let participantConfig = config.config.participants
+        let calendarSource = participantConfig.calendarSource
+        
+        // Initialize Outlook database if needed
+        var database: OutlookDatabaseProtocol? = nil
+        var fileReader: EventFileReaderProtocol? = nil
+        
+        if calendarSource == "outlook" || calendarSource == "both" {
+            let configPath = participantConfig.outlookDatabasePath
+            let databasePath: String
+            if !configPath.isEmpty {
+                let expanded = (configPath as NSString).expandingTildeInPath
+                databasePath = expanded.hasSuffix("/") ? expanded : expanded + "/"
+            } else {
+                databasePath = (Self.defaultOutlookPath as NSString).expandingTildeInPath
+            }
+            database = OutlookSQLiteDatabase(databasePath: databasePath)
+            fileReader = OutlookEventFileReader(basePath: databasePath)
+        }
+        
+        // Initialize EventKit reader if needed
+        var eventKitReader: EventKitCalendarReaderProtocol? = nil
+        if calendarSource == "eventkit" || calendarSource == "both" {
+            eventKitReader = EventKitCalendarReader(
+                targetCalendarNames: [participantConfig.eventKitCalendarName],
+                debugLogging: participantConfig.debugLogging
+            )
         }
         
         self.init(
-            database: OutlookSQLiteDatabase(databasePath: databasePath),
-            fileReader: OutlookEventFileReader(basePath: databasePath),
-            isEnabled: config.config.participants.enabled,
-            debugLogging: config.config.participants.debugLogging
+            database: database,
+            fileReader: fileReader,
+            eventKitReader: eventKitReader,
+            calendarSource: calendarSource,
+            isEnabled: participantConfig.enabled,
+            debugLogging: participantConfig.debugLogging
         )
     }
     
     /// Testable initializer with dependency injection
-    init(database: OutlookDatabaseProtocol, fileReader: EventFileReaderProtocol, isEnabled: Bool = true, debugLogging: Bool = false) {
+    init(
+        database: OutlookDatabaseProtocol?,
+        fileReader: EventFileReaderProtocol?,
+        eventKitReader: EventKitCalendarReaderProtocol? = nil,
+        calendarSource: String = "eventkit",
+        isEnabled: Bool = true,
+        debugLogging: Bool = false
+    ) {
         self.database = database
         self.fileReader = fileReader
+        self.eventKitReader = eventKitReader
+        self.calendarSource = calendarSource
         self.isEnabled = isEnabled
         self.debugLogging = debugLogging
     }
@@ -321,6 +355,97 @@ class CalendarParticipantResolver {
             logger.info("Participant resolution disabled in config")
             return nil
         }
+        
+        // Try EventKit first if configured
+        if (calendarSource == "eventkit" || calendarSource == "both"), let eventKitReader = eventKitReader {
+            if let result = resolveFromEventKit(reader: eventKitReader, recordingStart: recordingStart, recordingEnd: recordingEnd) {
+                return result
+            }
+            
+            // If "both" mode, fall through to Outlook
+            if calendarSource == "eventkit" {
+                return nil
+            }
+        }
+        
+        // Try Outlook if configured
+        if (calendarSource == "outlook" || calendarSource == "both"), let database = database, let fileReader = fileReader {
+            return resolveFromOutlook(database: database, fileReader: fileReader, recordingStart: recordingStart, recordingEnd: recordingEnd)
+        }
+        
+        logger.warning("No calendar source configured or available")
+        return nil
+    }
+    
+    // MARK: - EventKit Resolution
+    
+    private func resolveFromEventKit(reader: EventKitCalendarReaderProtocol, recordingStart: Date, recordingEnd: Date) -> MeetingParticipants? {
+        logger.info("Attempting to resolve participants from EventKit...")
+        
+        guard let meetingInfo = reader.findMeeting(overlapping: recordingStart, end: recordingEnd) else {
+            logger.info("No matching EventKit calendar event found")
+            return nil
+        }
+        
+        logger.info("✓ Found EventKit meeting: \(meetingInfo.title)")
+        
+        // Build participants from EventKit attendees
+        var participants: [Participant] = []
+        var myEmail = ""
+        var myFirstName = ""
+        
+        for attendee in meetingInfo.attendees {
+            let firstName = attendee.name ?? Self.deriveFirstName(from: attendee.email)
+            let isMe = attendee.isOrganizer  // Current user is typically the organizer in their own calendar
+            
+            let participant = Participant(
+                email: attendee.email,
+                firstName: firstName,
+                isMe: isMe,
+                inferredRole: isMe ? "local" : (meetingInfo.attendees.count == 2 ? "remote" : nil)
+            )
+            participants.append(participant)
+            
+            if isMe {
+                myEmail = attendee.email
+                myFirstName = firstName
+            }
+        }
+        
+        // If we couldn't identify "me", use the first attendee as a fallback
+        if myEmail.isEmpty && !participants.isEmpty {
+            myEmail = participants[0].email
+            myFirstName = participants[0].firstName
+        }
+        
+        let otherParticipants = participants.filter { !$0.isMe }
+        let otherEmails = otherParticipants.map { $0.email }
+        let otherNames = otherParticipants.map { $0.firstName }
+        
+        logger.info("✓ Resolved \(participants.count) participant(s) from EventKit with title: \(meetingInfo.title)")
+        
+        if debugLogging {
+            logger.debug("Meeting title: \(meetingInfo.title)")
+            logger.debug("Participants:")
+            for p in participants {
+                logger.debug("  - \(p.firstName) <\(p.email)>: isMe=\(p.isMe)")
+            }
+        }
+        
+        return MeetingParticipants(
+            meetingTitle: meetingInfo.title,
+            myEmail: myEmail,
+            myFirstName: myFirstName,
+            attendeeEmails: otherEmails,
+            attendeeFirstNames: otherNames,
+            participants: participants
+        )
+    }
+    
+    // MARK: - Outlook Resolution
+    
+    private func resolveFromOutlook(database: OutlookDatabaseProtocol, fileReader: EventFileReaderProtocol, recordingStart: Date, recordingEnd: Date) -> MeetingParticipants? {
+        logger.info("Attempting to resolve participants from Outlook...")
         
         // Get user's email first
         guard let myEmail = database.getUserEmail() else {
@@ -394,7 +519,9 @@ class CalendarParticipantResolver {
         
         logger.info("✓ Successfully resolved \(participants.count) participant(s): \(myFirstName) (me) + \(otherNames.joined(separator: ", "))")
         
+        // Note: Outlook resolution doesn't provide meeting title
         return MeetingParticipants(
+            meetingTitle: nil,
             myEmail: myEmail,
             myFirstName: myFirstName,
             attendeeEmails: otherEmails,

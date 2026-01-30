@@ -69,6 +69,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: mockFileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -115,6 +116,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: MockEventFileReader(),
+            calendarSource: "outlook",
             isEnabled: false  // Disabled!
         )
         
@@ -135,6 +137,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: MockEventFileReader(),
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -159,6 +162,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: mockFileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -190,6 +194,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: mockFileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -223,6 +228,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: mockFileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -265,6 +271,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: mockFileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -357,6 +364,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         ]
         
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "dan.rohan@ibm.com",
             myFirstName: "Dan",
             attendeeEmails: ["pradeep.sekar1@ibm.com", "tim.messier@ibm.com"],
@@ -382,6 +390,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         ]
         
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "dan.rohan@ibm.com",
             myFirstName: "Dan",
             attendeeEmails: ["pradeep.sekar1@ibm.com"],
@@ -404,6 +413,7 @@ final class CalendarParticipantResolverTests: XCTestCase {
         ]
         
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "dan.rohan@ibm.com",
             myFirstName: "Dan",
             attendeeEmails: [],
@@ -644,6 +654,7 @@ final class CalendarParticipantResolverIntegrationTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: db,
             fileReader: fileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -674,6 +685,7 @@ final class CalendarParticipantResolverIntegrationTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: db,
             fileReader: fileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -884,6 +896,7 @@ final class ConfigManagerIntegrationTests: XCTestCase {
         let disabledResolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: MockEventFileReader(),
+            calendarSource: "outlook",
             isEnabled: false
         )
         
@@ -939,6 +952,7 @@ final class GracefulDegradationTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: db,
             fileReader: fileReader,
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -988,6 +1002,7 @@ final class GracefulDegradationTests: XCTestCase {
         let resolver = CalendarParticipantResolver(
             database: mockDB,
             fileReader: MockEventFileReader(),
+            calendarSource: "outlook",
             isEnabled: true
         )
         
@@ -1035,6 +1050,7 @@ final class NotesGenerationIntegrationTests: XCTestCase {
         ]
         
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "test@example.com",
             myFirstName: "Test",
             attendeeEmails: ["other@example.com"],
@@ -1090,6 +1106,7 @@ final class MeetingParticipantsEdgeCaseTests: XCTestCase {
         ]
         
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "john.smith@example.com",
             myFirstName: "John",
             attendeeEmails: ["john.doe@example.com", "jane.doe@example.com"],
@@ -1114,6 +1131,7 @@ final class MeetingParticipantsEdgeCaseTests: XCTestCase {
         ]
         
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "@malformed.com",
             myFirstName: "",
             attendeeEmails: ["alice@example.com"],
@@ -1131,6 +1149,7 @@ final class MeetingParticipantsEdgeCaseTests: XCTestCase {
     /// Tests that formatForLLMContext returns empty string when no participants
     func testFormatForLLMContext_AllEmpty_ReturnsEmptyString() {
         let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
             myEmail: "",
             myFirstName: "",
             attendeeEmails: [],
@@ -1185,3 +1204,242 @@ func getFixturePathFor(subdir: String) -> String {
     let testsDir = (currentFile as NSString).deletingLastPathComponent
     return testsDir + "/fixtures/" + subdir + "/"
 }
+
+// MARK: - EventKit Integration Tests
+
+/// Tests for EventKit calendar reader integration with CalendarParticipantResolver
+final class EventKitIntegrationTests: XCTestCase {
+    
+    private func createDate(hour: Int, minute: Int) -> Date {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 1
+        components.day = 15
+        components.hour = hour
+        components.minute = minute
+        return Calendar.current.date(from: components)!
+    }
+    
+    /// Tests that EventKit source returns meeting title in MeetingParticipants
+    func testResolveParticipants_EventKit_ReturnsMeetingTitle() {
+        let mockEventKit = MockEventKitCalendarReader()
+        mockEventKit.meetingInfo = EventKitMeetingInfo(
+            title: "Weekly Team Sync",
+            startDate: createDate(hour: 10, minute: 0),
+            endDate: createDate(hour: 11, minute: 0),
+            location: "Conference Room A",
+            attendees: [
+                EventKitAttendee(email: "dan@example.com", name: "Dan", isOrganizer: true),
+                EventKitAttendee(email: "alice@example.com", name: "Alice", isOrganizer: false)
+            ],
+            calendarName: "Calendar"
+        )
+        
+        let resolver = CalendarParticipantResolver(
+            database: nil,
+            fileReader: nil,
+            eventKitReader: mockEventKit,
+            calendarSource: "eventkit",
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 10, minute: 5),
+            recordingEnd: createDate(hour: 10, minute: 55)
+        )
+        
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.meetingTitle, "Weekly Team Sync")
+        XCTAssertEqual(result?.participants.count, 2)
+        XCTAssertEqual(mockEventKit.findMeetingCallCount, 1)
+    }
+    
+    /// Tests that EventKit source uses attendee names directly (not derived from email)
+    func testResolveParticipants_EventKit_UsesAttendeeNames() {
+        let mockEventKit = MockEventKitCalendarReader()
+        mockEventKit.meetingInfo = EventKitMeetingInfo(
+            title: "Project Review",
+            startDate: createDate(hour: 14, minute: 0),
+            endDate: createDate(hour: 15, minute: 0),
+            location: nil,
+            attendees: [
+                EventKitAttendee(email: "dan.rohan@company.com", name: "Daniel Rohan", isOrganizer: true),
+                EventKitAttendee(email: "alice.smith@company.com", name: "Alice Smith", isOrganizer: false)
+            ],
+            calendarName: "Calendar"
+        )
+        
+        let resolver = CalendarParticipantResolver(
+            database: nil,
+            fileReader: nil,
+            eventKitReader: mockEventKit,
+            calendarSource: "eventkit",
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 14, minute: 5),
+            recordingEnd: createDate(hour: 14, minute: 55)
+        )
+        
+        XCTAssertNotNil(result)
+        // Should use the full name from EventKit, not derived "Dan" from email
+        XCTAssertEqual(result?.myFirstName, "Daniel Rohan")
+        XCTAssertTrue(result?.attendeeFirstNames.contains("Alice Smith") ?? false)
+    }
+    
+    /// Tests that EventKit source falls back to email-derived names when name is nil
+    func testResolveParticipants_EventKit_FallsBackToEmailDerivedName() {
+        let mockEventKit = MockEventKitCalendarReader()
+        mockEventKit.meetingInfo = EventKitMeetingInfo(
+            title: "Quick Call",
+            startDate: createDate(hour: 9, minute: 0),
+            endDate: createDate(hour: 9, minute: 30),
+            location: nil,
+            attendees: [
+                EventKitAttendee(email: "dan@example.com", name: nil, isOrganizer: true),
+                EventKitAttendee(email: "bob.jones@example.com", name: nil, isOrganizer: false)
+            ],
+            calendarName: "Calendar"
+        )
+        
+        let resolver = CalendarParticipantResolver(
+            database: nil,
+            fileReader: nil,
+            eventKitReader: mockEventKit,
+            calendarSource: "eventkit",
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 9, minute: 5),
+            recordingEnd: createDate(hour: 9, minute: 25)
+        )
+        
+        XCTAssertNotNil(result)
+        // Should derive names from email when attendee.name is nil
+        XCTAssertEqual(result?.myFirstName, "Dan")
+        XCTAssertTrue(result?.attendeeFirstNames.contains("Bob") ?? false)
+    }
+    
+    /// Tests that "both" mode tries EventKit first
+    func testResolveParticipants_BothMode_TriesEventKitFirst() {
+        let mockEventKit = MockEventKitCalendarReader()
+        mockEventKit.meetingInfo = EventKitMeetingInfo(
+            title: "EventKit Meeting",
+            startDate: createDate(hour: 10, minute: 0),
+            endDate: createDate(hour: 11, minute: 0),
+            location: nil,
+            attendees: [
+                EventKitAttendee(email: "dan@example.com", name: "Dan", isOrganizer: true)
+            ],
+            calendarName: "Calendar"
+        )
+        
+        let mockDB = MockOutlookDatabase()
+        mockDB.userEmail = "dan@outlook.com"
+        
+        let resolver = CalendarParticipantResolver(
+            database: mockDB,
+            fileReader: MockEventFileReader(),
+            eventKitReader: mockEventKit,
+            calendarSource: "both",
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 10, minute: 5),
+            recordingEnd: createDate(hour: 10, minute: 55)
+        )
+        
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.meetingTitle, "EventKit Meeting")
+        XCTAssertEqual(mockEventKit.findMeetingCallCount, 1)
+        // Outlook should NOT be called since EventKit succeeded
+        XCTAssertEqual(mockDB.getUserEmailCallCount, 0)
+    }
+    
+    /// Tests that "both" mode falls back to Outlook when EventKit fails
+    func testResolveParticipants_BothMode_FallsBackToOutlook() {
+        let mockEventKit = MockEventKitCalendarReader()
+        mockEventKit.meetingInfo = nil  // EventKit returns nothing
+        
+        let mockDB = MockOutlookDatabase()
+        mockDB.userEmail = "dan@company.com"
+        mockDB.calendarEvent = CalendarEvent(
+            recordId: 1,
+            pathToDataFile: "Events/123/test.olk15Event",
+            startDateUTC: createDate(hour: 10, minute: 0),
+            endDateUTC: createDate(hour: 11, minute: 0),
+            attendeeCount: 2
+        )
+        
+        let mockFileReader = MockEventFileReader()
+        mockFileReader.attendeeEmails = ["dan@company.com", "alice@company.com"]
+        
+        let resolver = CalendarParticipantResolver(
+            database: mockDB,
+            fileReader: mockFileReader,
+            eventKitReader: mockEventKit,
+            calendarSource: "both",
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 10, minute: 5),
+            recordingEnd: createDate(hour: 10, minute: 55)
+        )
+        
+        XCTAssertNotNil(result)
+        // Should fall back to Outlook (no meeting title from Outlook)
+        XCTAssertNil(result?.meetingTitle)
+        XCTAssertEqual(result?.myEmail, "dan@company.com")
+        XCTAssertEqual(mockEventKit.findMeetingCallCount, 1)
+        XCTAssertEqual(mockDB.getUserEmailCallCount, 1)
+    }
+    
+    /// Tests that EventKit-only mode returns nil when EventKit fails
+    func testResolveParticipants_EventKitOnly_ReturnsNilWhenNoEvent() {
+        let mockEventKit = MockEventKitCalendarReader()
+        mockEventKit.meetingInfo = nil  // No matching event
+        
+        let resolver = CalendarParticipantResolver(
+            database: nil,
+            fileReader: nil,
+            eventKitReader: mockEventKit,
+            calendarSource: "eventkit",
+            isEnabled: true
+        )
+        
+        let result = resolver.resolveParticipants(
+            recordingStart: createDate(hour: 10, minute: 0),
+            recordingEnd: createDate(hour: 10, minute: 30)
+        )
+        
+        XCTAssertNil(result)
+    }
+    
+    /// Tests MeetingParticipants with meeting title
+    func testMeetingParticipants_WithMeetingTitle() {
+        let participants = [
+            Participant(email: "dan@example.com", firstName: "Dan", isMe: true, inferredRole: "local"),
+            Participant(email: "alice@example.com", firstName: "Alice", isMe: false, inferredRole: "remote")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
+            meetingTitle: "Weekly Team Sync",
+            myEmail: "dan@example.com",
+            myFirstName: "Dan",
+            attendeeEmails: ["alice@example.com"],
+            attendeeFirstNames: ["Alice"],
+            participants: participants
+        )
+        
+        XCTAssertEqual(meetingParticipants.meetingTitle, "Weekly Team Sync")
+        XCTAssertEqual(meetingParticipants.myFirstName, "Dan")
+        XCTAssertEqual(meetingParticipants.attendeeFirstNames.count, 1)
+    }
+}
+
+// MARK: - Mock for EventKit Tests (defined in EventKitCalendarReaderTests.swift)
+// MockEventKitCalendarReader is already defined there and will be available

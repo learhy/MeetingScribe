@@ -5,6 +5,7 @@ struct NoteData {
     let time: String
     let duration: String
     let title: String
+    let attendees: String  // Formatted list of meeting attendees
     let summary: String
     let notes: String
     let transcript: String
@@ -43,7 +44,7 @@ class TemplateEngine {
     
     private func validateTemplate(_ template: String) {
         let requiredPlaceholders = ["{notes}", "{summary}"]
-        let recommendedPlaceholders = ["{title}", "{date}", "{transcript}"]
+        let recommendedPlaceholders = ["{title}", "{date}", "{transcript}", "{attendees}"]
         
         var missingRequired: [String] = []
         var missingRecommended: [String] = []
@@ -76,6 +77,7 @@ class TemplateEngine {
         result = result.replacingOccurrences(of: "{time}", with: data.time)
         result = result.replacingOccurrences(of: "{duration}", with: data.duration)
         result = result.replacingOccurrences(of: "{title}", with: data.title)
+        result = result.replacingOccurrences(of: "{attendees}", with: data.attendees)
         result = result.replacingOccurrences(of: "{summary}", with: data.summary)
         result = result.replacingOccurrences(of: "{notes}", with: data.notes)
         result = result.replacingOccurrences(of: "{transcript}", with: data.transcript)
@@ -93,6 +95,7 @@ class TemplateEngine {
         **Date:** {date}
         **Time:** {time}
         **Duration:** {duration}
+        **Attendees:** {attendees}
         
         ## Summary
         {summary}

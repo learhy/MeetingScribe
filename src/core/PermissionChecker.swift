@@ -82,16 +82,26 @@ class PermissionChecker {
 
     private func requestMicrophoneAccessIfNeeded() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        
         switch status {
         case .authorized:
+            logger.info("Microphone authorization status: authorized")
             return true
         case .notDetermined:
+            logger.info("Microphone authorization status: notDetermined - requesting access...")
             return await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: .audio) { granted in
                     continuation.resume(returning: granted)
                 }
             }
-        default:
+        case .denied:
+            logger.warning("Microphone authorization status: denied - user must enable in System Settings > Privacy & Security > Microphone")
+            return false
+        case .restricted:
+            logger.warning("Microphone authorization status: restricted - device policy prevents microphone access")
+            return false
+        @unknown default:
+            logger.warning("Microphone authorization status: unknown (\(status.rawValue))")
             return false
         }
     }

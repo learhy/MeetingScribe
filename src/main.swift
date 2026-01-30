@@ -171,8 +171,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let perms = await permissionChecker.checkPermissions()
         logger.info("Permission check result: screenGranted=\(perms.screenGranted), micGranted=\(perms.micGranted)")
         
-        if !perms.screenGranted {
-            logger.warning("Screen recording permission not granted - entering disabled state")
+        if !perms.screenGranted || !perms.micGranted {
+            if !perms.screenGranted {
+                logger.warning("Screen recording permission not granted - entering disabled state")
+            }
+            if !perms.micGranted {
+                logger.warning("Microphone permission not granted - entering disabled state")
+            }
             DispatchQueue.main.async { [weak self] in
                 self?.menuBarController?.updateState(.disabled)
             }
@@ -258,16 +263,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let permissionChecker = PermissionChecker()
             let perms = await permissionChecker.checkPermissions()
             
-            if perms.screenGranted {
-                logger.info("Permissions granted! Starting service...")
+            if perms.screenGranted && perms.micGranted {
+                logger.info("All permissions granted! Starting service...")
                 await meetingScribeService?.run()
+                
+                DispatchQueue.main.async { [weak self] in
+                    self?.menuBarController?.updateState(.idle)
+                }
             } else {
-                logger.warning("Permissions still not granted")
+                var missing: [String] = []
+                if !perms.screenGranted { missing.append("Screen Recording") }
+                if !perms.micGranted { missing.append("Microphone") }
+                logger.warning("Permissions still not granted: \(missing.joined(separator: ", "))")
                 
                 DispatchQueue.main.async {
                     let alert = NSAlert()
                     alert.messageText = "Permissions Not Granted"
-                    alert.informativeText = "Screen Recording permission is still not enabled. Please check System Settings."
+                    alert.informativeText = "The following permissions are still not enabled:\n\n• \(missing.joined(separator: "\n• "))\n\nPlease check System Settings > Privacy & Security."
                     alert.alertStyle = .warning
                     alert.runModal()
                 }
@@ -323,9 +335,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let permissionChecker = PermissionChecker()
                 let perms = await permissionChecker.checkPermissions()
                 
-                if perms.screenGranted {
-                    logger.info("Permissions detected! Starting service...")
+                if perms.screenGranted && perms.micGranted {
+                    logger.info("All permissions detected! Starting service...")
                     await meetingScribeService?.run()
+                    
+                    DispatchQueue.main.async { [weak self] in
+                        self?.menuBarController?.updateState(.idle)
+                    }
                     break
                 }
             }
@@ -624,12 +640,24 @@ class MeetingScribeService {
             // 1. Resolve meeting participants from calendar
             let recordingEnd = Date()
             var participantContext: String? = nil
+            var calendarMeetingTitle: String? = nil
+            var attendeesList: String = ""
+            
             if let participants = participantResolver.resolveParticipants(
                 recordingStart: startTime,
                 recordingEnd: recordingEnd
             ) {
                 participantContext = participants.formatForLLMContext()
+                calendarMeetingTitle = participants.meetingTitle
+                
+                // Format attendees list for template
+                let allNames = [participants.myFirstName] + participants.attendeeFirstNames
+                attendeesList = allNames.filter { !$0.isEmpty }.joined(separator: ", ")
+                
                 logger.info("Resolved \(participants.attendeeFirstNames.count + 1) meeting participants")
+                if let title = calendarMeetingTitle {
+                    logger.info("Calendar meeting title: \(title)")
+                }
             } else {
                 logger.info("No participant context available for this recording")
             }
@@ -645,30 +673,39 @@ class MeetingScribeService {
             let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
             logger.info("Notes generation complete")
             
-            // 3. Split notes to get summary
+            // 4. Split notes to get summary
             let splitNotes = GeneratedNotesParser.split(generatedNotes)
             
-            // 4. Generate title from transcript and summary
+            // 5. Determine meeting title
+            // Priority: Calendar title -> LLM-generated -> Date-based fallback
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
             
-            var meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
+            var meetingTitle: String
             if isCancelled {
                 meetingTitle = "Cancelled Recording - \(dateFormatter.string(from: startTime))"
+            } else if let calendarTitle = calendarMeetingTitle, !calendarTitle.isEmpty {
+                // Use calendar meeting title as primary source
+                meetingTitle = calendarTitle
+                logger.info("Using calendar meeting title: \(calendarTitle)")
             } else {
+                // Fall back to LLM-generated title
                 do {
-                    logger.info("Generating meeting title...")
+                    logger.info("No calendar title available, generating meeting title with LLM...")
                     let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: splitNotes.summary)
                     if !generatedTitle.isEmpty {
                         meetingTitle = generatedTitle
                         logger.info("Generated title: \(generatedTitle)")
+                    } else {
+                        meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
                     }
                 } catch {
                     logger.warning("Failed to generate title, using date-based title: \(error.localizedDescription)")
+                    meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
                 }
             }
             
-            // 5. Render template
+            // 6. Render template
             let timeFormatter = DateFormatter()
             timeFormatter.timeStyle = .short
             
@@ -677,6 +714,7 @@ class MeetingScribeService {
                 time: timeFormatter.string(from: startTime),
                 duration: formatDuration(duration),
                 title: meetingTitle,
+                attendees: attendeesList,
                 summary: splitNotes.summary,
                 notes: splitNotes.notes,
                 transcript: transcript,

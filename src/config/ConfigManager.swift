@@ -89,6 +89,8 @@ struct AppConfiguration: Codable {
     
     struct Participants: Codable {
         var enabled: Bool = true
+        var calendarSource: String = "eventkit"  // "eventkit" | "outlook" | "both"
+        var eventKitCalendarName: String = "Calendar"
         var outlookDatabasePath: String = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
         var debugLogging: Bool = false
     }

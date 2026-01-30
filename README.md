@@ -20,6 +20,7 @@ Automated meeting transcription and notes service for macOS that automatically d
 - macOS 13.0+ (Ventura or later)
 - Screen Recording permission
 - Microphone permission (optional, for local track)
+- Calendar permission (optional, for meeting titles and attendees from Apple Calendar)
 - ~2GB disk space for app bundle (includes bundled Python + ML models)
 - Additional ~500MB for ML model cache (downloaded on first use)
 
@@ -94,6 +95,7 @@ This installs the app bundle to `~/Applications/MeetingScribe.app` and sets up t
 On first run, macOS will prompt for:
 - **Screen Recording** permission (required)
 - **Microphone** permission (optional)
+- **Calendar** permission (optional, for meeting titles from Apple Calendar)
 
 **Important**: Grant permissions to `MeetingScribe.app` in **System Settings > Privacy & Security > Screen & System Audio Recording**
 
@@ -220,9 +222,38 @@ Edit `~/.meetingscribe/config.json`:
       }
     },
     "backend": "bear"
+  },
+  "participants": {
+    "enabled": true,
+    "calendarSource": "eventkit",
+    "eventKitCalendarName": "Calendar"
   }
 }
 ```
+
+### Calendar Configuration
+
+MeetingScribe can read meeting titles and attendees from your calendar. This means your notes will be titled with the actual meeting name (e.g., "Weekly Team Sync") instead of an LLM-generated title.
+
+**Calendar Source Options:**
+- `"eventkit"` (default) - Read from Apple Calendar using EventKit. Provides meeting titles and attendee names.
+- `"outlook"` - Read from Outlook's local SQLite database. Does not provide meeting titles (falls back to LLM-generated).
+- `"both"` - Try EventKit first, fall back to Outlook if no matching event found.
+
+**Configuration:**
+```json
+{
+  "participants": {
+    "enabled": true,
+    "calendarSource": "eventkit",
+    "eventKitCalendarName": "Calendar",
+    "outlookDatabasePath": "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/",
+    "debugLogging": false
+  }
+}
+```
+
+**Note:** When using EventKit, you'll be prompted for Calendar permission on first use. Grant access in **System Settings > Privacy & Security > Calendars**.
 
 ## Architecture
 
@@ -321,7 +352,8 @@ meeting-scribe/
 │   │   ├── PermissionChecker.swift     # TCC permission handling
 │   │   ├── DualLogger.swift            # Unified+stderr logging
 │   │   ├── WAVStreamWriter.swift       # Audio file output
-│   │   └── CalendarParticipantResolver.swift  # Outlook calendar integration
+│   │   ├── CalendarParticipantResolver.swift  # Calendar integration (EventKit/Outlook)
+│   │   └── EventKitCalendarReader.swift       # Apple Calendar (EventKit) reader
 │   ├── plugins/           # Notes backend plugins
 │   │   ├── NotesPlugin.swift
 │   │   └── BearPlugin.swift            # Bear.app integration
@@ -361,7 +393,8 @@ meeting-scribe/
 
 ## Recent Improvements
 
-- ✅ **Participant name resolution** - Automatically extracts meeting participant names from Outlook calendar to help LLM identify speakers
+- ✅ **Apple Calendar integration** - Uses EventKit to pull meeting titles and attendees from Apple Calendar (note titles now match your calendar events)
+- ✅ **Participant name resolution** - Automatically extracts meeting participant names from calendar to help LLM identify speakers
 - ✅ **Fast speaker diarization** - 60% faster using SpeechBrain (2:26 vs 4+ min for 26-min audio), no HF token required
 - ✅ **Speaker diarization (Phase 1)** - Identify different speakers with SPEAKER_00, SPEAKER_01 labels
 - ✅ **Local Whisper.cpp integration** - No API costs for transcription
