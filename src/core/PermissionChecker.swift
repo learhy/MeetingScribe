@@ -16,11 +16,27 @@ class PermissionChecker {
         // 1) Screen recording (required for ScreenCaptureKit audio capture)
         logger.info("Checking screen recording permission...")
         logger.info("Process: \(ProcessInfo.processInfo.processName)")
+        logger.info("Process ID: \(ProcessInfo.processInfo.processIdentifier)")
         logger.info("Executable: \(CommandLine.arguments.first ?? "(unknown)")")
         logger.info("Bundle: \(Bundle.main.bundlePath)")
+        logger.info("Bundle ID: \(Bundle.main.bundleIdentifier ?? "none")")
+        
+        // Check code signature
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        task.arguments = ["-dvvv", Bundle.main.bundlePath]
+        let pipe = Pipe()
+        task.standardError = pipe
+        try? task.run()
+        task.waitUntilExit()
+        if let output = try? pipe.fileHandleForReading.readToEnd(),
+           let sigInfo = String(data: output, encoding: .utf8) {
+            logger.info("Code signature info: \(sigInfo.split(separator: "\n").prefix(5).joined(separator: " | "))")
+        }
 
         var screenGranted = false
         do {
+            logger.info("Attempting to access SCShareableContent...")
             _ = try await SCShareableContent.excludingDesktopWindows(false,
                                                                      onScreenWindowsOnly: false)
             screenGranted = true
@@ -28,6 +44,8 @@ class PermissionChecker {
         } catch {
             logger.error("❌ Screen recording permission denied or unavailable")
             logger.error("Error: \(error.localizedDescription)")
+            logger.error("Error type: \(type(of: error))")
+            logger.error("Error details: \(String(reflecting: error))")
 
             logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             logger.info("PERMISSION REQUIRED")

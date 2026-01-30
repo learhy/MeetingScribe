@@ -34,13 +34,21 @@ struct AppConfiguration: Codable {
             var hfToken: String = ""  // No longer required for fast diarization
             var pythonPath: String = "python3"
             var scriptPath: String = "/Applications/MeetingScribe.app/Contents/Resources/scripts/diarize_audio_fast.py"
-            var whisperModel: String = "base"  // tiny, base, small, medium, large
+            var whisperModel: String = "turbo"  // tiny, base, small, medium, large, turbo
             var distanceThreshold: Double = 0.90  // Agglomerative clustering threshold (0.85-0.95)
+            var vocabularyFile: String = ""  // Optional path to vocabulary file with domain terms
+            var initialPrompt: String = ""  // Optional initial prompt for Whisper (e.g., "Glossary: QBR, MBR, GTM")
+        }
+        
+        struct PostProcessing: Codable {
+            var enabled: Bool = false
+            var systemPrompt: String = "You are a transcript correction assistant. Your task is to fix obvious transcription errors in the following meeting transcript while preserving the original meaning and speaker labels. Fix misspelled names, technical terms, and words that were clearly misheard. Do not add, remove, or rephrase content - only correct errors. Return only the corrected transcript without explanations."
         }
         
         var openai: OpenAI = OpenAI()
         var local: Local = Local()
         var diarization: Diarization = Diarization()
+        var postProcessing: PostProcessing = PostProcessing()
     }
     
     struct Notes: Codable {

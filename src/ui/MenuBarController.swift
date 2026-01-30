@@ -86,26 +86,7 @@ class MenuBarController {
     }
     
     @objc private func quit() {
-        // Unload the LaunchAgent first so it doesn't restart us
-        let logger = DualLogger(category: "MenuBarController")
-        logger.info("Quit requested - unloading LaunchAgent...")
-        
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        let plistPath = "\(NSHomeDirectory())/Library/LaunchAgents/com.meetingscribe.daemon.plist"
-        let domain = "gui/\(getuid())"
-        process.arguments = ["bootout", domain, plistPath]
-        
-        do {
-            try process.run()
-            process.waitUntilExit()
-            logger.info("LaunchAgent unloaded, quitting...")
-        } catch {
-            logger.error("Failed to unload LaunchAgent: \(error.localizedDescription)")
-            // Quit anyway
-        }
-        
-        NSApplication.shared.terminate(nil)
+        LaunchAgentManager.quitApplication()
     }
     
     func updateState(_ state: RecordingState) {

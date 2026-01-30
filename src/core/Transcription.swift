@@ -279,27 +279,46 @@ struct DiarizedTranscript: Codable {
 class TranscriptionService {
     private let logger = DualLogger(category: "TranscriptionService")
     private let config: ConfigManager
+    private let postProcessor: TranscriptPostProcessor
     
     init(config: ConfigManager = .shared) {
         self.config = config
+        self.postProcessor = TranscriptPostProcessor(config: config)
     }
     
     func transcribe(audioFileURL: URL) async throws -> String {
+        var transcript: String
+        
         // Check if diarization is enabled
         if config.config.transcription.diarization.enabled {
             logger.info("Diarization enabled, attempting diarized transcription")
             do {
                 let diarizedResult = try await transcribeWithDiarization(audioFileURL: audioFileURL)
-                return formatDiarizedTranscript(diarizedResult)
+                transcript = formatDiarizedTranscript(diarizedResult)
             } catch {
                 logger.warning("Diarization failed, falling back to standard transcription: \(error.localizedDescription)")
                 // Fall through to standard transcription
+                let provider = try createProvider()
+                transcript = try await provider.transcribe(audioFileURL: audioFileURL)
+            }
+        } else {
+            // Standard transcription (no diarization)
+            let provider = try createProvider()
+            transcript = try await provider.transcribe(audioFileURL: audioFileURL)
+        }
+        
+        // Apply LLM post-processing if enabled
+        if config.config.transcription.postProcessing.enabled {
+            logger.info("Applying LLM post-processing to transcript")
+            do {
+                transcript = try await postProcessor.process(transcript: transcript)
+                logger.info("Post-processing completed successfully")
+            } catch {
+                logger.warning("Post-processing failed, using original transcript: \(error.localizedDescription)")
             }
         }
         
-        // Standard transcription (no diarization)
-        let provider = try createProvider()
-        return try await provider.transcribe(audioFileURL: audioFileURL)
+        return transcript
     }
     
     func transcribeWithDiarization(audioFileURL: URL) async throws -> DiarizedTranscript {
@@ -339,6 +358,23 @@ class TranscriptionService {
             "--whisper-model", diarizationConfig.whisperModel,
             "--distance-threshold", String(diarizationConfig.distanceThreshold)
         ]
+        
+        // Add initial prompt if configured
+        if !diarizationConfig.initialPrompt.isEmpty {
+            arguments.append(contentsOf: ["--initial-prompt", diarizationConfig.initialPrompt])
+            logger.info("Using initial prompt for Whisper")
+        }
+        
+        // Add vocabulary file if configured
+        if !diarizationConfig.vocabularyFile.isEmpty {
+            let vocabPath = config.expandPath(diarizationConfig.vocabularyFile)
+            if FileManager.default.fileExists(atPath: vocabPath.path) {
+                arguments.append(contentsOf: ["--vocabulary-file", vocabPath.path])
+                logger.info("Using vocabulary file: \(vocabPath.path)")
+            } else {
+                logger.warning("Vocabulary file not found: \(vocabPath.path)")
+            }
+        }
         
         // Note: min/max speakers not supported by fast diarization
         // It auto-detects based on distance threshold

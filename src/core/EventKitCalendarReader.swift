@@ -31,7 +31,7 @@ protocol EventKitCalendarReaderProtocol {
 // MARK: - EventKit Calendar Reader
 
 /// Reads calendar events from Apple Calendar using EventKit
-class EventKitCalendarReader: EventKitCalendarReaderProtocol {
+class EventKitCalendarReader: EventKitCalendarReaderProtocol, @unchecked Sendable {
     private let logger = DualLogger(category: "EventKitCalendarReader")
     private let eventStore: EKEventStore
     private let targetCalendarNames: [String]

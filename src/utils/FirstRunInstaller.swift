@@ -64,7 +64,11 @@ class FirstRunInstaller {
     /// Returns true if installation completed successfully or was already done
     static func runInstaller() -> Bool {
         let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("========================================")
         logger.info("[PID \(processId)] runInstaller() called")
+        logger.info("[PID \(processId)] Bundle: \(Bundle.main.bundlePath)")
+        logger.info("[PID \(processId)] Bundle ID: \(Bundle.main.bundleIdentifier ?? "none")")
+        logger.info("========================================")
         
         // Check if we actually need to install
         if !needsInstallation() {
@@ -73,6 +77,7 @@ class FirstRunInstaller {
         }
         
         logger.info("[PID \(processId)] Running first-run installer...")
+        logger.info("[PID \(processId)] This will run the bash installer script")
         
         let bundlePath = Bundle.main.bundlePath
         

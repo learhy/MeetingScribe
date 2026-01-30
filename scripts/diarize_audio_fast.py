@@ -227,20 +227,56 @@ def create_diarization_segments(
     return segments
 
 
+def load_vocabulary_file(vocab_path: str) -> str:
+    """Load vocabulary terms from a file and format as prompt."""
+    if not vocab_path or not os.path.exists(vocab_path):
+        return ""
+    
+    try:
+        with open(vocab_path, 'r', encoding='utf-8') as f:
+            terms = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        if terms:
+            return "Glossary: " + ", ".join(terms)
+    except Exception as e:
+        print(f"Warning: Could not load vocabulary file: {e}", file=sys.stderr)
+    return ""
+
+
 def transcribe_with_whisper(
     audio_path: str,
-    model_name: str = "base"
+    model_name: str = "base",
+    initial_prompt: str = None,
+    vocabulary_file: str = None
 ) -> Dict[str, Any]:
     """Transcribe audio with Whisper."""
     print(f"Loading Whisper model '{model_name}'...", file=sys.stderr)
     model = whisper.load_model(model_name, device="cpu")
     
+    # Build the prompt from vocabulary file and/or initial prompt
+    prompt_parts = []
+    if vocabulary_file:
+        vocab_prompt = load_vocabulary_file(vocabulary_file)
+        if vocab_prompt:
+            prompt_parts.append(vocab_prompt)
+            print(f"Loaded vocabulary from: {vocabulary_file}", file=sys.stderr)
+    if initial_prompt:
+        prompt_parts.append(initial_prompt)
+        print(f"Using initial prompt: {initial_prompt[:50]}...", file=sys.stderr)
+    
+    final_prompt = " ".join(prompt_parts) if prompt_parts else None
+    
     print(f"Transcribing...", file=sys.stderr)
-    result = model.transcribe(
-        audio_path,
-        word_timestamps=True,
-        verbose=False
-    )
+    transcribe_kwargs = {
+        "word_timestamps": True,
+        "verbose": False
+    }
+    
+    if final_prompt:
+        transcribe_kwargs["initial_prompt"] = final_prompt
+        # Keep the prompt across segments for consistent vocabulary recognition
+        transcribe_kwargs["condition_on_previous_text"] = True
+    
+    result = model.transcribe(audio_path, **transcribe_kwargs)
     
     return result
 
@@ -329,9 +365,21 @@ def main():
     )
     parser.add_argument(
         "--whisper-model",
-        default="base",
-        choices=["tiny", "base", "small", "medium", "large"],
-        help="Whisper model size (default: base)"
+        default="turbo",
+        choices=["tiny", "base", "small", "medium", "large", "turbo"],
+        help="Whisper model size (default: turbo)"
+    )
+    parser.add_argument(
+        "--initial-prompt",
+        type=str,
+        default=None,
+        help="Initial prompt for Whisper (e.g., 'Glossary: QBR, MBR, GTM')"
+    )
+    parser.add_argument(
+        "--vocabulary-file",
+        type=str,
+        default=None,
+        help="Path to vocabulary file with domain terms (one per line)"
     )
     parser.add_argument(
         "--window-size",
@@ -392,7 +440,9 @@ def main():
     # Step 5: Transcribe with Whisper
     transcription = transcribe_with_whisper(
         args.audio_file,
-        model_name=args.whisper_model
+        model_name=args.whisper_model,
+        initial_prompt=args.initial_prompt,
+        vocabulary_file=args.vocabulary_file
     )
     
     # Step 6: Align transcription with diarization

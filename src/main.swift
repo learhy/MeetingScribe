@@ -15,7 +15,7 @@ let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private let logger = DualLogger(category: "MeetingScribe")
     private var menuBarController: MenuBarController?
     private var meetingScribeService: MeetingScribeService?
@@ -165,11 +165,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func startWithPermissionCheck() async {
         let processId = ProcessInfo.processInfo.processIdentifier
+        logger.info("========================================")
         logger.info("startWithPermissionCheck() called (PID: \(processId))")
+        logger.info("Bundle ID: \(Bundle.main.bundleIdentifier ?? "none")")
+        logger.info("Bundle Path: \(Bundle.main.bundlePath)")
+        logger.info("Executable Path: \(Bundle.main.executablePath ?? "none")")
+        logger.info("Launch arguments: \(CommandLine.arguments)")
+        logger.info("Parent process: \(getppid())")
+        logger.info("========================================")
         
         let permissionChecker = PermissionChecker()
         let perms = await permissionChecker.checkPermissions()
+        logger.info("========================================")
         logger.info("Permission check result: screenGranted=\(perms.screenGranted), micGranted=\(perms.micGranted)")
+        logger.info("========================================")
         
         if !perms.screenGranted || !perms.micGranted {
             if !perms.screenGranted {

@@ -116,7 +116,8 @@ class PermissionGuideWindow: NSWindow {
     
     
     @objc private func quit() {
-        NSApplication.shared.terminate(nil)
+        logger.info("User clicked Quit - unloading LaunchAgent to prevent restart")
+        LaunchAgentManager.quitApplication()
     }
     
     func show() {

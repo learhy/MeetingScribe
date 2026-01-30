@@ -88,7 +88,7 @@ class CLIInstaller {
         
         var error: NSDictionary?
         if let scriptObject = NSAppleScript(source: appleScript) {
-            let output = scriptObject.executeAndReturnError(&error)
+            _ = scriptObject.executeAndReturnError(&error)
             
             if let error = error {
                 print("Failed to install CLI tool: \(error)")
