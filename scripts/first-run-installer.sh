@@ -102,10 +102,14 @@ else
             fi
         fi
         
-        if ! sudo cp -R "$APP_PATH" "$EXPECTED_LOCATION"; then
+        # Use ditto instead of cp to preserve all extended attributes including code signature
+        if ! sudo ditto "$APP_PATH" "$EXPECTED_LOCATION"; then
             show_dialog "Failed to copy to Applications folder. Please manually drag MeetingScribe.app to Applications."
             exit 1
         fi
+        
+        # Preserve ownership
+        sudo chown -R root:wheel "$EXPECTED_LOCATION"
         
         # Update APP_PATH to new location
         APP_PATH="$EXPECTED_LOCATION"

@@ -2,6 +2,11 @@
 
 # Package MeetingScribe for distribution
 # Creates a distributable DMG or ZIP archive
+#
+# Usage: SIGNING_IDENTITY="Your Identity" ./scripts/package-for-distribution.sh VERSION
+# Example: SIGNING_IDENTITY="AudioCapture Dev" ./scripts/package-for-distribution.sh 1.0.0
+#
+# Note: SIGNING_IDENTITY must match what was used in build-and-sign.sh
 
 set -e
 
@@ -31,6 +36,27 @@ fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST"
 echo "✅ Version updated in Info.plist"
+
+# Re-sign the app bundle since we modified Info.plist (this invalidates the signature)
+if [ -n "$SIGNING_IDENTITY" ]; then
+    echo "Re-signing app bundle after Info.plist modification..."
+    codesign --force --sign "$SIGNING_IDENTITY" \
+        --timestamp \
+        --options runtime \
+        --entitlements "entitlements.plist" \
+        --deep \
+        "$APP_BUNDLE"
+    
+    if codesign --verify --deep --strict "$APP_BUNDLE" 2>/dev/null; then
+        echo "✅ App bundle re-signed successfully"
+    else
+        echo "❌ Re-signing failed!"
+        exit 1
+    fi
+else
+    echo "⚠️  Warning: SIGNING_IDENTITY not set, cannot re-sign after modifying Info.plist"
+    echo "   The app signature is now invalid. For distribution, set SIGNING_IDENTITY."
+fi
 
 # Check if bundled Python exists
 if [ ! -f "$APP_BUNDLE/Contents/Resources/python/bin/python3" ]; then
@@ -79,8 +105,16 @@ DMG_TEMP="build/dmg_temp"
 rm -rf "$DMG_TEMP"
 mkdir -p "$DMG_TEMP"
 
-# Copy app bundle to temp directory
-cp -R "$APP_BUNDLE" "$DMG_TEMP/"
+# Copy app bundle to temp directory (use ditto to preserve all attributes including code signature)
+ditto "$APP_BUNDLE" "$DMG_TEMP/$APP_NAME.app"
+
+# Verify signature was preserved
+if ! codesign --verify --deep --strict "$DMG_TEMP/$APP_NAME.app" 2>/dev/null; then
+    echo "❌ ERROR: Code signature was not preserved during copy!"
+    echo "   This will cause permission issues when installed."
+    exit 1
+fi
+echo "✅ Code signature verified in DMG temp directory"
 
 # Create a symbolic link to /Applications for easy drag-and-drop
 # Use absolute path to ensure it works correctly
@@ -250,8 +284,8 @@ ZIP_TEMP="build/zip_temp"
 rm -rf "$ZIP_TEMP"
 mkdir -p "$ZIP_TEMP"
 
-# Copy app bundle
-cp -R "$APP_BUNDLE" "$ZIP_TEMP/"
+# Copy app bundle (use ditto to preserve all attributes including code signature)
+ditto "$APP_BUNDLE" "$ZIP_TEMP/$APP_NAME.app"
 
 # Create README
 cat > "$ZIP_TEMP/README.txt" << EOF
