@@ -401,12 +401,14 @@ class NotesGenerationService {
         6. Use clear, professional language
         7. Format output in Markdown
         
-        Structure:
-        - Summary
-        - Key Points
-        - Action Items (if any)
-        - Decisions (if any)
-        - Next Steps (if any)
+        CRITICAL: Generate exactly ONE cohesive document with the following structure, regardless of transcript length:
+        - Summary (at the top)
+        - Key Points (all points in ONE section)
+        - Action Items (if any - in ONE section)
+        - Decisions (if any - in ONE section)
+        - Next Steps (if any - in ONE section)
+        
+        DO NOT create multiple "Meeting Notes" sections or repeat headers. Process the entire transcript and consolidate all information into a single, unified document with the structure above.
         
         Be concise but comprehensive. Focus on actionable information.
         """

@@ -21,6 +21,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private var meetingScribeService: MeetingScribeService?
     private var wasFirstRun = false
     
+    // Phase 1: Track state for MenuBarState construction
+    private var currentlyRecording = false
+    private var currentProcessingCount = 0
+    private var currentSystemStatus: MenuBarState.SystemStatus = .normal
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         let processId = ProcessInfo.processInfo.processIdentifier
         let bundlePath = Bundle.main.bundlePath
@@ -114,16 +119,56 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             self?.requestPermissions()
         }
         
-        // Link service state to menu bar
+        // Link service state to menu bar (keep for backward compatibility with disabled/configError)
         meetingScribeService?.onStateChanged = { [weak self] state in
             DispatchQueue.main.async {
-                self?.menuBarController?.updateState(state)
+                guard let self = self else { return }
+                // Update old callback for backward compatibility
+                self.menuBarController?.updateState(state)
+                
+                // Also track system status for Phase 1 MenuBarState
+                switch state {
+                case .disabled:
+                    self.currentSystemStatus = .disabled
+                case .configError:
+                    self.currentSystemStatus = .configError
+                case .idle, .recording, .processing:
+                    self.currentSystemStatus = .normal
+                }
             }
         }
         
         meetingScribeService?.onAutoRecordingChanged = { [weak self] enabled in
             DispatchQueue.main.async {
                 self?.menuBarController?.updateAutoRecordingState(enabled)
+            }
+        }
+        
+        // Phase 1: Wire recording state callback
+        meetingScribeService?.onRecordingStateChanged = { [weak self] isRecording in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.currentlyRecording = isRecording
+                let state = MenuBarState(
+                    systemStatus: self.currentSystemStatus,
+                    isRecording: self.currentlyRecording,
+                    processingCount: self.currentProcessingCount
+                )
+                self.menuBarController?.updateState(state)
+            }
+        }
+        
+        // Phase 1: Wire processing count callback
+        meetingScribeService?.onProcessingCountChanged = { [weak self] count in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.currentProcessingCount = count
+                let state = MenuBarState(
+                    systemStatus: self.currentSystemStatus,
+                    isRecording: self.currentlyRecording,
+                    processingCount: self.currentProcessingCount
+                )
+                self.menuBarController?.updateState(state)
             }
         }
         
@@ -380,8 +425,14 @@ class MeetingScribeService {
     private var isCancelled = false
     private var configFileMonitor: DispatchSourceFileSystemObject?
     
+    // Phase 1: Processing counter and recording state (thread-safe with @MainActor)
+    @MainActor private var processingCount = 0
+    @MainActor private var isCurrentlyRecording = false
+    
     var onStateChanged: ((RecordingState) -> Void)?
     var onAutoRecordingChanged: ((Bool) -> Void)?
+    var onRecordingStateChanged: ((Bool) -> Void)?
+    var onProcessingCountChanged: ((Int) -> Void)?
     
     init() {
         self.callDetector = HybridCallDetector(
@@ -591,6 +642,18 @@ class MeetingScribeService {
         // Update state to recording
         onStateChanged?(.recording)
         
+        // Update recording state (Phase 1)
+        Task { @MainActor in
+            logger.info("[Phase1] Setting isCurrentlyRecording=true")
+            isCurrentlyRecording = true
+            if let callback = onRecordingStateChanged {
+                logger.info("[Phase1] Invoking onRecordingStateChanged(true)")
+                callback(true)
+            } else {
+                logger.warning("[Phase1] onRecordingStateChanged is nil!")
+            }
+        }
+        
         // Send notification
         if config.config.ui.notifyOnStart {
             sendNotification(title: "Recording Started", body: "Meeting recording has begun")
@@ -615,6 +678,18 @@ class MeetingScribeService {
         // Update state to processing
         onStateChanged?(.processing)
         
+        // Update recording state (Phase 1)
+        Task { @MainActor in
+            logger.info("[Phase1] Setting isCurrentlyRecording=false")
+            isCurrentlyRecording = false
+            if let callback = onRecordingStateChanged {
+                logger.info("[Phase1] Invoking onRecordingStateChanged(false)")
+                callback(false)
+            } else {
+                logger.warning("[Phase1] onRecordingStateChanged is nil!")
+            }
+        }
+        
         // Send notification
         if config.config.ui.notifyOnEnd {
             sendNotification(title: "Processing Meeting", body: "Transcribing and generating notes...")
@@ -629,6 +704,31 @@ class MeetingScribeService {
     }
     
     private func processRecording(startTime: Date, duration: TimeInterval, platform: String) async {
+        // Increment processing counter (Phase 1)
+        await MainActor.run {
+            logger.info("[Phase1] Incrementing processingCount to \(processingCount + 1)")
+            processingCount += 1
+            if let callback = onProcessingCountChanged {
+                logger.info("[Phase1] Invoking onProcessingCountChanged(\(processingCount))")
+                callback(processingCount)
+            } else {
+                logger.warning("[Phase1] onProcessingCountChanged is nil!")
+            }
+        }
+        // CRITICAL: defer declared immediately after increment, before any throwing code
+        defer {
+            Task { @MainActor in
+                logger.info("[Phase1] Decrementing processingCount to \(processingCount - 1)")
+                processingCount -= 1
+                if let callback = onProcessingCountChanged {
+                    logger.info("[Phase1] Invoking onProcessingCountChanged(\(processingCount))")
+                    callback(processingCount)
+                } else {
+                    logger.warning("[Phase1] onProcessingCountChanged is nil in defer!")
+                }
+            }
+        }
+        
         // Get actual audio file path from capture
         guard let audioFilePath = currentAudioFilePath else {
             logger.error("No audio file path available - cannot process recording")

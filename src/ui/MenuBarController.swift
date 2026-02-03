@@ -8,6 +8,19 @@ enum RecordingState {
     case processing
 }
 
+// New composite state model for Phase 1
+struct MenuBarState {
+    enum SystemStatus {
+        case normal
+        case disabled
+        case configError
+    }
+    
+    let systemStatus: SystemStatus
+    let isRecording: Bool
+    let processingCount: Int
+}
+
 class MenuBarController {
     private let statusItem: NSStatusItem
     private let menu: NSMenu
@@ -22,6 +35,7 @@ class MenuBarController {
     
     private var isRecording = false
     private var currentState: RecordingState = .idle
+    private var currentMenuBarState: MenuBarState = MenuBarState(systemStatus: .normal, isRecording: false, processingCount: 0)
     private var autoRecordingEnabled = true
     
     init() {
@@ -95,6 +109,12 @@ class MenuBarController {
         updateMenuForState()
     }
     
+    func updateState(_ state: MenuBarState) {
+        currentMenuBarState = state
+        updateIconFromMenuBarState()
+        updateMenuFromMenuBarState()
+    }
+    
     func updateAutoRecordingState(_ enabled: Bool) {
         autoRecordingEnabled = enabled
         updateAutoRecordingMenuItem()
@@ -143,6 +163,38 @@ class MenuBarController {
         button.contentTintColor = color
     }
     
+    private func updateIconFromMenuBarState() {
+        guard let button = statusItem.button else { return }
+        
+        // Use text-based indicators since contentTintColor is broken on macOS 11+
+        // and colored images don't follow macOS design guidelines
+        switch currentMenuBarState.systemStatus {
+        case .disabled:
+            button.image = nil
+            button.title = "⚠️"
+        case .configError:
+            button.image = nil  
+            button.title = "⚠️"
+        case .normal:
+            button.image = nil
+            // Recording takes precedence over processing for icon color
+            if currentMenuBarState.isRecording {
+                button.title = "🔴"  // Red circle for recording
+            } else if currentMenuBarState.processingCount > 0 {
+                button.title = "🟠"  // Orange circle for processing
+            } else {
+                // Use SF Symbol for idle state
+                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+                if let image = NSImage(systemSymbolName: "message.circle", accessibilityDescription: "MeetingScribe")?
+                    .withSymbolConfiguration(config) {
+                    image.isTemplate = true
+                    button.image = image
+                    button.title = ""
+                }
+            }
+        }
+    }
+    
     private func updateAutoRecordingMenuItem() {
         let title = autoRecordingEnabled ? "Disable Auto Recording" : "Enable Auto Recording"
         
@@ -152,6 +204,41 @@ class MenuBarController {
                 break
             }
         }
+    }
+    
+    private func updateMenuFromMenuBarState() {
+        // Show different menu based on system status
+        switch currentMenuBarState.systemStatus {
+        case .disabled:
+            buildDisabledMenu()
+        case .configError:
+            buildConfigErrorMenu()
+        case .normal:
+            buildNormalMenuWithState()
+        }
+    }
+    
+    private func updateStatusMenuItem() {
+        // Find the status menu item (should be second from last, before Quit)
+        let statusIndex = menu.items.count - 2
+        guard statusIndex >= 0 && statusIndex < menu.items.count else { return }
+        
+        let statusItem = menu.items[statusIndex]
+        
+        // Build status text
+        let statusText: String
+        if currentMenuBarState.isRecording && currentMenuBarState.processingCount > 0 {
+            statusText = "Status: Recording + Processing \(currentMenuBarState.processingCount)"
+        } else if currentMenuBarState.isRecording {
+            statusText = "Status: Recording"
+        } else if currentMenuBarState.processingCount > 0 {
+            let meetingText = currentMenuBarState.processingCount == 1 ? "meeting" : "meetings"
+            statusText = "Status: Processing \(currentMenuBarState.processingCount) \(meetingText)"
+        } else {
+            statusText = "Status: Waiting"
+        }
+        
+        statusItem.title = statusText
     }
     
     private func updateMenuForState() {
@@ -251,6 +338,47 @@ class MenuBarController {
         let quitItem = NSMenuItem(title: "Quit MeetingScribe", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
+    }
+    
+    private func buildNormalMenuWithState() {
+        menu.removeAllItems()
+        
+        let startItem = NSMenuItem(title: "Start Recording", action: #selector(startRecording), keyEquivalent: "")
+        startItem.target = self
+        startItem.isHidden = currentMenuBarState.isRecording
+        menu.addItem(startItem)
+        
+        let stopItem = NSMenuItem(title: "Stop Recording", action: #selector(stopRecording), keyEquivalent: "")
+        stopItem.target = self
+        stopItem.isHidden = !currentMenuBarState.isRecording
+        menu.addItem(stopItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let toggleAutoTitle = autoRecordingEnabled ? "Disable Auto Recording" : "Enable Auto Recording"
+        let toggleAutoItem = NSMenuItem(title: toggleAutoTitle, action: #selector(toggleAutoRecording), keyEquivalent: "")
+        toggleAutoItem.target = self
+        menu.addItem(toggleAutoItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let prefsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Add status menu item (non-clickable, grayed out)
+        let statusItem = NSMenuItem(title: "Status: Waiting", action: nil, keyEquivalent: "")
+        statusItem.isEnabled = false
+        menu.addItem(statusItem)
+        
+        let quitItem = NSMenuItem(title: "Quit MeetingScribe", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+        
+        // Update status text based on current state
+        updateStatusMenuItem()
     }
     
     @objc private func showPermissionGuide() {
