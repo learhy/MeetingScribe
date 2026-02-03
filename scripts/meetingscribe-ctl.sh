@@ -68,24 +68,31 @@ daemon_status() {
 daemon_start() {
     check_installed
     
-    if launchctl list | grep -q "$LABEL"; then
+    # Check if process is already running
+    if ps aux | grep -v grep | grep -q "/Applications/MeetingScribe.app/Contents/MacOS/meetingscribe"; then
         echo -e "${YELLOW}⚠️  Daemon is already running${NC}"
         return 0
     fi
     
+    # Check if service is loaded
+    if ! launchctl list | grep -q "$LABEL"; then
+        echo "Loading MeetingScribe daemon..."
+        launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null || {
+            echo -e "${RED}❌ Failed to load daemon${NC}"
+            exit 1
+        }
+    fi
+    
     echo "Starting MeetingScribe daemon..."
-    launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null || {
-        echo -e "${YELLOW}⚠️  Daemon already loaded, attempting to start...${NC}"
-        launchctl kickstart "$DOMAIN/$LABEL" 2>/dev/null || true
-    }
+    launchctl kickstart -kp "$DOMAIN/$LABEL" 2>&1
     
-    sleep 1
+    sleep 3
     
-    if daemon_status >/dev/null 2>&1; then
+    # Check if process is actually running
+    if pgrep -f "/Applications/MeetingScribe.app/Contents/MacOS/meetingscribe" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Daemon started successfully${NC}"
     else
-        echo -e "${RED}❌ Failed to start daemon${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  Daemon may have started but process not found (check logs)${NC}"
     fi
 }
 
@@ -98,20 +105,18 @@ daemon_stop() {
     fi
     
     echo "Stopping MeetingScribe daemon..."
-    launchctl bootout "$DOMAIN" "$PLIST" 2>/dev/null || {
-        echo -e "${YELLOW}⚠️  Attempting alternative stop method...${NC}"
-        launchctl kill SIGTERM "$DOMAIN/$LABEL" 2>/dev/null || true
-        sleep 1
-        launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
-    }
+    # Use kill to stop the process without unloading the service
+    launchctl kill SIGTERM "$DOMAIN/$LABEL" 2>/dev/null || true
     
-    sleep 1
+    # Wait for process to stop
+    sleep 2
     
-    if ! launchctl list | grep -q "$LABEL"; then
+    # Verify it stopped by checking if there's a PID
+    if launchctl list | grep "$LABEL" | grep -q "^-"; then
         echo -e "${GREEN}✅ Daemon stopped successfully${NC}"
     else
-        echo -e "${RED}❌ Failed to stop daemon completely${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  Daemon may still be running (KeepAlive will restart it)${NC}"
+        echo -e "${YELLOW}    To fully disable, run: launchctl bootout $DOMAIN $PLIST${NC}"
     fi
 }
 

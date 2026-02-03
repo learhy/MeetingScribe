@@ -2,8 +2,8 @@
 
 set -e
 
-# Installation mode: 'user' (default) or 'system'
-INSTALL_MODE="${1:-user}"
+# Installation mode: 'system' (default) or 'user'
+INSTALL_MODE="${1:-system}"
 
 echo "Installing MeetingScribe..."
 
@@ -58,8 +58,11 @@ echo "Installing LaunchAgent..."
 PLIST_SRC="$PROJECT_DIR/resources/com.meetingscribe.daemon.plist"
 PLIST_DEST="$HOME/Library/LaunchAgents/com.meetingscribe.daemon.plist"
 
-# Replace USERNAME placeholder
-sed "s/USERNAME/$USER/g" "$PLIST_SRC" > "$PLIST_DEST"
+# Replace USERNAME and Applications path placeholders
+# Do the path replacement first before USERNAME is replaced
+sed -e "s|/Users/USERNAME/Applications|$APP_DEST_DIR|g" \
+    -e "s/USERNAME/$USER/g" \
+    "$PLIST_SRC" > "$PLIST_DEST"
 
 # Verify app was actually copied
 if [ ! -d "$APP_DEST" ]; then
