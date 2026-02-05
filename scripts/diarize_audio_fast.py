@@ -21,10 +21,16 @@ import json
 import sys
 import os
 import warnings
+import random
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
+
+# Set random seeds for reproducibility
+RANDOM_SEED = 42
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -40,6 +46,12 @@ try:
     import torchaudio
     from speechbrain.pretrained import EncoderClassifier
     from sklearn.cluster import AgglomerativeClustering
+    
+    # Set PyTorch seed for reproducibility
+    torch.manual_seed(RANDOM_SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(RANDOM_SEED)
+    # Note: MPS (Apple Silicon) doesn't have a separate seed function
 except ImportError as e:
     print(f"Error: Missing required dependency: {e}", file=sys.stderr)
     print("Please install: pip install speechbrain scikit-learn openai-whisper torch torchaudio", file=sys.stderr)
@@ -122,10 +134,17 @@ def extract_embeddings_with_speechbrain(
     step_samples = int(step_size * sample_rate)
     audio_length = waveform.shape[1]
     
+    # Calculate total windows for progress reporting
+    total_windows = max(1, (audio_length - window_samples) // step_samples + 1)
+    
     embeddings = []
     timestamps = []
     
     print(f"Extracting embeddings (window={window_size}s, step={step_size}s)...", file=sys.stderr)
+    
+    # Progress tracking
+    last_progress_pct = 0
+    window_idx = 0
     
     # Sliding window extraction
     for start_sample in range(0, audio_length - window_samples + 1, step_samples):
@@ -139,6 +158,13 @@ def extract_embeddings_with_speechbrain(
         
         # Store timestamp (in seconds)
         timestamps.append(start_sample / sample_rate)
+        
+        # Emit progress every 10%
+        window_idx += 1
+        progress_pct = int((window_idx / total_windows) * 100)
+        if progress_pct >= last_progress_pct + 10:
+            print(f"PROGRESS:embedding:{window_idx}:{total_windows}", file=sys.stderr)
+            last_progress_pct = progress_pct
     
     embeddings_array = np.array(embeddings)
     print(f"Extracted {len(embeddings)} embeddings", file=sys.stderr)
@@ -246,7 +272,8 @@ def transcribe_with_whisper(
     audio_path: str,
     model_name: str = "base",
     initial_prompt: str = None,
-    vocabulary_file: str = None
+    vocabulary_file: str = None,
+    audio_duration_seconds: float = None
 ) -> Dict[str, Any]:
     """Transcribe audio with Whisper."""
     print(f"Loading Whisper model '{model_name}'...", file=sys.stderr)
@@ -265,7 +292,13 @@ def transcribe_with_whisper(
     
     final_prompt = " ".join(prompt_parts) if prompt_parts else None
     
-    print(f"Transcribing...", file=sys.stderr)
+    # Estimate total chunks for progress (Whisper processes ~30 second chunks)
+    total_chunks = int((audio_duration_seconds or 0) / 30) + 1 if audio_duration_seconds else None
+    if total_chunks:
+        print(f"Transcribing (~{total_chunks} chunks)...", file=sys.stderr)
+    else:
+        print(f"Transcribing...", file=sys.stderr)
+    
     transcribe_kwargs = {
         "word_timestamps": True,
         "verbose": False
@@ -277,6 +310,11 @@ def transcribe_with_whisper(
         transcribe_kwargs["condition_on_previous_text"] = True
     
     result = model.transcribe(audio_path, **transcribe_kwargs)
+    
+    # Report completion with segment count
+    num_segments = len(result.get("segments", []))
+    print(f"PROGRESS:transcribe:{num_segments}:{num_segments}", file=sys.stderr)
+    print(f"Transcription complete: {num_segments} segments", file=sys.stderr)
     
     return result
 
@@ -415,6 +453,10 @@ def main():
     # Step 1: Load and preprocess audio
     waveform, sample_rate = load_and_preprocess_audio(args.audio_file)
     
+    # Calculate audio duration for progress reporting
+    audio_duration_seconds = waveform.shape[1] / sample_rate
+    print(f"Audio duration: {audio_duration_seconds:.1f}s ({audio_duration_seconds/60:.1f} minutes)", file=sys.stderr)
+    
     # Step 2: Extract speaker embeddings
     embeddings, timestamps = extract_embeddings_with_speechbrain(
         waveform,
@@ -442,7 +484,8 @@ def main():
         args.audio_file,
         model_name=args.whisper_model,
         initial_prompt=args.initial_prompt,
-        vocabulary_file=args.vocabulary_file
+        vocabulary_file=args.vocabulary_file,
+        audio_duration_seconds=audio_duration_seconds
     )
     
     # Step 6: Align transcription with diarization

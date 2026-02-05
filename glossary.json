@@ -1,0 +1,5378 @@
+{
+  "enabled": true,
+  "maxSize": 1000,
+  "entries": [
+    {
+      "term": "Kubernetes",
+      "pronunciation": "koo-ber-NET-eez",
+      "context": "container orchestration platform",
+      "aliases": [
+        "k8s",
+        "K8s"
+      ]
+    },
+    {
+      "term": "AWS",
+      "pronunciation": "ay-double-you-ess",
+      "context": "Amazon Web Services cloud platform",
+      "aliases": [
+        "Amazon Web Services"
+      ]
+    },
+    {
+      "term": "API",
+      "pronunciation": "ay-pee-eye",
+      "context": "Application Programming Interface",
+      "aliases": [
+        "APIs"
+      ]
+    },
+    {
+      "term": "Azure",
+      "pronunciation": "AZH-er",
+      "context": "Microsoft cloud computing platform",
+      "aliases": [
+        "Microsoft Azure"
+      ]
+    },
+    {
+      "term": "Terraform",
+      "pronunciation": "TERRA-form",
+      "context": "infrastructure as code tool by HashiCorp",
+      "aliases": [
+        "TF"
+      ]
+    },
+    {
+      "term": "Slack",
+      "pronunciation": "slack",
+      "context": "team communication and collaboration platform",
+      "aliases": null
+    },
+    {
+      "term": "Node.js",
+      "pronunciation": "node-jay-ess",
+      "context": "JavaScript runtime built on Chrome's V8 engine",
+      "aliases": [
+        "NodeJS",
+        "node"
+      ]
+    },
+    {
+      "term": "GitHub",
+      "pronunciation": "git-hub",
+      "context": "version control and collaboration platform",
+      "aliases": [
+        "Github"
+      ]
+    },
+    {
+      "term": "REST",
+      "pronunciation": "rest",
+      "context": "Representational State Transfer API architecture",
+      "aliases": [
+        "RESTful",
+        "REST API"
+      ]
+    },
+    {
+      "term": "Zoom",
+      "pronunciation": "zoom",
+      "context": "video conferencing platform",
+      "aliases": null
+    },
+    {
+      "term": "GCP",
+      "pronunciation": "gee-see-pee",
+      "context": "Google Cloud Platform",
+      "aliases": [
+        "Google Cloud"
+      ]
+    },
+    {
+      "term": "Docker",
+      "pronunciation": "docker",
+      "context": "containerization platform",
+      "aliases": null
+    },
+    {
+      "term": "PostgreSQL",
+      "pronunciation": "POST-gres-cue-ell",
+      "context": "relational database management system",
+      "aliases": [
+        "Postgres",
+        "postgres",
+        "pg"
+      ]
+    },
+    {
+      "term": "JSON",
+      "pronunciation": "jay-sawn",
+      "context": "JavaScript Object Notation data format",
+      "aliases": null
+    },
+    {
+      "term": "Python",
+      "pronunciation": "PIE-thon",
+      "context": "high-level programming language",
+      "aliases": null
+    },
+    {
+      "term": "OAuth",
+      "pronunciation": "OH-auth",
+      "context": "open standard for authentication and authorization",
+      "aliases": [
+        "OAuth 2.0",
+        "OAuth2"
+      ]
+    },
+    {
+      "term": "Jira",
+      "pronunciation": "JEE-rah",
+      "context": "project management and issue tracking tool by Atlassian",
+      "aliases": [
+        "JIRA"
+      ]
+    },
+    {
+      "term": "Anthropic",
+      "pronunciation": "an-THRO-pic",
+      "context": "AI safety company, creator of Claude",
+      "aliases": [
+        "Claude"
+      ]
+    },
+    {
+      "term": "OpenAI",
+      "pronunciation": "open-ay-eye",
+      "context": "AI research company, creator of ChatGPT",
+      "aliases": [
+        "ChatGPT",
+        "GPT",
+        "GPT-4"
+      ]
+    },
+    {
+      "term": "SQL",
+      "pronunciation": "ess-cue-ell",
+      "context": "Structured Query Language for databases",
+      "aliases": null
+    },
+    {
+      "term": "YAML",
+      "pronunciation": "YAM-el",
+      "context": "human-readable data serialization format",
+      "aliases": [
+        "yml"
+      ]
+    },
+    {
+      "term": "Nginx",
+      "pronunciation": "engine-ex",
+      "context": "web server and reverse proxy",
+      "aliases": null
+    },
+    {
+      "term": "JavaScript",
+      "pronunciation": "JAVA-script",
+      "context": "programming language for web development",
+      "aliases": [
+        "JS",
+        "js"
+      ]
+    },
+    {
+      "term": "FastAPI",
+      "pronunciation": "fast-ay-pee-eye",
+      "context": "modern Python web framework",
+      "aliases": null
+    },
+    {
+      "term": "React",
+      "pronunciation": "react",
+      "context": "JavaScript library for building user interfaces",
+      "aliases": [
+        "ReactJS",
+        "React.js"
+      ]
+    },
+    {
+      "term": "LangChain",
+      "pronunciation": "LANG-chain",
+      "context": "framework for building LLM-powered applications",
+      "aliases": null
+    },
+    {
+      "term": "MongoDB",
+      "pronunciation": "mon-go-dee-bee",
+      "context": "NoSQL document database",
+      "aliases": [
+        "Mongo"
+      ]
+    },
+    {
+      "term": "GitLab",
+      "pronunciation": "git-lab",
+      "context": "DevOps platform for version control and CI/CD",
+      "aliases": [
+        "Gitlab"
+      ]
+    },
+    {
+      "term": "Redis",
+      "pronunciation": "RED-iss",
+      "context": "in-memory data structure store and cache",
+      "aliases": null
+    },
+    {
+      "term": "TypeScript",
+      "pronunciation": "type-script",
+      "context": "typed superset of JavaScript",
+      "aliases": [
+        "TS"
+      ]
+    },
+    {
+      "term": "GraphQL",
+      "pronunciation": "GRAF-cue-ell",
+      "context": "API query language developed by Facebook",
+      "aliases": null
+    },
+    {
+      "term": "Jenkins",
+      "pronunciation": "jen-kins",
+      "context": "automation server for CI/CD",
+      "aliases": null
+    },
+    {
+      "term": "CI/CD",
+      "pronunciation": "see-eye-see-dee",
+      "context": "Continuous Integration and Continuous Deployment",
+      "aliases": [
+        "CICD"
+      ]
+    },
+    {
+      "term": "SaaS",
+      "pronunciation": "sass",
+      "context": "Software as a Service, cloud-based software delivery model",
+      "aliases": null
+    },
+    {
+      "term": "DevOps",
+      "pronunciation": "dev-ops",
+      "context": "practices combining software development and IT operations",
+      "aliases": null
+    },
+    {
+      "term": "Elasticsearch",
+      "pronunciation": "ee-lastic-search",
+      "context": "distributed search and analytics engine",
+      "aliases": [
+        "ES"
+      ]
+    },
+    {
+      "term": "Kafka",
+      "pronunciation": "KAF-kah",
+      "context": "distributed event streaming platform",
+      "aliases": [
+        "Apache Kafka"
+      ]
+    },
+    {
+      "term": "RabbitMQ",
+      "pronunciation": "rabbit-em-cue",
+      "context": "message broker for distributed systems",
+      "aliases": null
+    },
+    {
+      "term": "gRPC",
+      "pronunciation": "gee-are-pee-see",
+      "context": "high-performance RPC framework by Google",
+      "aliases": null
+    },
+    {
+      "term": "Lambda",
+      "pronunciation": "LAM-dah",
+      "context": "serverless computing service by AWS",
+      "aliases": [
+        "AWS Lambda"
+      ]
+    },
+    {
+      "term": "S3",
+      "pronunciation": "ess-three",
+      "context": "Simple Storage Service by AWS",
+      "aliases": [
+        "AWS S3"
+      ]
+    },
+    {
+      "term": "EC2",
+      "pronunciation": "ee-see-two",
+      "context": "Elastic Compute Cloud virtual servers by AWS",
+      "aliases": [
+        "AWS EC2"
+      ]
+    },
+    {
+      "term": "CloudFormation",
+      "pronunciation": "cloud-for-MAY-shun",
+      "context": "infrastructure as code service by AWS",
+      "aliases": [
+        "CFN"
+      ]
+    },
+    {
+      "term": "CloudWatch",
+      "pronunciation": "cloud-watch",
+      "context": "monitoring and observability service by AWS",
+      "aliases": null
+    },
+    {
+      "term": "VPC",
+      "pronunciation": "vee-pee-see",
+      "context": "Virtual Private Cloud for isolated networks",
+      "aliases": [
+        "AWS VPC"
+      ]
+    },
+    {
+      "term": "ECS",
+      "pronunciation": "ee-see-ess",
+      "context": "Elastic Container Service by AWS",
+      "aliases": [
+        "AWS ECS"
+      ]
+    },
+    {
+      "term": "EKS",
+      "pronunciation": "ee-kay-ess",
+      "context": "Elastic Kubernetes Service by AWS",
+      "aliases": [
+        "AWS EKS"
+      ]
+    },
+    {
+      "term": "IAM",
+      "pronunciation": "eye-am",
+      "context": "Identity and Access Management",
+      "aliases": [
+        "AWS IAM"
+      ]
+    },
+    {
+      "term": "SSO",
+      "pronunciation": "ess-ess-oh",
+      "context": "Single Sign-On authentication method",
+      "aliases": null
+    },
+    {
+      "term": "SAML",
+      "pronunciation": "SAM-el",
+      "context": "Security Assertion Markup Language for authentication",
+      "aliases": null
+    },
+    {
+      "term": "JWT",
+      "pronunciation": "jot",
+      "context": "JSON Web Token for secure information transmission",
+      "aliases": null
+    },
+    {
+      "term": "SSL",
+      "pronunciation": "ess-ess-ell",
+      "context": "Secure Sockets Layer encryption protocol",
+      "aliases": [
+        "TLS"
+      ]
+    },
+    {
+      "term": "DNS",
+      "pronunciation": "dee-en-ess",
+      "context": "Domain Name System for resolving hostnames",
+      "aliases": null
+    },
+    {
+      "term": "CDN",
+      "pronunciation": "see-dee-en",
+      "context": "Content Delivery Network for distributed content",
+      "aliases": null
+    },
+    {
+      "term": "CloudFront",
+      "pronunciation": "cloud-front",
+      "context": "CDN service by AWS",
+      "aliases": null
+    },
+    {
+      "term": "Route53",
+      "pronunciation": "route-fifty-three",
+      "context": "DNS service by AWS",
+      "aliases": [
+        "Route 53"
+      ]
+    },
+    {
+      "term": "Dan Rohan",
+      "pronunciation": "dan ROH-han",
+      "context": "team member",
+      "aliases": [
+        "Dan"
+      ]
+    },
+    {
+      "term": "Tim",
+      "pronunciation": "tim",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "John",
+      "pronunciation": "jon",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Mike",
+      "pronunciation": "mike",
+      "context": "team member",
+      "aliases": [
+        "Michael"
+      ]
+    },
+    {
+      "term": "Iris",
+      "pronunciation": "EYE-riss",
+      "context": "team member or product name",
+      "aliases": null
+    },
+    {
+      "term": "HashiCorp",
+      "pronunciation": "HASH-ee-corp",
+      "context": "software company, creator of Terraform, Consul, Vault",
+      "aliases": null
+    },
+    {
+      "term": "Consul",
+      "pronunciation": "CON-sul",
+      "context": "service mesh and service discovery tool by HashiCorp",
+      "aliases": null
+    },
+    {
+      "term": "Vault",
+      "pronunciation": "vawlt",
+      "context": "secrets management tool by HashiCorp",
+      "aliases": [
+        "HashiCorp Vault"
+      ]
+    },
+    {
+      "term": "Kentik",
+      "pronunciation": "KEN-tik",
+      "context": "network observability platform",
+      "aliases": null
+    },
+    {
+      "term": "Elastic",
+      "pronunciation": "ee-LASS-tik",
+      "context": "company behind Elasticsearch and Elastic Stack",
+      "aliases": [
+        "Elastic Stack",
+        "ELK"
+      ]
+    },
+    {
+      "term": "Pradeep",
+      "pronunciation": "pra-DEEP",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Prakash",
+      "pronunciation": "pra-KAHSH",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Anando",
+      "pronunciation": "ah-NAN-doh",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Vishal",
+      "pronunciation": "vish-AHL",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Anand",
+      "pronunciation": "ah-NAND",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Ananda",
+      "pronunciation": "ah-NAN-dah",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Krishnan",
+      "pronunciation": "KRISH-nan",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Rachana",
+      "pronunciation": "ruh-CHAH-nah",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Aman",
+      "pronunciation": "ah-MAHN",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Shuba",
+      "pronunciation": "SHOO-bah",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "KT",
+      "pronunciation": "kay-tee",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Sapta",
+      "pronunciation": "SAP-tah",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Suja",
+      "pronunciation": "SOO-jah",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Swati",
+      "pronunciation": "SWAH-tee",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Van",
+      "pronunciation": "van",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Cami",
+      "pronunciation": "KAM-ee",
+      "context": "team member",
+      "aliases": [
+        "Camille"
+      ]
+    },
+    {
+      "term": "Wendy",
+      "pronunciation": "WEN-dee",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Zed",
+      "pronunciation": "zed",
+      "context": "team member or text editor",
+      "aliases": null
+    },
+    {
+      "term": "Madeleine",
+      "pronunciation": "MAD-uh-lin",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Vinithra",
+      "pronunciation": "vih-NITH-rah",
+      "context": "team member",
+      "aliases": null
+    },
+    {
+      "term": "Git",
+      "pronunciation": "git",
+      "context": "version control system",
+      "aliases": null
+    },
+    {
+      "term": "Bitbucket",
+      "pronunciation": "bit-bucket",
+      "context": "Git repository hosting service",
+      "aliases": null
+    },
+    {
+      "term": "repo",
+      "pronunciation": "REP-oh",
+      "context": "short for repository",
+      "aliases": [
+        "repository"
+      ]
+    },
+    {
+      "term": "commit",
+      "pronunciation": "kuh-MIT",
+      "context": "Git change submission",
+      "aliases": null
+    },
+    {
+      "term": "pull request",
+      "pronunciation": "pull ree-KWEST",
+      "context": "Git code review workflow",
+      "aliases": [
+        "PR"
+      ]
+    },
+    {
+      "term": "merge conflict",
+      "pronunciation": "merge CON-flict",
+      "context": "Git version conflict",
+      "aliases": null
+    },
+    {
+      "term": "Golang",
+      "pronunciation": "GO-lang",
+      "context": "Go programming language",
+      "aliases": [
+        "Go"
+      ]
+    },
+    {
+      "term": "Rust",
+      "pronunciation": "rust",
+      "context": "systems programming language",
+      "aliases": null
+    },
+    {
+      "term": "Kotlin",
+      "pronunciation": "KOT-lin",
+      "context": "JVM programming language",
+      "aliases": null
+    },
+    {
+      "term": "Swift",
+      "pronunciation": "swift",
+      "context": "Apple programming language",
+      "aliases": null
+    },
+    {
+      "term": "Scala",
+      "pronunciation": "SKAH-lah",
+      "context": "JVM functional language",
+      "aliases": null
+    },
+    {
+      "term": "Elixir",
+      "pronunciation": "ee-LIX-er",
+      "context": "functional programming language",
+      "aliases": null
+    },
+    {
+      "term": "Ruby",
+      "pronunciation": "ROO-bee",
+      "context": "dynamic programming language",
+      "aliases": null
+    },
+    {
+      "term": "Perl",
+      "pronunciation": "perl",
+      "context": "scripting language",
+      "aliases": null
+    },
+    {
+      "term": "PHP",
+      "pronunciation": "pee-aych-pee",
+      "context": "server-side scripting language",
+      "aliases": null
+    },
+    {
+      "term": "Vue.js",
+      "pronunciation": "view-jay-ess",
+      "context": "JavaScript framework",
+      "aliases": [
+        "Vue"
+      ]
+    },
+    {
+      "term": "Angular",
+      "pronunciation": "ANG-gyuh-ler",
+      "context": "TypeScript web framework",
+      "aliases": null
+    },
+    {
+      "term": "Svelte",
+      "pronunciation": "svelt",
+      "context": "JavaScript compiler framework",
+      "aliases": null
+    },
+    {
+      "term": "Next.js",
+      "pronunciation": "next-jay-ess",
+      "context": "React framework",
+      "aliases": [
+        "Next"
+      ]
+    },
+    {
+      "term": "Nuxt",
+      "pronunciation": "nux",
+      "context": "Vue framework",
+      "aliases": null
+    },
+    {
+      "term": "Django",
+      "pronunciation": "JANG-oh",
+      "context": "Python web framework",
+      "aliases": null
+    },
+    {
+      "term": "Flask",
+      "pronunciation": "flask",
+      "context": "Python micro-framework",
+      "aliases": null
+    },
+    {
+      "term": "Express.js",
+      "pronunciation": "ex-PRESS-jay-ess",
+      "context": "Node.js web framework",
+      "aliases": [
+        "Express"
+      ]
+    },
+    {
+      "term": "Laravel",
+      "pronunciation": "lah-RAH-vel",
+      "context": "PHP web framework",
+      "aliases": null
+    },
+    {
+      "term": "Spring Boot",
+      "pronunciation": "spring boot",
+      "context": "Java application framework",
+      "aliases": null
+    },
+    {
+      "term": "Rails",
+      "pronunciation": "raylz",
+      "context": "Ruby web framework",
+      "aliases": [
+        "Ruby on Rails"
+      ]
+    },
+    {
+      "term": "kubectl",
+      "pronunciation": "KOOB-control",
+      "context": "Kubernetes CLI tool",
+      "aliases": [
+        "kube-cuddle"
+      ]
+    },
+    {
+      "term": "Helm",
+      "pronunciation": "helm",
+      "context": "Kubernetes package manager",
+      "aliases": null
+    },
+    {
+      "term": "Istio",
+      "pronunciation": "ISS-tee-oh",
+      "context": "service mesh platform",
+      "aliases": null
+    },
+    {
+      "term": "etcd",
+      "pronunciation": "et-see-dee",
+      "context": "distributed key-value store",
+      "aliases": null
+    },
+    {
+      "term": "Dockerfile",
+      "pronunciation": "docker-file",
+      "context": "Docker image definition",
+      "aliases": null
+    },
+    {
+      "term": "Podman",
+      "pronunciation": "pod-man",
+      "context": "container engine alternative to Docker",
+      "aliases": null
+    },
+    {
+      "term": "MySQL",
+      "pronunciation": "my-ess-cue-ell",
+      "context": "open-source relational database",
+      "aliases": null
+    },
+    {
+      "term": "SQLite",
+      "pronunciation": "ess-cue-ell-lite",
+      "context": "embedded database",
+      "aliases": null
+    },
+    {
+      "term": "Cassandra",
+      "pronunciation": "kuh-SAN-druh",
+      "context": "distributed NoSQL database",
+      "aliases": null
+    },
+    {
+      "term": "DynamoDB",
+      "pronunciation": "DY-nuh-moh-dee-bee",
+      "context": "AWS NoSQL database",
+      "aliases": null
+    },
+    {
+      "term": "CockroachDB",
+      "pronunciation": "COCK-roach-dee-bee",
+      "context": "distributed SQL database",
+      "aliases": null
+    },
+    {
+      "term": "MariaDB",
+      "pronunciation": "muh-REE-uh-dee-bee",
+      "context": "MySQL fork database",
+      "aliases": null
+    },
+    {
+      "term": "Neo4j",
+      "pronunciation": "nee-oh-four-jay",
+      "context": "graph database",
+      "aliases": null
+    },
+    {
+      "term": "InfluxDB",
+      "pronunciation": "IN-flux-dee-bee",
+      "context": "time-series database",
+      "aliases": null
+    },
+    {
+      "term": "Supabase",
+      "pronunciation": "SOO-puh-base",
+      "context": "open-source Firebase alternative",
+      "aliases": null
+    },
+    {
+      "term": "PlanetScale",
+      "pronunciation": "PLAN-et-scale",
+      "context": "serverless MySQL platform",
+      "aliases": null
+    },
+    {
+      "term": "Prisma",
+      "pronunciation": "PRIZ-mah",
+      "context": "database ORM",
+      "aliases": null
+    },
+    {
+      "term": "EC2",
+      "pronunciation": "ee-see-two",
+      "context": "AWS virtual servers",
+      "aliases": [
+        "AWS EC2"
+      ]
+    },
+    {
+      "term": "RDS",
+      "pronunciation": "arr-dee-ess",
+      "context": "AWS relational database service",
+      "aliases": [
+        "AWS RDS"
+      ]
+    },
+    {
+      "term": "SQS",
+      "pronunciation": "ess-cue-ess",
+      "context": "AWS message queue service",
+      "aliases": [
+        "AWS SQS"
+      ]
+    },
+    {
+      "term": "SNS",
+      "pronunciation": "ess-en-ess",
+      "context": "AWS notification service",
+      "aliases": [
+        "AWS SNS"
+      ]
+    },
+    {
+      "term": "Fargate",
+      "pronunciation": "FAR-gate",
+      "context": "AWS serverless container service",
+      "aliases": null
+    },
+    {
+      "term": "BigQuery",
+      "pronunciation": "big-KWEER-ee",
+      "context": "Google Cloud data warehouse",
+      "aliases": null
+    },
+    {
+      "term": "Pub/Sub",
+      "pronunciation": "pub-sub",
+      "context": "Google Cloud messaging",
+      "aliases": null
+    },
+    {
+      "term": "Vercel",
+      "pronunciation": "VER-sel",
+      "context": "frontend hosting platform",
+      "aliases": null
+    },
+    {
+      "term": "Netlify",
+      "pronunciation": "NET-luh-fy",
+      "context": "web hosting platform",
+      "aliases": null
+    },
+    {
+      "term": "Heroku",
+      "pronunciation": "heh-ROH-koo",
+      "context": "cloud application platform",
+      "aliases": null
+    },
+    {
+      "term": "DigitalOcean",
+      "pronunciation": "digital OH-shun",
+      "context": "cloud infrastructure provider",
+      "aliases": null
+    },
+    {
+      "term": "DNS",
+      "pronunciation": "dee-en-ess",
+      "context": "Domain Name System",
+      "aliases": null
+    },
+    {
+      "term": "TCP/IP",
+      "pronunciation": "tee-see-pee-eye-pee",
+      "context": "internet protocol suite",
+      "aliases": null
+    },
+    {
+      "term": "HTTP",
+      "pronunciation": "aych-tee-tee-pee",
+      "context": "hypertext transfer protocol",
+      "aliases": null
+    },
+    {
+      "term": "HTTPS",
+      "pronunciation": "aych-tee-tee-pee-ess",
+      "context": "secure HTTP",
+      "aliases": null
+    },
+    {
+      "term": "UDP",
+      "pronunciation": "you-dee-pee",
+      "context": "User Datagram Protocol",
+      "aliases": null
+    },
+    {
+      "term": "CIDR",
+      "pronunciation": "SY-der",
+      "context": "Classless Inter-Domain Routing",
+      "aliases": null
+    },
+    {
+      "term": "IPv4",
+      "pronunciation": "eye-pee-vee-four",
+      "context": "Internet Protocol version 4",
+      "aliases": null
+    },
+    {
+      "term": "IPv6",
+      "pronunciation": "eye-pee-vee-six",
+      "context": "Internet Protocol version 6",
+      "aliases": null
+    },
+    {
+      "term": "SSH",
+      "pronunciation": "ess-ess-aych",
+      "context": "Secure Shell protocol",
+      "aliases": null
+    },
+    {
+      "term": "VPN",
+      "pronunciation": "vee-pee-en",
+      "context": "Virtual Private Network",
+      "aliases": null
+    },
+    {
+      "term": "WAF",
+      "pronunciation": "waff",
+      "context": "Web Application Firewall",
+      "aliases": null
+    },
+    {
+      "term": "MFA",
+      "pronunciation": "em-eff-ay",
+      "context": "Multi-Factor Authentication",
+      "aliases": null
+    },
+    {
+      "term": "2FA",
+      "pronunciation": "two-eff-ay",
+      "context": "Two-Factor Authentication",
+      "aliases": null
+    },
+    {
+      "term": "Kerberos",
+      "pronunciation": "KER-ber-oss",
+      "context": "network authentication protocol",
+      "aliases": null
+    },
+    {
+      "term": "PKI",
+      "pronunciation": "pee-kay-eye",
+      "context": "Public Key Infrastructure",
+      "aliases": null
+    },
+    {
+      "term": "RSA",
+      "pronunciation": "arr-ess-ay",
+      "context": "encryption algorithm",
+      "aliases": null
+    },
+    {
+      "term": "AES",
+      "pronunciation": "ay-ee-ess",
+      "context": "Advanced Encryption Standard",
+      "aliases": null
+    },
+    {
+      "term": "BERT",
+      "pronunciation": "bert",
+      "context": "transformer model by Google",
+      "aliases": null
+    },
+    {
+      "term": "GPT",
+      "pronunciation": "gee-pee-tee",
+      "context": "Generative Pre-trained Transformer",
+      "aliases": null
+    },
+    {
+      "term": "PyTorch",
+      "pronunciation": "pie-torch",
+      "context": "machine learning framework",
+      "aliases": null
+    },
+    {
+      "term": "Keras",
+      "pronunciation": "KAIR-ahss",
+      "context": "deep learning API",
+      "aliases": null
+    },
+    {
+      "term": "NumPy",
+      "pronunciation": "num-pie",
+      "context": "Python numerical library",
+      "aliases": null
+    },
+    {
+      "term": "Pandas",
+      "pronunciation": "PAN-duhz",
+      "context": "Python data analysis library",
+      "aliases": null
+    },
+    {
+      "term": "CUDA",
+      "pronunciation": "COO-dah",
+      "context": "NVIDIA parallel computing platform",
+      "aliases": null
+    },
+    {
+      "term": "TPU",
+      "pronunciation": "tee-pee-you",
+      "context": "Tensor Processing Unit",
+      "aliases": null
+    },
+    {
+      "term": "Hugging Face",
+      "pronunciation": "hugging face",
+      "context": "ML model platform",
+      "aliases": null
+    },
+    {
+      "term": "Llama",
+      "pronunciation": "LAH-mah",
+      "context": "Meta's LLM model",
+      "aliases": null
+    },
+    {
+      "term": "Mistral",
+      "pronunciation": "miss-TRAHL",
+      "context": "open-source LLM",
+      "aliases": null
+    },
+    {
+      "term": "Gemini",
+      "pronunciation": "JEM-ih-ny",
+      "context": "Google's multimodal AI",
+      "aliases": null
+    },
+    {
+      "term": "RAG",
+      "pronunciation": "rag",
+      "context": "Retrieval-Augmented Generation",
+      "aliases": null
+    },
+    {
+      "term": "Pinecone",
+      "pronunciation": "PINE-cone",
+      "context": "vector database",
+      "aliases": null
+    },
+    {
+      "term": "Weaviate",
+      "pronunciation": "WEE-vee-ate",
+      "context": "vector database",
+      "aliases": null
+    },
+    {
+      "term": "Chroma",
+      "pronunciation": "KROH-mah",
+      "context": "vector database",
+      "aliases": [
+        "ChromaDB"
+      ]
+    },
+    {
+      "term": "Milvus",
+      "pronunciation": "MIL-vuss",
+      "context": "vector database",
+      "aliases": null
+    },
+    {
+      "term": "Qdrant",
+      "pronunciation": "KWAD-rant",
+      "context": "vector database",
+      "aliases": null
+    },
+    {
+      "term": "FAISS",
+      "pronunciation": "fayss",
+      "context": "Facebook AI Similarity Search",
+      "aliases": null
+    },
+    {
+      "term": "ETL",
+      "pronunciation": "ee-tee-el",
+      "context": "Extract Transform Load",
+      "aliases": null
+    },
+    {
+      "term": "Spark",
+      "pronunciation": "spark",
+      "context": "Apache distributed computing",
+      "aliases": [
+        "Apache Spark"
+      ]
+    },
+    {
+      "term": "PySpark",
+      "pronunciation": "pie-spark",
+      "context": "Python API for Spark",
+      "aliases": null
+    },
+    {
+      "term": "Hadoop",
+      "pronunciation": "huh-DOOP",
+      "context": "distributed storage framework",
+      "aliases": null
+    },
+    {
+      "term": "Hive",
+      "pronunciation": "hive",
+      "context": "data warehouse software",
+      "aliases": null
+    },
+    {
+      "term": "Airflow",
+      "pronunciation": "AIR-flow",
+      "context": "workflow orchestration",
+      "aliases": [
+        "Apache Airflow"
+      ]
+    },
+    {
+      "term": "dbt",
+      "pronunciation": "dee-bee-tee",
+      "context": "data build tool",
+      "aliases": null
+    },
+    {
+      "term": "Looker",
+      "pronunciation": "LOOK-er",
+      "context": "business intelligence platform",
+      "aliases": null
+    },
+    {
+      "term": "Tableau",
+      "pronunciation": "tab-LOH",
+      "context": "data visualization tool",
+      "aliases": null
+    },
+    {
+      "term": "Power BI",
+      "pronunciation": "power-bee-eye",
+      "context": "Microsoft business analytics",
+      "aliases": null
+    },
+    {
+      "term": "ClickHouse",
+      "pronunciation": "click-house",
+      "context": "columnar database",
+      "aliases": null
+    },
+    {
+      "term": "Snowflake",
+      "pronunciation": "SNOW-flake",
+      "context": "cloud data platform",
+      "aliases": null
+    },
+    {
+      "term": "Databricks",
+      "pronunciation": "DAY-tah-bricks",
+      "context": "data analytics platform",
+      "aliases": null
+    },
+    {
+      "term": "CI/CD",
+      "pronunciation": "see-eye-see-dee",
+      "context": "Continuous Integration/Deployment",
+      "aliases": [
+        "CICD"
+      ]
+    },
+    {
+      "term": "GitHub Actions",
+      "pronunciation": "git-hub actions",
+      "context": "GitHub CI/CD platform",
+      "aliases": null
+    },
+    {
+      "term": "CircleCI",
+      "pronunciation": "circle-see-eye",
+      "context": "continuous integration platform",
+      "aliases": null
+    },
+    {
+      "term": "ArgoCD",
+      "pronunciation": "AR-go-see-dee",
+      "context": "GitOps deployment tool",
+      "aliases": null
+    },
+    {
+      "term": "Flux",
+      "pronunciation": "flux",
+      "context": "GitOps deployment tool",
+      "aliases": null
+    },
+    {
+      "term": "Datadog",
+      "pronunciation": "DAY-tah-dog",
+      "context": "monitoring and analytics platform",
+      "aliases": null
+    },
+    {
+      "term": "New Relic",
+      "pronunciation": "new REL-ick",
+      "context": "observability platform",
+      "aliases": null
+    },
+    {
+      "term": "Dynatrace",
+      "pronunciation": "DY-nah-trace",
+      "context": "application monitoring",
+      "aliases": null
+    },
+    {
+      "term": "Kibana",
+      "pronunciation": "kih-BAH-nah",
+      "context": "Elasticsearch visualization",
+      "aliases": null
+    },
+    {
+      "term": "Logstash",
+      "pronunciation": "log-stash",
+      "context": "log processing pipeline",
+      "aliases": null
+    },
+    {
+      "term": "Fluentd",
+      "pronunciation": "FLEW-ent-dee",
+      "context": "log collector",
+      "aliases": null
+    },
+    {
+      "term": "OpenTelemetry",
+      "pronunciation": "open-tuh-LEM-uh-tree",
+      "context": "observability framework",
+      "aliases": [
+        "OTel"
+      ]
+    },
+    {
+      "term": "Jaeger",
+      "pronunciation": "YAY-ger",
+      "context": "distributed tracing system",
+      "aliases": null
+    },
+    {
+      "term": "Loki",
+      "pronunciation": "LOH-kee",
+      "context": "log aggregation system",
+      "aliases": null
+    },
+    {
+      "term": "Incident.io",
+      "pronunciation": "incident-dot-eye-oh",
+      "context": "incident management platform",
+      "aliases": null
+    },
+    {
+      "term": "Pulumi",
+      "pronunciation": "puh-LOO-mee",
+      "context": "infrastructure as code tool",
+      "aliases": null
+    },
+    {
+      "term": "Ansible",
+      "pronunciation": "AN-sih-bul",
+      "context": "IT automation tool",
+      "aliases": null
+    },
+    {
+      "term": "Puppet",
+      "pronunciation": "PUP-et",
+      "context": "configuration management",
+      "aliases": null
+    },
+    {
+      "term": "Chef",
+      "pronunciation": "shef",
+      "context": "configuration management",
+      "aliases": null
+    },
+    {
+      "term": "NVIDIA",
+      "pronunciation": "en-VID-ee-ah",
+      "context": "graphics processor company",
+      "aliases": null
+    },
+    {
+      "term": "Palantir",
+      "pronunciation": "PAL-an-teer",
+      "context": "data analytics company",
+      "aliases": null
+    },
+    {
+      "term": "Confluent",
+      "pronunciation": "con-FLEW-ent",
+      "context": "data streaming company",
+      "aliases": null
+    },
+    {
+      "term": "Twilio",
+      "pronunciation": "TWIL-ee-oh",
+      "context": "communications platform",
+      "aliases": null
+    },
+    {
+      "term": "Stripe",
+      "pronunciation": "stripe",
+      "context": "payment processing platform",
+      "aliases": null
+    },
+    {
+      "term": "Auth0",
+      "pronunciation": "auth-zero",
+      "context": "authentication platform",
+      "aliases": null
+    },
+    {
+      "term": "Okta",
+      "pronunciation": "OCK-tah",
+      "context": "identity management",
+      "aliases": null
+    },
+    {
+      "term": "CrowdStrike",
+      "pronunciation": "crowd-strike",
+      "context": "cybersecurity company",
+      "aliases": null
+    },
+    {
+      "term": "Cloudflare",
+      "pronunciation": "cloud-flare",
+      "context": "CDN and security company",
+      "aliases": null
+    },
+    {
+      "term": "Akamai",
+      "pronunciation": "ah-kah-MY",
+      "context": "CDN provider",
+      "aliases": null
+    },
+    {
+      "term": "HTML",
+      "pronunciation": "aych-tee-em-el",
+      "context": "HyperText Markup Language",
+      "aliases": null
+    },
+    {
+      "term": "CSS",
+      "pronunciation": "see-ess-ess",
+      "context": "Cascading Style Sheets",
+      "aliases": null
+    },
+    {
+      "term": "Sass",
+      "pronunciation": "sass",
+      "context": "CSS preprocessor",
+      "aliases": null
+    },
+    {
+      "term": "Tailwind",
+      "pronunciation": "TAIL-wind",
+      "context": "utility-first CSS framework",
+      "aliases": [
+        "Tailwind CSS"
+      ]
+    },
+    {
+      "term": "Bootstrap",
+      "pronunciation": "BOOT-strap",
+      "context": "CSS framework",
+      "aliases": null
+    },
+    {
+      "term": "Webpack",
+      "pronunciation": "web-pack",
+      "context": "JavaScript module bundler",
+      "aliases": null
+    },
+    {
+      "term": "Vite",
+      "pronunciation": "veet",
+      "context": "frontend build tool",
+      "aliases": null
+    },
+    {
+      "term": "SEO",
+      "pronunciation": "ess-ee-oh",
+      "context": "Search Engine Optimization",
+      "aliases": null
+    },
+    {
+      "term": "React Native",
+      "pronunciation": "react NAY-tiv",
+      "context": "mobile app framework",
+      "aliases": null
+    },
+    {
+      "term": "Flutter",
+      "pronunciation": "FLUT-er",
+      "context": "Google mobile UI framework",
+      "aliases": null
+    },
+    {
+      "term": "Xcode",
+      "pronunciation": "ecks-code",
+      "context": "Apple IDE",
+      "aliases": null
+    },
+    {
+      "term": "Agile",
+      "pronunciation": "AJ-ile",
+      "context": "software development methodology",
+      "aliases": null
+    },
+    {
+      "term": "Scrum",
+      "pronunciation": "skrum",
+      "context": "Agile framework",
+      "aliases": null
+    },
+    {
+      "term": "Kanban",
+      "pronunciation": "kahn-BAHN",
+      "context": "workflow visualization method",
+      "aliases": null
+    },
+    {
+      "term": "Aarav",
+      "pronunciation": "AH-ruv",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Aditya",
+      "pronunciation": "uh-DITH-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ajay",
+      "pronunciation": "uh-JAY",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Akash",
+      "pronunciation": "uh-KAHSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Amit",
+      "pronunciation": "uh-MIT",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Amitabh",
+      "pronunciation": "uh-MI-tahb",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Anil",
+      "pronunciation": "uh-NEEL",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Anirudh",
+      "pronunciation": "uh-ni-ROODH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ankur",
+      "pronunciation": "UN-koor",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Anuj",
+      "pronunciation": "uh-NOOJ",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Anupam",
+      "pronunciation": "uh-NOO-pum",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Arjun",
+      "pronunciation": "AR-jun",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Arnav",
+      "pronunciation": "AR-nuv",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Arun",
+      "pronunciation": "uh-ROON",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ashish",
+      "pronunciation": "uh-SHEESH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ashok",
+      "pronunciation": "uh-SHOHK",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ashwin",
+      "pronunciation": "UHSH-win",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Balaji",
+      "pronunciation": "BAH-luh-jee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Bhaskar",
+      "pronunciation": "BHAHS-kur",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Bharat",
+      "pronunciation": "BUH-rut",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Chetan",
+      "pronunciation": "CHAY-tun",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Chirag",
+      "pronunciation": "chi-RAHG",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Darshan",
+      "pronunciation": "DUR-shun",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Deepak",
+      "pronunciation": "DEE-puk",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Dev",
+      "pronunciation": "DAYV",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Dhruv",
+      "pronunciation": "DHROOV",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Dilip",
+      "pronunciation": "di-LEEP",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Dinesh",
+      "pronunciation": "di-NAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ganesh",
+      "pronunciation": "guh-NAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Gaurav",
+      "pronunciation": "GOW-ruv",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Girish",
+      "pronunciation": "gi-REESH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Gopal",
+      "pronunciation": "goh-PAHL",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Govind",
+      "pronunciation": "goh-VIND",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Hari",
+      "pronunciation": "HUH-ree",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Harish",
+      "pronunciation": "huh-REESH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Harsh",
+      "pronunciation": "HURSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Hemant",
+      "pronunciation": "HAY-munt",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Hitesh",
+      "pronunciation": "hi-TAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ishaan",
+      "pronunciation": "i-SHAHN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Jagdish",
+      "pronunciation": "JUG-deesh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Jai",
+      "pronunciation": "JAI",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Jayesh",
+      "pronunciation": "juh-YAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kailash",
+      "pronunciation": "kai-LAHSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kamal",
+      "pronunciation": "kuh-MUHL",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Karan",
+      "pronunciation": "KUH-run",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Karthik",
+      "pronunciation": "KAHR-thik",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kishore",
+      "pronunciation": "ki-SHOHR",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Krishna",
+      "pronunciation": "KRISH-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kumar",
+      "pronunciation": "koo-MAHR",
+      "context": "person name or surname",
+      "aliases": null
+    },
+    {
+      "term": "Lakshman",
+      "pronunciation": "LUKSH-mun",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Lalit",
+      "pronunciation": "luh-LIT",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Madhav",
+      "pronunciation": "MAH-dhuv",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Mahesh",
+      "pronunciation": "muh-HAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Manoj",
+      "pronunciation": "muh-NOHJ",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Manish",
+      "pronunciation": "muh-NEESH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Mohan",
+      "pronunciation": "MOH-hun",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Mukesh",
+      "pronunciation": "moo-KAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Naresh",
+      "pronunciation": "nuh-RAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Naveen",
+      "pronunciation": "nuh-VEEN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nikhil",
+      "pronunciation": "ni-KHIL",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nilesh",
+      "pronunciation": "ni-LAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nitin",
+      "pronunciation": "ni-TIN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pankaj",
+      "pronunciation": "PUN-kuj",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Paresh",
+      "pronunciation": "puh-RAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Piyush",
+      "pronunciation": "PEE-yoosh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Prabhu",
+      "pronunciation": "PRUH-boo",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pranav",
+      "pronunciation": "pruh-NUHV",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Prasad",
+      "pronunciation": "pruh-SAHD",
+      "context": "person name or surname",
+      "aliases": null
+    },
+    {
+      "term": "Prashant",
+      "pronunciation": "pruh-SHAHNT",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pratik",
+      "pronunciation": "pruh-TEEK",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Praveen",
+      "pronunciation": "pruh-VEEN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rahul",
+      "pronunciation": "RAH-hool",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Raj",
+      "pronunciation": "RAHJ",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rajat",
+      "pronunciation": "RAH-jut",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rajeev",
+      "pronunciation": "rah-JEEV",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rajesh",
+      "pronunciation": "rah-JAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rakesh",
+      "pronunciation": "ruh-KAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ram",
+      "pronunciation": "RAHM",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ramesh",
+      "pronunciation": "ruh-MAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ravi",
+      "pronunciation": "RUH-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rohit",
+      "pronunciation": "ROH-hit",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sachin",
+      "pronunciation": "suh-CHIN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sagar",
+      "pronunciation": "SAH-gur",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sameer",
+      "pronunciation": "suh-MEER",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sandeep",
+      "pronunciation": "sun-DEEP",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sanjay",
+      "pronunciation": "sun-JAY",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sanjiv",
+      "pronunciation": "sun-JEEV",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Santosh",
+      "pronunciation": "sun-TOHSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Satish",
+      "pronunciation": "suh-TISH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shailesh",
+      "pronunciation": "SHAY-laysh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sharad",
+      "pronunciation": "SHUH-rud",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shashi",
+      "pronunciation": "SHUH-shee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shekhar",
+      "pronunciation": "SHAYK-hur",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shiv",
+      "pronunciation": "SHIV",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shivam",
+      "pronunciation": "shi-VUHM",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shyam",
+      "pronunciation": "SHYAHM",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Siddharth",
+      "pronunciation": "sid-DHARTH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sudhir",
+      "pronunciation": "soo-DHEER",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sumit",
+      "pronunciation": "soo-MIT",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sunil",
+      "pronunciation": "soo-NEEL",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Suresh",
+      "pronunciation": "soo-RAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Surya",
+      "pronunciation": "SOOR-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Tushar",
+      "pronunciation": "TOO-shur",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Uday",
+      "pronunciation": "oo-DAY",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Varun",
+      "pronunciation": "VUH-roon",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Venkat",
+      "pronunciation": "VAYN-kut",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vijay",
+      "pronunciation": "vi-JAY",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vikram",
+      "pronunciation": "VIK-rum",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vinay",
+      "pronunciation": "vi-NAY",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vinod",
+      "pronunciation": "vi-NOHD",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vipin",
+      "pronunciation": "vi-PIN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Viraj",
+      "pronunciation": "vi-RAHJ",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vivek",
+      "pronunciation": "vi-VAYK",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Yash",
+      "pronunciation": "YUHSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Yogesh",
+      "pronunciation": "yoh-GAYSH",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Aanya",
+      "pronunciation": "AHN-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Aarti",
+      "pronunciation": "AHR-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Aditi",
+      "pronunciation": "uh-DI-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Aishwarya",
+      "pronunciation": "eyesh-WAR-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Akshara",
+      "pronunciation": "uk-SHUH-ruh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Amrita",
+      "pronunciation": "um-REE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ananya",
+      "pronunciation": "uh-NUN-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Anjali",
+      "pronunciation": "un-JUH-lee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Anushka",
+      "pronunciation": "uh-NOOSH-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Archana",
+      "pronunciation": "ur-CHUH-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Asha",
+      "pronunciation": "AH-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Bhavana",
+      "pronunciation": "BHAH-vuh-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Bhavika",
+      "pronunciation": "bhah-VEE-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Chitra",
+      "pronunciation": "CHIT-ruh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Deepa",
+      "pronunciation": "DEE-puh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Deepika",
+      "pronunciation": "dee-PI-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Devi",
+      "pronunciation": "DAY-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Devika",
+      "pronunciation": "day-VI-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Divya",
+      "pronunciation": "DIV-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Durga",
+      "pronunciation": "DOOR-guh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Gauri",
+      "pronunciation": "GOW-ree",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Gayatri",
+      "pronunciation": "GAH-yuh-tree",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Geeta",
+      "pronunciation": "GEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Harini",
+      "pronunciation": "huh-RI-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Harsha",
+      "pronunciation": "HUR-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Indira",
+      "pronunciation": "in-DI-ruh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Isha",
+      "pronunciation": "EE-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Ishita",
+      "pronunciation": "i-SHEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Jaya",
+      "pronunciation": "JUH-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Jyoti",
+      "pronunciation": "JYO-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kajal",
+      "pronunciation": "kuh-JUHL",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kamala",
+      "pronunciation": "KUH-muh-luh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kalpana",
+      "pronunciation": "kul-PUH-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kanchan",
+      "pronunciation": "KUN-chun",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kavita",
+      "pronunciation": "kuh-VEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kavya",
+      "pronunciation": "KAHV-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Keerthi",
+      "pronunciation": "KEER-thee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Kirti",
+      "pronunciation": "KEER-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Lakshmi",
+      "pronunciation": "LUKSH-mee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Lata",
+      "pronunciation": "LUH-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Lavanya",
+      "pronunciation": "luh-VUN-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Laxmi",
+      "pronunciation": "LUKSH-mee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Madhu",
+      "pronunciation": "MUH-dhoo",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Madhuri",
+      "pronunciation": "muh-DHOO-ree",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Mamta",
+      "pronunciation": "MUM-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Manisha",
+      "pronunciation": "muh-NEE-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Meena",
+      "pronunciation": "MEE-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Meera",
+      "pronunciation": "MEE-ruh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Megha",
+      "pronunciation": "MAY-ghuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Mohini",
+      "pronunciation": "moh-HI-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nandini",
+      "pronunciation": "nun-DI-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Neelam",
+      "pronunciation": "NEE-lum",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Neeraj",
+      "pronunciation": "nee-RAHJ",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Neetu",
+      "pronunciation": "NEE-too",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Neha",
+      "pronunciation": "NAY-huh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nikita",
+      "pronunciation": "ni-KI-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nisha",
+      "pronunciation": "NI-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Nita",
+      "pronunciation": "NEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Padma",
+      "pronunciation": "PUD-muh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pallavi",
+      "pronunciation": "pul-LUH-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Parvati",
+      "pronunciation": "PAR-vuh-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pooja",
+      "pronunciation": "POO-juh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Prachi",
+      "pronunciation": "PRUH-chee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pragya",
+      "pronunciation": "PRAHG-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Pramila",
+      "pronunciation": "pruh-MI-luh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Preethi",
+      "pronunciation": "PREE-thee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Preeti",
+      "pronunciation": "PREE-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Prerna",
+      "pronunciation": "PRAYR-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Priya",
+      "pronunciation": "PREE-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Priyanka",
+      "pronunciation": "pree-YUN-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Puja",
+      "pronunciation": "POO-juh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Radha",
+      "pronunciation": "RAH-dhuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Radhika",
+      "pronunciation": "RAH-dhi-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rajani",
+      "pronunciation": "ruh-JUH-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rakhi",
+      "pronunciation": "RUH-khee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rama",
+      "pronunciation": "RAH-muh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rani",
+      "pronunciation": "RAH-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rashmi",
+      "pronunciation": "RUSH-mee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Raveena",
+      "pronunciation": "ruh-VEE-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Reema",
+      "pronunciation": "REE-muh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rekha",
+      "pronunciation": "RAY-khuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Renuka",
+      "pronunciation": "ray-NOO-kuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Riya",
+      "pronunciation": "REE-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rohini",
+      "pronunciation": "roh-HI-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rupa",
+      "pronunciation": "ROO-puh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Rupali",
+      "pronunciation": "roo-PAH-lee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Saanvi",
+      "pronunciation": "SAHN-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sakshi",
+      "pronunciation": "SAHK-shee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sandhya",
+      "pronunciation": "SUND-hyuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sangita",
+      "pronunciation": "sun-GEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sarita",
+      "pronunciation": "suh-REE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Saroja",
+      "pronunciation": "suh-ROH-juh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Savita",
+      "pronunciation": "suh-VEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Seema",
+      "pronunciation": "SEE-muh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shailaja",
+      "pronunciation": "shy-LUH-juh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shakuntala",
+      "pronunciation": "shuh-KOON-tuh-luh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shalini",
+      "pronunciation": "SHAH-li-nee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shanti",
+      "pronunciation": "SHAHN-tee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sharmila",
+      "pronunciation": "shur-MEE-luh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sheela",
+      "pronunciation": "SHEE-luh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shikha",
+      "pronunciation": "SHIK-huh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shilpa",
+      "pronunciation": "SHIL-puh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shobha",
+      "pronunciation": "SHOH-bhuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shreya",
+      "pronunciation": "SHRAY-uh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Shweta",
+      "pronunciation": "SHWAY-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sita",
+      "pronunciation": "SEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Smita",
+      "pronunciation": "SMI-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sneha",
+      "pronunciation": "SNAY-huh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sonia",
+      "pronunciation": "SOH-nee-uh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Soniya",
+      "pronunciation": "SOH-ni-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sridevi",
+      "pronunciation": "shree-DAY-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Subha",
+      "pronunciation": "SOOB-huh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Suchitra",
+      "pronunciation": "soo-CHIT-ruh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sudha",
+      "pronunciation": "SOOD-huh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sujata",
+      "pronunciation": "soo-JAH-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Suman",
+      "pronunciation": "soo-MUN",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sumitra",
+      "pronunciation": "soo-MI-truh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Sunita",
+      "pronunciation": "soo-NEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Tanvi",
+      "pronunciation": "TUN-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Tara",
+      "pronunciation": "TUH-ruh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Uma",
+      "pronunciation": "OO-muh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Usha",
+      "pronunciation": "OO-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vaishnavi",
+      "pronunciation": "vyesh-NUH-vee",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vandana",
+      "pronunciation": "VUN-duh-nuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Varsha",
+      "pronunciation": "VUR-shuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vidya",
+      "pronunciation": "VID-yuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vimala",
+      "pronunciation": "vi-MUH-luh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Vineeta",
+      "pronunciation": "vi-NEE-tuh",
+      "context": "person name",
+      "aliases": null
+    },
+    {
+      "term": "Agarwal",
+      "pronunciation": "uh-GAR-wuhl",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Banerjee",
+      "pronunciation": "BAN-er-jee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Bhardwaj",
+      "pronunciation": "BHURD-wahj",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Bhatia",
+      "pronunciation": "BHUH-tee-uh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Chakraborty",
+      "pronunciation": "CHUK-ruh-BOR-tee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Chatterjee",
+      "pronunciation": "CHUT-er-jee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Chaudhary",
+      "pronunciation": "CHOW-dhuh-ree",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Chopra",
+      "pronunciation": "CHOH-pruh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Desai",
+      "pronunciation": "day-SAI",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Deshmukh",
+      "pronunciation": "DAYSH-mookh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Gandhi",
+      "pronunciation": "GAHN-dee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Ghosh",
+      "pronunciation": "GOHSH",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Goyal",
+      "pronunciation": "GOY-ul",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Gupta",
+      "pronunciation": "GOOP-tuh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Iyer",
+      "pronunciation": "AI-yer",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Jain",
+      "pronunciation": "JAIN",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Joshi",
+      "pronunciation": "JOH-shee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Kapoor",
+      "pronunciation": "kuh-POOR",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Kaur",
+      "pronunciation": "KOWR",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Khan",
+      "pronunciation": "KHAHN",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Khanna",
+      "pronunciation": "KHUN-nuh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Kohli",
+      "pronunciation": "KOHL-ee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Kulkarni",
+      "pronunciation": "kool-KAR-nee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Malhotra",
+      "pronunciation": "mul-HOH-truh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Menon",
+      "pronunciation": "MAY-nun",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Mishra",
+      "pronunciation": "MISH-ruh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Mukherjee",
+      "pronunciation": "MOOK-er-jee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Nair",
+      "pronunciation": "NAIR",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Pandey",
+      "pronunciation": "PAHN-day",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Patel",
+      "pronunciation": "puh-TAYL",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Pillai",
+      "pronunciation": "PIL-lai",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Rao",
+      "pronunciation": "ROW",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Reddy",
+      "pronunciation": "RED-dee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Saxena",
+      "pronunciation": "suk-SAY-nuh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Sen",
+      "pronunciation": "SAYN",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Sethi",
+      "pronunciation": "SAY-thee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Shah",
+      "pronunciation": "SHAH",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Sharma",
+      "pronunciation": "SHUR-muh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Shetty",
+      "pronunciation": "SHET-tee",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Singh",
+      "pronunciation": "SING",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Sinha",
+      "pronunciation": "SIN-huh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Srinivasan",
+      "pronunciation": "shree-ni-VAH-sun",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Thakur",
+      "pronunciation": "THAH-koor",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Verma",
+      "pronunciation": "VUR-muh",
+      "context": "surname",
+      "aliases": null
+    },
+    {
+      "term": "Amélie",
+      "pronunciation": "ah-may-LEE",
+      "context": "French female name"
+    },
+    {
+      "term": "Antoine",
+      "pronunciation": "ahn-TWAHN",
+      "context": "French male name"
+    },
+    {
+      "term": "Benoît",
+      "pronunciation": "ben-WAH",
+      "context": "French male name"
+    },
+    {
+      "term": "Camille",
+      "pronunciation": "kah-MEEL",
+      "context": "French unisex name"
+    },
+    {
+      "term": "Céline",
+      "pronunciation": "say-LEEN",
+      "context": "French female name"
+    },
+    {
+      "term": "Chloé",
+      "pronunciation": "kloh-AY",
+      "context": "French female name"
+    },
+    {
+      "term": "Claude",
+      "pronunciation": "KLOHD",
+      "context": "French unisex name"
+    },
+    {
+      "term": "Colette",
+      "pronunciation": "koh-LET",
+      "context": "French female name"
+    },
+    {
+      "term": "Dominique",
+      "pronunciation": "doh-mee-NEEK",
+      "context": "French unisex name"
+    },
+    {
+      "term": "Élise",
+      "pronunciation": "ay-LEEZ",
+      "context": "French female name"
+    },
+    {
+      "term": "Émile",
+      "pronunciation": "ay-MEEL",
+      "context": "French male name"
+    },
+    {
+      "term": "François",
+      "pronunciation": "frahn-SWAH",
+      "context": "French male name"
+    },
+    {
+      "term": "Geneviève",
+      "pronunciation": "zhon-vee-EV",
+      "context": "French female name"
+    },
+    {
+      "term": "Gérard",
+      "pronunciation": "zhay-RAHR",
+      "context": "French male name"
+    },
+    {
+      "term": "Guillaume",
+      "pronunciation": "gee-YOHM",
+      "context": "French male name"
+    },
+    {
+      "term": "Henri",
+      "pronunciation": "ahn-REE",
+      "context": "French male name"
+    },
+    {
+      "term": "Jacques",
+      "pronunciation": "ZHAHK",
+      "context": "French male name"
+    },
+    {
+      "term": "Jean",
+      "pronunciation": "ZHAHN",
+      "context": "French male name"
+    },
+    {
+      "term": "Joséphine",
+      "pronunciation": "zhoh-zay-FEEN",
+      "context": "French female name"
+    },
+    {
+      "term": "Julien",
+      "pronunciation": "zhoo-LYEHN",
+      "context": "French male name"
+    },
+    {
+      "term": "Laurent",
+      "pronunciation": "loh-RAHN",
+      "context": "French male name"
+    },
+    {
+      "term": "Léon",
+      "pronunciation": "lay-OHN",
+      "context": "French male name"
+    },
+    {
+      "term": "Louis",
+      "pronunciation": "loo-EE",
+      "context": "French male name"
+    },
+    {
+      "term": "Lucien",
+      "pronunciation": "loo-SYEHN",
+      "context": "French male name"
+    },
+    {
+      "term": "Madeleine",
+      "pronunciation": "mahd-LEN",
+      "context": "French female name"
+    },
+    {
+      "term": "Marguerite",
+      "pronunciation": "mahr-guh-REET",
+      "context": "French female name"
+    },
+    {
+      "term": "Mathieu",
+      "pronunciation": "mah-TYUH",
+      "context": "French male name"
+    },
+    {
+      "term": "Michel",
+      "pronunciation": "mee-SHEL",
+      "context": "French male name"
+    },
+    {
+      "term": "Monique",
+      "pronunciation": "moh-NEEK",
+      "context": "French female name"
+    },
+    {
+      "term": "Nicolas",
+      "pronunciation": "nee-koh-LAH",
+      "context": "French male name"
+    },
+    {
+      "term": "Noël",
+      "pronunciation": "noh-EL",
+      "context": "French male name"
+    },
+    {
+      "term": "Olivier",
+      "pronunciation": "oh-lee-VYAY",
+      "context": "French male name"
+    },
+    {
+      "term": "Pascal",
+      "pronunciation": "pahs-KAHL",
+      "context": "French male name"
+    },
+    {
+      "term": "Philippe",
+      "pronunciation": "fee-LEEP",
+      "context": "French male name"
+    },
+    {
+      "term": "Pierre",
+      "pronunciation": "pyehr",
+      "context": "French male name"
+    },
+    {
+      "term": "Renée",
+      "pronunciation": "ruh-NAY",
+      "context": "French female name"
+    },
+    {
+      "term": "Simone",
+      "pronunciation": "see-MOHN",
+      "context": "French female name"
+    },
+    {
+      "term": "Thérèse",
+      "pronunciation": "tay-REZ",
+      "context": "French female name"
+    },
+    {
+      "term": "Véronique",
+      "pronunciation": "vay-roh-NEEK",
+      "context": "French female name"
+    },
+    {
+      "term": "Yves",
+      "pronunciation": "EEV",
+      "context": "French male name"
+    },
+    {
+      "term": "Albrecht",
+      "pronunciation": "AHL-brekht",
+      "context": "German male name"
+    },
+    {
+      "term": "Anneliese",
+      "pronunciation": "ah-nuh-LEE-zuh",
+      "context": "German female name"
+    },
+    {
+      "term": "Bernhard",
+      "pronunciation": "BEHRN-hahrt",
+      "context": "German male name"
+    },
+    {
+      "term": "Brigitte",
+      "pronunciation": "bri-GI-tuh",
+      "context": "German female name"
+    },
+    {
+      "term": "Dietrich",
+      "pronunciation": "DEE-trikh",
+      "context": "German male name"
+    },
+    {
+      "term": "Friedrich",
+      "pronunciation": "FREE-drikh",
+      "context": "German male name"
+    },
+    {
+      "term": "Günther",
+      "pronunciation": "GUEN-ter",
+      "context": "German male name"
+    },
+    {
+      "term": "Hannelore",
+      "pronunciation": "HAH-nuh-LOH-ruh",
+      "context": "German female name"
+    },
+    {
+      "term": "Heinrich",
+      "pronunciation": "HINE-rikh",
+      "context": "German male name"
+    },
+    {
+      "term": "Helmut",
+      "pronunciation": "HEL-moot",
+      "context": "German male name"
+    },
+    {
+      "term": "Hildegard",
+      "pronunciation": "HIL-duh-gahrt",
+      "context": "German female name"
+    },
+    {
+      "term": "Ingrid",
+      "pronunciation": "ING-grid",
+      "context": "German female name"
+    },
+    {
+      "term": "Johann",
+      "pronunciation": "YOH-hahn",
+      "context": "German male name"
+    },
+    {
+      "term": "Jürgen",
+      "pronunciation": "YUER-gen",
+      "context": "German male name"
+    },
+    {
+      "term": "Klaus",
+      "pronunciation": "KLOWS",
+      "context": "German male name"
+    },
+    {
+      "term": "Liesel",
+      "pronunciation": "LEE-zul",
+      "context": "German female name"
+    },
+    {
+      "term": "Ludwig",
+      "pronunciation": "LOOT-vikh",
+      "context": "German male name"
+    },
+    {
+      "term": "Manfred",
+      "pronunciation": "MAHN-freht",
+      "context": "German male name"
+    },
+    {
+      "term": "Marlene",
+      "pronunciation": "mahr-LAY-nuh",
+      "context": "German female name"
+    },
+    {
+      "term": "Rainer",
+      "pronunciation": "RY-ner",
+      "context": "German male name"
+    },
+    {
+      "term": "Reinhard",
+      "pronunciation": "RINE-hahrt",
+      "context": "German male name"
+    },
+    {
+      "term": "Siegfried",
+      "pronunciation": "ZEEK-freet",
+      "context": "German male name"
+    },
+    {
+      "term": "Ulrich",
+      "pronunciation": "OOL-rikh",
+      "context": "German male name"
+    },
+    {
+      "term": "Ursula",
+      "pronunciation": "OOR-zoo-lah",
+      "context": "German female name"
+    },
+    {
+      "term": "Werner",
+      "pronunciation": "VEHR-ner",
+      "context": "German male name"
+    },
+    {
+      "term": "Wilhelm",
+      "pronunciation": "VIL-helm",
+      "context": "German male name"
+    },
+    {
+      "term": "Wolfgang",
+      "pronunciation": "VOHLF-gahng",
+      "context": "German male name"
+    },
+    {
+      "term": "Alessandro",
+      "pronunciation": "ah-les-SAHN-droh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Alessia",
+      "pronunciation": "ah-LES-see-ah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Antonella",
+      "pronunciation": "ahn-toh-NEL-lah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Beatrice",
+      "pronunciation": "bay-ah-TREE-chay",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Bianca",
+      "pronunciation": "bee-AHN-kah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Chiara",
+      "pronunciation": "KYAH-rah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Claudio",
+      "pronunciation": "KLOW-dyoh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Donatella",
+      "pronunciation": "doh-nah-TEL-lah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Elisabetta",
+      "pronunciation": "ay-lee-zah-BET-tah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Enrico",
+      "pronunciation": "en-REE-koh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Fabio",
+      "pronunciation": "FAH-byoh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Francesca",
+      "pronunciation": "frahn-CHES-kah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Giacomo",
+      "pronunciation": "JAH-koh-moh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Giancarlo",
+      "pronunciation": "jahn-KAHR-loh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Gianna",
+      "pronunciation": "JAHN-nah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Giorgio",
+      "pronunciation": "JOR-joh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Giulia",
+      "pronunciation": "JOO-lyah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Giuseppe",
+      "pronunciation": "joo-ZEP-pay",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Lorenzo",
+      "pronunciation": "loh-REN-tsoh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Lucia",
+      "pronunciation": "loo-CHEE-ah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Luciano",
+      "pronunciation": "loo-CHAH-noh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Luigi",
+      "pronunciation": "loo-EE-jee",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Marco",
+      "pronunciation": "MAHR-koh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Massimo",
+      "pronunciation": "MAHS-see-moh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Matteo",
+      "pronunciation": "mah-TAY-oh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Michelangelo",
+      "pronunciation": "mee-kel-AHN-jeh-loh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Niccolò",
+      "pronunciation": "nee-koh-LOH",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Paolo",
+      "pronunciation": "PAH-oh-loh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Raffaele",
+      "pronunciation": "rahf-fah-EL-lay",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Salvatore",
+      "pronunciation": "sahl-vah-TOH-ray",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Sergio",
+      "pronunciation": "SEHR-joh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Silvia",
+      "pronunciation": "SEEL-vyah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Valentina",
+      "pronunciation": "vah-len-TEE-nah",
+      "context": "Italian female name"
+    },
+    {
+      "term": "Vincenzo",
+      "pronunciation": "veen-CHEN-tsoh",
+      "context": "Italian male name"
+    },
+    {
+      "term": "Alejandro",
+      "pronunciation": "ah-lay-HAHN-droh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Álvaro",
+      "pronunciation": "AHL-vah-roh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Beatriz",
+      "pronunciation": "bay-ah-TREES",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Camila",
+      "pronunciation": "kah-MEE-lah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Carlos",
+      "pronunciation": "KAHR-lohs",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Catalina",
+      "pronunciation": "kah-tah-LEE-nah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Diego",
+      "pronunciation": "DYAY-goh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Dolores",
+      "pronunciation": "doh-LOH-res",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Eduardo",
+      "pronunciation": "ay-DWAHR-doh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Enrique",
+      "pronunciation": "en-REE-kay",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Felipe",
+      "pronunciation": "feh-LEE-pay",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Fernando",
+      "pronunciation": "fehr-NAHN-doh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Francisca",
+      "pronunciation": "frahn-SEES-kah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Gabriela",
+      "pronunciation": "gah-bree-EH-lah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Guadalupe",
+      "pronunciation": "gwah-dah-LOO-pay",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Guillermo",
+      "pronunciation": "gee-YEHR-moh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Ignacio",
+      "pronunciation": "eeg-NAH-thyoh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Inés",
+      "pronunciation": "ee-NES",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Isabel",
+      "pronunciation": "ee-sah-BEL",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Javier",
+      "pronunciation": "hah-VYEHR",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Joaquín",
+      "pronunciation": "hwah-KEEN",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Jorge",
+      "pronunciation": "HOR-hay",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "José",
+      "pronunciation": "hoh-SAY",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Juan",
+      "pronunciation": "HWAHN",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Lucía",
+      "pronunciation": "loo-SEE-ah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Luis",
+      "pronunciation": "loo-EES",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Manuel",
+      "pronunciation": "mah-NWEL",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "María",
+      "pronunciation": "mah-REE-ah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Miguel",
+      "pronunciation": "mee-GEL",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Pablo",
+      "pronunciation": "PAHB-loh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Pedro",
+      "pronunciation": "PAY-droh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Pilar",
+      "pronunciation": "pee-LAHR",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Rafael",
+      "pronunciation": "rah-fah-EL",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Raúl",
+      "pronunciation": "rah-OOL",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Ricardo",
+      "pronunciation": "ree-KAHR-doh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Rodrigo",
+      "pronunciation": "rohd-REE-goh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Santiago",
+      "pronunciation": "sahn-tee-AH-goh",
+      "context": "Spanish male name"
+    },
+    {
+      "term": "Teresa",
+      "pronunciation": "teh-REH-sah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Ximena",
+      "pronunciation": "hee-MAY-nah",
+      "context": "Spanish female name"
+    },
+    {
+      "term": "Agnieszka",
+      "pronunciation": "ahg-NYESH-kah",
+      "context": "Polish female name"
+    },
+    {
+      "term": "Andrzej",
+      "pronunciation": "AHN-jay",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Bartosz",
+      "pronunciation": "BAHR-tosh",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Czesław",
+      "pronunciation": "CHES-wahf",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Grzegorz",
+      "pronunciation": "GZHEH-gosh",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Jadwiga",
+      "pronunciation": "yahd-VEE-gah",
+      "context": "Polish female name"
+    },
+    {
+      "term": "Jakub",
+      "pronunciation": "YAH-koob",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Katarzyna",
+      "pronunciation": "kah-tah-ZHIH-nah",
+      "context": "Polish female name"
+    },
+    {
+      "term": "Krzysztof",
+      "pronunciation": "KSHIH-shtof",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Małgorzata",
+      "pronunciation": "mahw-goh-ZHAH-tah",
+      "context": "Polish female name"
+    },
+    {
+      "term": "Mariusz",
+      "pronunciation": "MAH-ryoosh",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Michał",
+      "pronunciation": "MEE-hahw",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Przemysław",
+      "pronunciation": "psheh-MIH-swahf",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Stanisław",
+      "pronunciation": "stah-NEE-swahf",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Szymon",
+      "pronunciation": "SHIH-mon",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Tomasz",
+      "pronunciation": "TOH-mahsh",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Władysław",
+      "pronunciation": "vwah-DIH-swahf",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Wojciech",
+      "pronunciation": "VOY-chekh",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Zbigniew",
+      "pronunciation": "ZBIG-nyef",
+      "context": "Polish male name"
+    },
+    {
+      "term": "Zuzanna",
+      "pronunciation": "zoo-ZAHN-nah",
+      "context": "Polish female name"
+    },
+    {
+      "term": "Astrid",
+      "pronunciation": "AHS-trid",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Bjørn",
+      "pronunciation": "BYUHRN",
+      "context": "Norwegian male name"
+    },
+    {
+      "term": "Dagny",
+      "pronunciation": "DAHG-nee",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Eirik",
+      "pronunciation": "AY-rik",
+      "context": "Norwegian male name"
+    },
+    {
+      "term": "Freya",
+      "pronunciation": "FRAY-ah",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Gunnar",
+      "pronunciation": "GOON-ahr",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Håkon",
+      "pronunciation": "HAW-kon",
+      "context": "Norwegian male name"
+    },
+    {
+      "term": "Ingeborg",
+      "pronunciation": "ING-eh-bor",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Jørgensen",
+      "pronunciation": "YUHR-gen-sen",
+      "context": "Scandinavian surname"
+    },
+    {
+      "term": "Kjell",
+      "pronunciation": "SHELL",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Knut",
+      "pronunciation": "KNOOT",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Lars",
+      "pronunciation": "LAHRS",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Leif",
+      "pronunciation": "LAYF",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Magnus",
+      "pronunciation": "MAHG-noos",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Olaf",
+      "pronunciation": "OH-lahf",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Sigrid",
+      "pronunciation": "SIG-rid",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Signe",
+      "pronunciation": "SIG-neh",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Siri",
+      "pronunciation": "SEE-ree",
+      "context": "Scandinavian female name"
+    },
+    {
+      "term": "Sven",
+      "pronunciation": "SVEN",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Torbjørn",
+      "pronunciation": "TOR-byuhrn",
+      "context": "Norwegian male name"
+    },
+    {
+      "term": "Ulf",
+      "pronunciation": "OOLF",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Viggo",
+      "pronunciation": "VIG-oh",
+      "context": "Scandinavian male name"
+    },
+    {
+      "term": "Bram",
+      "pronunciation": "BRAHM",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Daan",
+      "pronunciation": "DAHN",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Femke",
+      "pronunciation": "FEM-kuh",
+      "context": "Dutch female name"
+    },
+    {
+      "term": "Geert",
+      "pronunciation": "KHAIRT",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Govert",
+      "pronunciation": "KHOH-vert",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Hendrik",
+      "pronunciation": "HEN-drik",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Jeroen",
+      "pronunciation": "yuh-ROON",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Joost",
+      "pronunciation": "YOHST",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Kees",
+      "pronunciation": "KAYS",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Maarten",
+      "pronunciation": "MAHR-tun",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Marijke",
+      "pronunciation": "mah-RYE-kuh",
+      "context": "Dutch female name"
+    },
+    {
+      "term": "Pieter",
+      "pronunciation": "PEE-ter",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Ruud",
+      "pronunciation": "RUUT",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Sanne",
+      "pronunciation": "SAHN-nuh",
+      "context": "Dutch female name"
+    },
+    {
+      "term": "Stijn",
+      "pronunciation": "STINE",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Thijs",
+      "pronunciation": "TICE",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Willem",
+      "pronunciation": "VIL-lum",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Wouter",
+      "pronunciation": "VOW-ter",
+      "context": "Dutch male name"
+    },
+    {
+      "term": "Alexandros",
+      "pronunciation": "ah-lex-AHN-dros",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Anastasia",
+      "pronunciation": "ah-nah-stah-SEE-ah",
+      "context": "Greek female name"
+    },
+    {
+      "term": "Christos",
+      "pronunciation": "khree-STOS",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Dimitrios",
+      "pronunciation": "dee-MEE-tree-os",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Eleni",
+      "pronunciation": "eh-LEH-nee",
+      "context": "Greek female name"
+    },
+    {
+      "term": "Evangelos",
+      "pronunciation": "eh-vahn-GEH-los",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Georgios",
+      "pronunciation": "yohr-YEE-os",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Ioannis",
+      "pronunciation": "ee-oh-AH-nees",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Konstantinos",
+      "pronunciation": "kon-stahn-DEE-nos",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Kyriakos",
+      "pronunciation": "kee-ree-AH-kos",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Nikolaos",
+      "pronunciation": "nee-KOH-lah-os",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Panagiotis",
+      "pronunciation": "pah-nah-YOH-tees",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Petros",
+      "pronunciation": "PEH-tros",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Sophia",
+      "pronunciation": "soh-FEE-ah",
+      "context": "Greek female name"
+    },
+    {
+      "term": "Spyridon",
+      "pronunciation": "spee-REE-don",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Stavros",
+      "pronunciation": "STAHV-ros",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Theodoros",
+      "pronunciation": "theh-OH-doh-ros",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Vasilios",
+      "pronunciation": "vah-SEE-lee-os",
+      "context": "Greek male name"
+    },
+    {
+      "term": "Abdulaziz",
+      "pronunciation": "ab-dool-ah-ZEEZ",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Abdullah",
+      "pronunciation": "ab-DOOL-lah",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Ahmed",
+      "pronunciation": "AH-med",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Aisha",
+      "pronunciation": "ah-EE-shah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Ali",
+      "pronunciation": "ah-LEE",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Amina",
+      "pronunciation": "ah-MEE-nah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Fatima",
+      "pronunciation": "FAH-tee-mah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Hakim",
+      "pronunciation": "hah-KEEM",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Hamza",
+      "pronunciation": "HAHM-zah",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Hassan",
+      "pronunciation": "hah-SAHN",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Hussein",
+      "pronunciation": "hoo-SAYN",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Ibrahim",
+      "pronunciation": "ib-rah-HEEM",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Ismail",
+      "pronunciation": "is-mah-EEL",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Jamal",
+      "pronunciation": "jah-MAHL",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Karim",
+      "pronunciation": "kah-REEM",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Khalid",
+      "pronunciation": "KHAH-lid",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Layla",
+      "pronunciation": "LAY-lah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Mahmoud",
+      "pronunciation": "mah-MOOD",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Mariam",
+      "pronunciation": "MAHR-yam",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Mohammed",
+      "pronunciation": "moh-HAM-med",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Nadia",
+      "pronunciation": "NAH-dyah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Nasser",
+      "pronunciation": "NAH-ser",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Omar",
+      "pronunciation": "OH-mar",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Rashid",
+      "pronunciation": "rah-SHEED",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Salim",
+      "pronunciation": "sah-LEEM",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Samira",
+      "pronunciation": "sah-MEE-rah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Tariq",
+      "pronunciation": "TAH-rik",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Youssef",
+      "pronunciation": "YOO-sef",
+      "context": "Arabic male name"
+    },
+    {
+      "term": "Zahra",
+      "pronunciation": "ZAH-rah",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Zainab",
+      "pronunciation": "ZAY-nab",
+      "context": "Arabic female name"
+    },
+    {
+      "term": "Amir",
+      "pronunciation": "ah-MEER",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Cyrus",
+      "pronunciation": "SY-rus",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Dariush",
+      "pronunciation": "dah-RYOOSH",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Farah",
+      "pronunciation": "fah-RAH",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Farhad",
+      "pronunciation": "fahr-HAHD",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Farzaneh",
+      "pronunciation": "fahr-zah-NEH",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Hossein",
+      "pronunciation": "ho-SAYN",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Leila",
+      "pronunciation": "LAY-lah",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Maryam",
+      "pronunciation": "MAHR-yahm",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Mehdi",
+      "pronunciation": "meh-DEE",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Mina",
+      "pronunciation": "MEE-nah",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Nima",
+      "pronunciation": "nee-MAH",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Parisa",
+      "pronunciation": "pah-ree-SAH",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Reza",
+      "pronunciation": "reh-ZAH",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Shahram",
+      "pronunciation": "shah-RAHM",
+      "context": "Persian male name"
+    },
+    {
+      "term": "Shirin",
+      "pronunciation": "shee-REEN",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Soraya",
+      "pronunciation": "soh-RAH-yah",
+      "context": "Persian female name"
+    },
+    {
+      "term": "Ahmet",
+      "pronunciation": "AH-met",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Ayşe",
+      "pronunciation": "AY-sheh",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Çağlar",
+      "pronunciation": "CHAH-lahr",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Elif",
+      "pronunciation": "eh-LEEF",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Emre",
+      "pronunciation": "EM-reh",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Fatih",
+      "pronunciation": "fah-TEEH",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Gökhan",
+      "pronunciation": "GUHR-hahn",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Gül",
+      "pronunciation": "GUUL",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Hakan",
+      "pronunciation": "hah-KAHN",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Kemal",
+      "pronunciation": "keh-MAHL",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Mehmet",
+      "pronunciation": "MEH-met",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Mustafa",
+      "pronunciation": "moos-tah-FAH",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Özlem",
+      "pronunciation": "URZ-lem",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Serkan",
+      "pronunciation": "sehr-KAHN",
+      "context": "Turkish male name"
+    },
+    {
+      "term": "Şerife",
+      "pronunciation": "sheh-ree-FEH",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Yıldız",
+      "pronunciation": "YUHL-duhz",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Zeynep",
+      "pronunciation": "zay-NEP",
+      "context": "Turkish female name"
+    },
+    {
+      "term": "Avigail",
+      "pronunciation": "ah-vee-GAH-yil",
+      "context": "Hebrew female name"
+    },
+    {
+      "term": "Chaim",
+      "pronunciation": "KHAH-yim",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Devorah",
+      "pronunciation": "deh-voh-RAH",
+      "context": "Hebrew female name"
+    },
+    {
+      "term": "Eliyahu",
+      "pronunciation": "eh-lee-YAH-hoo",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Gavriel",
+      "pronunciation": "gahv-ree-EL",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Miriam",
+      "pronunciation": "MEER-yahm",
+      "context": "Hebrew female name"
+    },
+    {
+      "term": "Moshe",
+      "pronunciation": "moh-SHEH",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Natan",
+      "pronunciation": "nah-TAHN",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Noam",
+      "pronunciation": "noh-AHM",
+      "context": "Hebrew unisex name"
+    },
+    {
+      "term": "Oren",
+      "pronunciation": "oh-REN",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Rivka",
+      "pronunciation": "RIV-kah",
+      "context": "Hebrew female name"
+    },
+    {
+      "term": "Shlomo",
+      "pronunciation": "SHLOH-moh",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Tamar",
+      "pronunciation": "tah-MAHR",
+      "context": "Hebrew female name"
+    },
+    {
+      "term": "Yael",
+      "pronunciation": "yah-EL",
+      "context": "Hebrew female name"
+    },
+    {
+      "term": "Yitzhak",
+      "pronunciation": "yits-KHAHK",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Yosef",
+      "pronunciation": "yoh-SEF",
+      "context": "Hebrew male name"
+    },
+    {
+      "term": "Chen Wei",
+      "pronunciation": "CHUN WAY",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Fang",
+      "pronunciation": "FAHNG",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Guangming",
+      "pronunciation": "GWAHNG-MING",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Huang",
+      "pronunciation": "HWAHNG",
+      "context": "Chinese surname"
+    },
+    {
+      "term": "Jiahui",
+      "pronunciation": "JYAH-HWAY",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Jianwei",
+      "pronunciation": "JYEN-WAY",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Li Ming",
+      "pronunciation": "LEE MING",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Li Wei",
+      "pronunciation": "LEE WAY",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Liu",
+      "pronunciation": "LYOH",
+      "context": "Chinese surname"
+    },
+    {
+      "term": "Mei Ling",
+      "pronunciation": "MAY LING",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Mingyu",
+      "pronunciation": "MING-YOO",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Qiang",
+      "pronunciation": "CHYAHNG",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Qing",
+      "pronunciation": "CHING",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Shuang",
+      "pronunciation": "SHWAHNG",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Wang",
+      "pronunciation": "WAHNG",
+      "context": "Chinese surname"
+    },
+    {
+      "term": "Wei",
+      "pronunciation": "WAY",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Xiao",
+      "pronunciation": "SHYOW",
+      "context": "Chinese name component"
+    },
+    {
+      "term": "Xiaoling",
+      "pronunciation": "SHYOW-LING",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Xiaowei",
+      "pronunciation": "SHYOW-WAY",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Xiaoyun",
+      "pronunciation": "SHYOW-YOON",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Xin",
+      "pronunciation": "SHIN",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Xinyi",
+      "pronunciation": "SHIN-YEE",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Yong",
+      "pronunciation": "YOHNG",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Yuan",
+      "pronunciation": "YWEN",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Zhang",
+      "pronunciation": "JAHNG",
+      "context": "Chinese surname"
+    },
+    {
+      "term": "Zheng",
+      "pronunciation": "JUHNG",
+      "context": "Chinese surname"
+    },
+    {
+      "term": "Zhi",
+      "pronunciation": "JUH",
+      "context": "Chinese name"
+    },
+    {
+      "term": "Akiko",
+      "pronunciation": "ah-KEE-koh",
+      "context": "Japanese female name"
+    },
+    {
+      "term": "Daisuke",
+      "pronunciation": "DAI-skay",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Haruki",
+      "pronunciation": "hah-ROO-kee",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Hiroshi",
+      "pronunciation": "hee-ROH-shee",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Ichiro",
+      "pronunciation": "ee-CHEE-roh",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Kenji",
+      "pronunciation": "KEN-jee",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Masahiro",
+      "pronunciation": "mah-sah-HEE-roh",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Naomi",
+      "pronunciation": "nah-OH-mee",
+      "context": "Japanese female name"
+    },
+    {
+      "term": "Sachiko",
+      "pronunciation": "sah-CHEE-koh",
+      "context": "Japanese female name"
+    },
+    {
+      "term": "Satoshi",
+      "pronunciation": "sah-TOH-shee",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Shinji",
+      "pronunciation": "SHIN-jee",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Takeshi",
+      "pronunciation": "tah-KEH-shee",
+      "context": "Japanese male name"
+    },
+    {
+      "term": "Toshiko",
+      "pronunciation": "toh-SHEE-koh",
+      "context": "Japanese female name"
+    },
+    {
+      "term": "Yoko",
+      "pronunciation": "YOH-koh",
+      "context": "Japanese female name"
+    },
+    {
+      "term": "Yuki",
+      "pronunciation": "YOO-kee",
+      "context": "Japanese unisex name"
+    },
+    {
+      "term": "Yumiko",
+      "pronunciation": "yoo-MEE-koh",
+      "context": "Japanese female name"
+    },
+    {
+      "term": "Bong-jun",
+      "pronunciation": "BOHNG-JOON",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Byung-ho",
+      "pronunciation": "BYUHNG-HOH",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Chae-won",
+      "pronunciation": "CHAY-WUHN",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Dong-hyuk",
+      "pronunciation": "DOHNG-HYUHK",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Eun-ji",
+      "pronunciation": "UHN-JEE",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Hye-jin",
+      "pronunciation": "HYEH-JIN",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Hyun-woo",
+      "pronunciation": "HYUHN-WOO",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Ji-hoon",
+      "pronunciation": "JEE-HOON",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Ji-yeon",
+      "pronunciation": "JEE-YUHN",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Jin-soo",
+      "pronunciation": "JIN-SOO",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Jung-hwan",
+      "pronunciation": "JOONG-HWAHN",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Kyung-soo",
+      "pronunciation": "KYUHNG-SOO",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Min-jun",
+      "pronunciation": "MIN-JOON",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Sang-hoon",
+      "pronunciation": "SAHNG-HOON",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Seung-hyun",
+      "pronunciation": "SUHNG-HYUHN",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Soo-jin",
+      "pronunciation": "SOO-JIN",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Sung-min",
+      "pronunciation": "SUHNG-MIN",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Woo-jin",
+      "pronunciation": "WOO-JIN",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Ye-ji",
+      "pronunciation": "YEH-JEE",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Yoon-ah",
+      "pronunciation": "YOON-AH",
+      "context": "Korean female name"
+    },
+    {
+      "term": "Young-soo",
+      "pronunciation": "YUHNG-SOO",
+      "context": "Korean male name"
+    },
+    {
+      "term": "Anh",
+      "pronunciation": "AHN",
+      "context": "Vietnamese unisex name"
+    },
+    {
+      "term": "Bảo",
+      "pronunciation": "BOW",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Dũng",
+      "pronunciation": "YOONG",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Hạnh",
+      "pronunciation": "HAHN",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Hiền",
+      "pronunciation": "HYEN",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Hương",
+      "pronunciation": "HWUHNG",
+      "context": "Vietnamese female name"
+    },
+    {
+      "term": "Khoa",
+      "pronunciation": "KHWAH",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Linh",
+      "pronunciation": "LINH",
+      "context": "Vietnamese unisex name"
+    },
+    {
+      "term": "Minh",
+      "pronunciation": "MIN",
+      "context": "Vietnamese unisex name"
+    },
+    {
+      "term": "Ngọc",
+      "pronunciation": "NGAWK",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Nguyễn",
+      "pronunciation": "NGWEE-uhn",
+      "context": "Vietnamese surname"
+    },
+    {
+      "term": "Nhung",
+      "pronunciation": "NYOONG",
+      "context": "Vietnamese female name"
+    },
+    {
+      "term": "Phong",
+      "pronunciation": "FAWNG",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Phúc",
+      "pronunciation": "FOOK",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Quang",
+      "pronunciation": "KWAHNG",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Tâm",
+      "pronunciation": "TAHM",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Thanh",
+      "pronunciation": "TAHN",
+      "context": "Vietnamese unisex name"
+    },
+    {
+      "term": "Thảo",
+      "pronunciation": "TOW",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Trung",
+      "pronunciation": "CHOONG",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Tuấn",
+      "pronunciation": "TWUHN",
+      "context": "Vietnamese male name"
+    },
+    {
+      "term": "Việt",
+      "pronunciation": "VYET",
+      "context": "Vietnamese name"
+    },
+    {
+      "term": "Adaeze",
+      "pronunciation": "ah-DAY-zay",
+      "context": "Nigerian female name"
+    },
+    {
+      "term": "Adebayo",
+      "pronunciation": "ah-DAY-bah-yoh",
+      "context": "Nigerian male name"
+    },
+    {
+      "term": "Amara",
+      "pronunciation": "ah-MAH-rah",
+      "context": "African female name"
+    },
+    {
+      "term": "Chidinma",
+      "pronunciation": "chee-DIN-mah",
+      "context": "Nigerian female name"
+    },
+    {
+      "term": "Chukwuemeka",
+      "pronunciation": "choo-kwoo-eh-MEH-kah",
+      "context": "Nigerian male name"
+    },
+    {
+      "term": "Efua",
+      "pronunciation": "EH-fwah",
+      "context": "Ghanaian female name"
+    },
+    {
+      "term": "Folake",
+      "pronunciation": "foh-LAH-kay",
+      "context": "Nigerian female name"
+    },
+    {
+      "term": "Ifeoma",
+      "pronunciation": "ee-feh-OH-mah",
+      "context": "Nigerian female name"
+    },
+    {
+      "term": "Kofi",
+      "pronunciation": "KOH-fee",
+      "context": "Ghanaian male name"
+    },
+    {
+      "term": "Kwame",
+      "pronunciation": "KWAH-may",
+      "context": "Ghanaian male name"
+    },
+    {
+      "term": "Nneka",
+      "pronunciation": "NEH-kah",
+      "context": "Nigerian female name"
+    },
+    {
+      "term": "Nnamdi",
+      "pronunciation": "NAHM-dee",
+      "context": "Nigerian male name"
+    },
+    {
+      "term": "Obinna",
+      "pronunciation": "oh-BIN-nah",
+      "context": "Nigerian male name"
+    },
+    {
+      "term": "Oluwaseun",
+      "pronunciation": "oh-loo-wah-SHAY-oon",
+      "context": "Nigerian name"
+    },
+    {
+      "term": "Ozioma",
+      "pronunciation": "oh-zee-OH-mah",
+      "context": "Nigerian female name"
+    },
+    {
+      "term": "Sanaa",
+      "pronunciation": "sah-NAH",
+      "context": "African female name"
+    },
+    {
+      "term": "Tendai",
+      "pronunciation": "ten-DAI",
+      "context": "Zimbabwean name"
+    },
+    {
+      "term": "Thandeka",
+      "pronunciation": "tahn-DEH-kah",
+      "context": "South African female name"
+    },
+    {
+      "term": "Uchenna",
+      "pronunciation": "oo-CHEN-nah",
+      "context": "Nigerian unisex name"
+    },
+    {
+      "term": "Yemi",
+      "pronunciation": "YEH-mee",
+      "context": "Nigerian name"
+    },
+    {
+      "term": "Zola",
+      "pronunciation": "ZOH-lah",
+      "context": "South African name"
+    },
+    {
+      "term": "Aleksei",
+      "pronunciation": "ah-lyek-SAY",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Dmitri",
+      "pronunciation": "DMEE-tree",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Ekaterina",
+      "pronunciation": "yeh-kah-teh-REE-nah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Fyodor",
+      "pronunciation": "FYOH-dor",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Galina",
+      "pronunciation": "gah-LEE-nah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Igor",
+      "pronunciation": "EE-gor",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Irina",
+      "pronunciation": "ee-REE-nah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Kateryna",
+      "pronunciation": "kah-teh-RIH-nah",
+      "context": "Ukrainian female name"
+    },
+    {
+      "term": "Mikhail",
+      "pronunciation": "mee-khah-EEL",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Natalya",
+      "pronunciation": "nah-TAHL-yah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Nikolai",
+      "pronunciation": "nee-koh-LY",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Oleksandr",
+      "pronunciation": "oh-lek-SAHN-dr",
+      "context": "Ukrainian male name"
+    },
+    {
+      "term": "Olga",
+      "pronunciation": "OL-gah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Pavlo",
+      "pronunciation": "PAHV-loh",
+      "context": "Ukrainian male name"
+    },
+    {
+      "term": "Sergei",
+      "pronunciation": "sehr-GAY",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Svetlana",
+      "pronunciation": "svyet-LAH-nah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Tatiana",
+      "pronunciation": "tah-TYAH-nah",
+      "context": "Russian female name"
+    },
+    {
+      "term": "Vasyl",
+      "pronunciation": "vah-SIHL",
+      "context": "Ukrainian male name"
+    },
+    {
+      "term": "Vladimir",
+      "pronunciation": "vlah-DEE-meer",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Volodymyr",
+      "pronunciation": "voh-loh-DIH-mihr",
+      "context": "Ukrainian male name"
+    },
+    {
+      "term": "Yaroslav",
+      "pronunciation": "yah-roh-SLAHV",
+      "context": "Slavic male name"
+    },
+    {
+      "term": "Yevgeny",
+      "pronunciation": "yev-GEH-nee",
+      "context": "Russian male name"
+    },
+    {
+      "term": "Yulia",
+      "pronunciation": "YOO-lyah",
+      "context": "Russian female name"
+    }
+  ]
+}

@@ -119,6 +119,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             self?.requestPermissions()
         }
         
+        menuBarController?.onReprocessRecording = { [weak self] path in
+            Task {
+                await self?.meetingScribeService?.processAudioFile(path)
+            }
+        }
+        
         // Link service state to menu bar (keep for backward compatibility with disabled/configError)
         meetingScribeService?.onStateChanged = { [weak self] state in
             DispatchQueue.main.async {
@@ -169,6 +175,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                     processingCount: self.currentProcessingCount
                 )
                 self.menuBarController?.updateState(state)
+            }
+        }
+        
+        // Wire reprocessing state callback
+        meetingScribeService?.onReprocessingStateChanged = { [weak self] (isReprocessing, filename) in
+            DispatchQueue.main.async {
+                self?.menuBarController?.updateReprocessingState(isReprocessing, filename: filename)
             }
         }
         
@@ -433,6 +446,11 @@ class MeetingScribeService {
     var onAutoRecordingChanged: ((Bool) -> Void)?
     var onRecordingStateChanged: ((Bool) -> Void)?
     var onProcessingCountChanged: ((Int) -> Void)?
+    var onReprocessingStateChanged: ((Bool, String?) -> Void)?  // (isReprocessing, filename)
+    
+    // Track reprocessing state
+    @MainActor private var isReprocessing = false
+    @MainActor private var reprocessingFilename: String?
     
     init() {
         self.callDetector = HybridCallDetector(
@@ -530,6 +548,252 @@ class MeetingScribeService {
             logger.info("Cancelling current recording due to auto-recording disable")
             cancelCurrentRecording()
         }
+    }
+    
+    // MARK: - Reprocess Recording
+    
+    /// Parse start time from filename with fallback chain:
+    /// 1. Strict pattern: meeting_YYYY-MM-DD_HH-MM-SS
+    /// 2. Loose pattern: any YYYY-MM-DD_HH-MM-SS substring
+    /// 3. Fallback: file modification date
+    func parseStartTime(from filename: String, fileURL: URL) -> Date {
+        // Strict pattern: meeting_YYYY-MM-DD_HH-MM-SS
+        let strictPattern = #"meeting_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})"#
+        if let match = filename.range(of: strictPattern, options: .regularExpression) {
+            let matchString = String(filename[match])
+            if let date = parseDateFromMatch(matchString) {
+                logger.info("Parsed start time from strict pattern: \(date)")
+                return date
+            }
+        }
+        
+        // Loose pattern: any YYYY-MM-DD_HH-MM-SS substring
+        let loosePattern = #"(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})"#
+        if let match = filename.range(of: loosePattern, options: .regularExpression) {
+            let matchString = String(filename[match])
+            if let date = parseDateFromMatch(matchString) {
+                logger.info("Parsed start time from loose pattern: \(date)")
+                return date
+            }
+        }
+        
+        // Fallback: file modification date
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+           let modDate = attrs[.modificationDate] as? Date {
+            logger.info("Using file modification date as start time: \(modDate)")
+            return modDate
+        }
+        
+        // Ultimate fallback: current date
+        logger.warning("Could not determine start time, using current date")
+        return Date()
+    }
+    
+    private func parseDateFromMatch(_ match: String) -> Date? {
+        // Extract date and time parts: YYYY-MM-DD_HH-MM-SS or meeting_YYYY-MM-DD_HH-MM-SS
+        let pattern = #"(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let result = regex.firstMatch(in: match, range: NSRange(match.startIndex..., in: match)) else {
+            return nil
+        }
+        
+        guard result.numberOfRanges == 7 else { return nil }
+        
+        func extractInt(_ index: Int) -> Int? {
+            guard let range = Range(result.range(at: index), in: match) else { return nil }
+            return Int(match[range])
+        }
+        
+        guard let year = extractInt(1),
+              let month = extractInt(2),
+              let day = extractInt(3),
+              let hour = extractInt(4),
+              let minute = extractInt(5),
+              let second = extractInt(6) else {
+            return nil
+        }
+        
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        
+        return Calendar.current.date(from: components)
+    }
+    
+    /// Process an existing audio file (reprocess recording)
+    func processAudioFile(_ audioPath: String) async {
+        let fileURL = URL(fileURLWithPath: audioPath)
+        let filename = fileURL.lastPathComponent
+        
+        logger.info("========================================")
+        logger.info("🔄 REPROCESSING RECORDING")
+        logger.info("   File: \(filename)")
+        logger.info("========================================")
+        
+        // Update reprocessing state
+        await MainActor.run {
+            isReprocessing = true
+            reprocessingFilename = filename
+            onReprocessingStateChanged?(true, filename)
+        }
+        
+        // Ensure we clear reprocessing state when done
+        defer {
+            Task { @MainActor in
+                isReprocessing = false
+                reprocessingFilename = nil
+                onReprocessingStateChanged?(false, nil)
+            }
+        }
+        
+        // Increment processing counter
+        await MainActor.run {
+            processingCount += 1
+            onProcessingCountChanged?(processingCount)
+        }
+        defer {
+            Task { @MainActor in
+                processingCount -= 1
+                onProcessingCountChanged?(processingCount)
+            }
+        }
+        
+        // Verify file exists
+        guard FileManager.default.fileExists(atPath: audioPath) else {
+            logger.error("Audio file does not exist: \(audioPath)")
+            sendNotification(title: "Reprocessing Failed", body: "Audio file not found")
+            return
+        }
+        
+        // Parse start time from filename
+        let startTime = parseStartTime(from: filename, fileURL: fileURL)
+        
+        // Estimate duration from file (we don't have the original duration)
+        // This is used for the notes template; not critical if approximate
+        let duration: TimeInterval
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: audioPath),
+           let fileSize = attrs[.size] as? Int64 {
+            // Rough estimate: 48kHz, 16-bit stereo = ~192KB/sec
+            duration = Double(fileSize) / 192000.0
+        } else {
+            duration = 0
+        }
+        
+        do {
+            // 1. Resolve meeting participants from calendar (using parsed start time)
+            let recordingEnd = startTime.addingTimeInterval(duration)
+            var participantContext: String? = nil
+            var calendarMeetingTitle: String? = nil
+            var attendeesList: String = ""
+            
+            if let participants = participantResolver.resolveParticipants(
+                recordingStart: startTime,
+                recordingEnd: recordingEnd
+            ) {
+                participantContext = participants.formatForLLMContext()
+                calendarMeetingTitle = participants.meetingTitle
+                
+                let allNames = [participants.myFirstName] + participants.attendeeFirstNames
+                attendeesList = allNames.filter { !$0.isEmpty }.joined(separator: ", ")
+                
+                logger.info("Resolved \(participants.attendeeFirstNames.count + 1) meeting participants")
+                if let title = calendarMeetingTitle {
+                    logger.info("Calendar meeting title: \(title)")
+                }
+            } else {
+                logger.info("No participant context available for this recording")
+            }
+            
+            // 2. Transcribe
+            logger.info("Starting transcription...")
+            let transcript = try await transcriptionService.transcribe(audioFileURL: fileURL)
+            logger.info("Transcription complete: \(transcript.prefix(100))...")
+            
+            // 3. Generate notes with participant context
+            logger.info("Generating notes...")
+            let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
+            logger.info("Notes generation complete")
+            
+            // 4. Split notes to get summary
+            let splitNotes = GeneratedNotesParser.split(generatedNotes)
+            
+            // 5. Determine meeting title
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .medium
+            
+            var meetingTitle: String
+            if let calendarTitle = calendarMeetingTitle, !calendarTitle.isEmpty {
+                meetingTitle = calendarTitle
+                logger.info("Using calendar meeting title: \(calendarTitle)")
+            } else {
+                do {
+                    logger.info("No calendar title available, generating meeting title with LLM...")
+                    let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: splitNotes.summary)
+                    if !generatedTitle.isEmpty {
+                        meetingTitle = generatedTitle
+                        logger.info("Generated title: \(generatedTitle)")
+                    } else {
+                        meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
+                    }
+                } catch {
+                    logger.warning("Failed to generate title: \(error.localizedDescription)")
+                    meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
+                }
+            }
+            
+            // 6. Render template
+            let timeFormatter = DateFormatter()
+            timeFormatter.timeStyle = .short
+            
+            let noteData = NoteData(
+                date: dateFormatter.string(from: startTime),
+                time: timeFormatter.string(from: startTime),
+                duration: formatDuration(duration),
+                title: meetingTitle,
+                attendees: attendeesList,
+                summary: splitNotes.summary,
+                notes: splitNotes.notes,
+                transcript: transcript,
+                audioFile: audioPath
+            )
+            
+            let renderedNote = try templateEngine.render(noteData: noteData)
+            
+            // 7. Save to plugin
+            logger.info("Saving notes...")
+            let result = try await notesPlugin.save(note: renderedNote, title: noteData.title)
+            
+            logger.info("========================================")
+            logger.info("✅ REPROCESSING COMPLETE")
+            logger.info("   \(result.message)")
+            logger.info("========================================")
+            
+            sendNotification(title: "Reprocessing Complete", body: result.message)
+            
+        } catch {
+            logger.error("========================================")
+            logger.error("❌ REPROCESSING FAILED")
+            logger.error("   \(error.localizedDescription)")
+            logger.error("========================================")
+            
+            sendNotification(title: "Reprocessing Failed", body: error.localizedDescription)
+        }
+    }
+    
+    /// Check if currently reprocessing (for menu state)
+    @MainActor
+    func getIsReprocessing() -> Bool {
+        return isReprocessing
+    }
+    
+    /// Check if currently recording (for menu state)
+    @MainActor
+    func getIsRecording() -> Bool {
+        return isCurrentlyRecording
     }
     
     private func startConfigFileWatcher() {

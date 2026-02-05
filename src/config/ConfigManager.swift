@@ -1,5 +1,9 @@
 import Foundation
 
+// Type aliases for convenience and test compatibility
+typealias GlossaryEntry = AppConfiguration.Transcription.GlossaryEntry
+typealias Glossary = AppConfiguration.Transcription.Glossary
+
 struct AppConfiguration: Codable {
     struct Detection: Codable {
         var pollInterval: Double = 2.0
@@ -45,10 +49,54 @@ struct AppConfiguration: Codable {
             var systemPrompt: String = "You are a transcript correction assistant. Your task is to fix obvious transcription errors in the following meeting transcript while preserving the original meaning and speaker labels. Fix misspelled names, technical terms, and words that were clearly misheard. Do not add, remove, or rephrase content - only correct errors. Return only the corrected transcript without explanations."
         }
         
+        struct GlossaryEntry: Codable {
+            var term: String
+            var pronunciation: String?
+            var context: String?
+            var aliases: [String]?
+        }
+        
+        struct Glossary: Codable {
+            var enabled: Bool = false
+            var entries: [GlossaryEntry] = []
+            var maxSize: Int = 1000
+            var maxGlossaryTokens: Int = 2000  // Token budget for filtered glossary injection
+            var filteringEnabled: Bool = true  // false = inject full glossary (legacy behavior)
+            var phoneticMatchingEnabled: Bool = true  // false = exact match only
+            
+            // Custom decoder to handle backwards compatibility with existing config files
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+                entries = try container.decodeIfPresent([GlossaryEntry].self, forKey: .entries) ?? []
+                maxSize = try container.decodeIfPresent(Int.self, forKey: .maxSize) ?? 1000
+                maxGlossaryTokens = try container.decodeIfPresent(Int.self, forKey: .maxGlossaryTokens) ?? 2000
+                filteringEnabled = try container.decodeIfPresent(Bool.self, forKey: .filteringEnabled) ?? true
+                phoneticMatchingEnabled = try container.decodeIfPresent(Bool.self, forKey: .phoneticMatchingEnabled) ?? true
+            }
+            
+            init() {}
+            
+            init(enabled: Bool = false, entries: [GlossaryEntry] = [], maxSize: Int = 1000,
+                 maxGlossaryTokens: Int = 2000, filteringEnabled: Bool = true, phoneticMatchingEnabled: Bool = true) {
+                self.enabled = enabled
+                self.entries = entries
+                self.maxSize = maxSize
+                self.maxGlossaryTokens = maxGlossaryTokens
+                self.filteringEnabled = filteringEnabled
+                self.phoneticMatchingEnabled = phoneticMatchingEnabled
+            }
+            
+            private enum CodingKeys: String, CodingKey {
+                case enabled, entries, maxSize, maxGlossaryTokens, filteringEnabled, phoneticMatchingEnabled
+            }
+        }
+        
         var openai: OpenAI = OpenAI()
         var local: Local = Local()
         var diarization: Diarization = Diarization()
         var postProcessing: PostProcessing = PostProcessing()
+        var glossary: Glossary = Glossary()
     }
     
     struct Notes: Codable {
@@ -244,5 +292,50 @@ class ConfigManager {
         }
         
         return (provider, hasKey)
+    }
+}
+
+// MARK: - GlossaryEntry Extensions for Phonetic Matching
+
+extension AppConfiguration.Transcription.GlossaryEntry {
+    
+    /// Format entry for prompt injection (matches Swift implementation in TranscriptPostProcessor)
+    func formatForPrompt() -> String {
+        var parts: [String] = []
+        if let pronunciation = pronunciation, !pronunciation.isEmpty {
+            parts.append("pronunciation: \(pronunciation)")
+        }
+        if let context = context, !context.isEmpty {
+            parts.append("context: \(context)")
+        }
+        if let aliases = aliases, !aliases.isEmpty {
+            parts.append("aliases: \(aliases.joined(separator: ", "))")
+        }
+        
+        if parts.isEmpty {
+            return term
+        } else {
+            return "\(term) (\(parts.joined(separator: "; ")))"
+        }
+    }
+    
+    /// Estimated token count for this entry when formatted for prompt
+    /// Uses chars/4 approximation - conservative enough given 4x headroom (2K vs 8K context)
+    var estimatedTokenCount: Int {
+        return max(1, formatForPrompt().count / 4)
+    }
+    
+    /// All searchable variants: term + aliases (lowercased for matching)
+    var searchableVariants: [String] {
+        var variants = [term.lowercased()]
+        if let aliases = aliases {
+            variants.append(contentsOf: aliases.map { $0.lowercased() })
+        }
+        return variants
+    }
+    
+    /// First word of the term (for multi-word phonetic matching)
+    var firstWord: String {
+        return term.split(separator: " ").first.map(String.init) ?? term
     }
 }

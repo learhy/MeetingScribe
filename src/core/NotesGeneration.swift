@@ -8,7 +8,8 @@ enum NotesGenerationError: Error {
 }
 
 protocol LLMProvider {
-    func generate(transcript: String, systemPrompt: String) async throws -> String
+    /// Generate a response from the LLM. The userMessage is passed directly to the model.
+    func generate(userMessage: String, systemPrompt: String) async throws -> String
 }
 
 // MARK: - OpenAI Provider
@@ -25,7 +26,7 @@ class OpenAIProvider: LLMProvider {
         self.timeoutSeconds = timeoutSeconds
     }
     
-    func generate(transcript: String, systemPrompt: String) async throws -> String {
+    func generate(userMessage: String, systemPrompt: String) async throws -> String {
         logger.info("Generating notes with OpenAI \(model)")
         
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
@@ -39,7 +40,7 @@ class OpenAIProvider: LLMProvider {
             "model": model,
             "messages": [
                 ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": "Generate meeting notes from this transcript:\n\n\(transcript)"]
+                ["role": "user", "content": userMessage]
             ],
             "max_tokens": 4096
         ]
@@ -107,7 +108,7 @@ class AnthropicProvider: LLMProvider {
         self.timeoutSeconds = timeoutSeconds
     }
     
-    func generate(transcript: String, systemPrompt: String) async throws -> String {
+    func generate(userMessage: String, systemPrompt: String) async throws -> String {
         logger.info("Generating notes with Anthropic \(model)")
         
         let url = URL(string: "https://api.anthropic.com/v1/messages")!
@@ -123,7 +124,7 @@ class AnthropicProvider: LLMProvider {
             "max_tokens": 4096,
             "system": systemPrompt,
             "messages": [
-                ["role": "user", "content": "Generate meeting notes from this transcript:\n\n\(transcript)"]
+                ["role": "user", "content": userMessage]
             ]
         ]
         
@@ -188,7 +189,7 @@ class OllamaProvider: LLMProvider {
         self.timeoutSeconds = timeoutSeconds
     }
     
-    func generate(transcript: String, systemPrompt: String) async throws -> String {
+    func generate(userMessage: String, systemPrompt: String) async throws -> String {
         logger.info("Generating notes with Ollama \(model)")
         
         let url = URL(string: "\(endpoint)/api/generate")!
@@ -197,7 +198,7 @@ class OllamaProvider: LLMProvider {
         request.timeoutInterval = timeoutSeconds
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let prompt = "\(systemPrompt)\n\nGenerate meeting notes from this transcript:\n\n\(transcript)"
+        let prompt = "\(systemPrompt)\n\n\(userMessage)"
         
         let requestBody: [String: Any] = [
             "model": model,
@@ -271,9 +272,10 @@ class NotesGenerationService {
 
         do {
             let timeoutSeconds = self.timeoutSeconds
+            let userMessage = "Generate meeting notes from this transcript:\n\n\(transcript)"
             let notes = try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask {
-                    try await provider.generate(transcript: transcript, systemPrompt: systemPrompt)
+                    try await provider.generate(userMessage: userMessage, systemPrompt: systemPrompt)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(timeoutSeconds))
@@ -311,7 +313,7 @@ class NotesGenerationService {
         do {
             let title = try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask {
-                    try await provider.generate(transcript: context, systemPrompt: titlePrompt)
+                    try await provider.generate(userMessage: context, systemPrompt: titlePrompt)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(titleTimeout))

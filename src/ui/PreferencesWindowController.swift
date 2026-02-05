@@ -87,6 +87,7 @@ class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         addTab(AudioTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(DetectionTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(TranscriptionTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(GlossaryTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(NotesTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(LLMProvidersTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(TemplateEditorTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))

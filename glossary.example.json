@@ -1,0 +1,65 @@
+{
+  "enabled": true,
+  "maxSize": 1000,
+  "entries": [
+    {
+      "term": "Kubernetes",
+      "pronunciation": "koo-ber-NET-eez",
+      "context": "container orchestration platform",
+      "aliases": [
+        "k8s",
+        "K8s"
+      ]
+    },
+    {
+      "term": "PostgreSQL",
+      "pronunciation": "POST-gres-cue-ell",
+      "context": "relational database management system",
+      "aliases": [
+        "Postgres",
+        "pg"
+      ]
+    },
+    {
+      "term": "GraphQL",
+      "pronunciation": "GRAF-cue-ell",
+      "context": "API query language developed by Facebook",
+      "aliases": null
+    },
+    {
+      "term": "OAuth",
+      "pronunciation": "OH-auth",
+      "context": "open standard for authentication and authorization",
+      "aliases": [
+        "OAuth 2.0",
+        "OAuth2"
+      ]
+    },
+    {
+      "term": "SaaS",
+      "pronunciation": "sass",
+      "context": "Software as a Service, cloud-based software delivery model",
+      "aliases": null
+    },
+    {
+      "term": "Terraform",
+      "pronunciation": "TERRA-form",
+      "context": "infrastructure as code tool by HashiCorp",
+      "aliases": [
+        "TF"
+      ]
+    },
+    {
+      "term": "Anthropic",
+      "pronunciation": "an-THRO-pic",
+      "context": "AI safety company, creator of Claude",
+      "aliases": null
+    },
+    {
+      "term": "LangChain",
+      "pronunciation": "LANG-chain",
+      "context": "framework for building LLM-powered applications",
+      "aliases": null
+    }
+  ]
+}

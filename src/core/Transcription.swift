@@ -324,6 +324,17 @@ class TranscriptionService {
     func transcribeWithDiarization(audioFileURL: URL) async throws -> DiarizedTranscript {
         let diarizationConfig = config.config.transcription.diarization
         
+        // Log audio file metadata
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: audioFileURL.path),
+           let fileSize = attrs[.size] as? Int64 {
+            let fileSizeMB = Double(fileSize) / 1_000_000.0
+            // Estimate duration: 48kHz, 16-bit stereo = ~192KB/sec
+            let estimatedDuration = Double(fileSize) / 192_000.0
+            let minutes = Int(estimatedDuration) / 60
+            let seconds = Int(estimatedDuration) % 60
+            logger.info("Audio file: \(audioFileURL.lastPathComponent) (\(String(format: "%.1f", fileSizeMB)) MB, ~\(minutes)m \(seconds)s)")
+        }
+        
         // Try bundled Python first, fall back to config
         let pythonPath: String
         if let bundled = config.bundledPythonPath {
@@ -389,17 +400,49 @@ class TranscriptionService {
         process.executableURL = URL(fileURLWithPath: pythonPath)
         process.arguments = arguments
         
+        // Set PYTHONUNBUFFERED to get real-time stderr output
+        var environment = ProcessInfo.processInfo.environment
+        environment["PYTHONUNBUFFERED"] = "1"
+        process.environment = environment
+        
         let errorPipe = Pipe()
         process.standardError = errorPipe
+        
+        // Buffer for incomplete lines
+        var lineBuffer = ""
+        let logger = self.logger  // Capture for closure
+        
+        // Stream stderr in real-time using readabilityHandler
+        errorPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            
+            if let output = String(data: data, encoding: .utf8) {
+                lineBuffer += output
+                
+                // Process complete lines
+                while let newlineIndex = lineBuffer.firstIndex(of: "\n") {
+                    let line = String(lineBuffer[..<newlineIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    lineBuffer = String(lineBuffer[lineBuffer.index(after: newlineIndex)...])
+                    
+                    if !line.isEmpty {
+                        // Always log the raw line (don't silently swallow malformed output)
+                        logger.info("[Diarization] \(line)")
+                    }
+                }
+            }
+        }
         
         do {
             try process.run()
             process.waitUntilExit()
             
-            // Log stderr for debugging
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            if let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
-                logger.info("Diarization stderr: \(errorOutput)")
+            // Clean up the readability handler
+            errorPipe.fileHandleForReading.readabilityHandler = nil
+            
+            // Log any remaining buffered content
+            if !lineBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                logger.info("[Diarization] \(lineBuffer.trimmingCharacters(in: .whitespacesAndNewlines))")
             }
             
             guard process.terminationStatus == 0 else {
@@ -422,8 +465,10 @@ class TranscriptionService {
             return result
             
         } catch let error as TranscriptionError {
+            errorPipe.fileHandleForReading.readabilityHandler = nil
             throw error
         } catch {
+            errorPipe.fileHandleForReading.readabilityHandler = nil
             logger.error("Diarization error: \(error.localizedDescription)")
             throw TranscriptionError.networkError(error)
         }

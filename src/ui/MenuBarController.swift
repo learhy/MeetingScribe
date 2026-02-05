@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 enum RecordingState {
     case disabled      // Missing required permissions
@@ -21,7 +22,7 @@ struct MenuBarState {
     let processingCount: Int
 }
 
-class MenuBarController {
+class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private let menu: NSMenu
     private var permissionGuide: PermissionGuideWindow?
@@ -29,6 +30,7 @@ class MenuBarController {
     var onManualStart: (() -> Void)?
     var onManualStop: (() -> Void)?
     var onToggleAutoRecording: (() -> Void)?
+    var onReprocessRecording: ((String) -> Void)?  // Passes selected file path
     var onRecheckPermissions: (() -> Void)?
     var onResetPermissions: (() -> Void)?
     var onRequestPermissions: (() -> Void)?
@@ -37,17 +39,21 @@ class MenuBarController {
     private var currentState: RecordingState = .idle
     private var currentMenuBarState: MenuBarState = MenuBarState(systemStatus: .normal, isRecording: false, processingCount: 0)
     private var autoRecordingEnabled = true
+    private var isReprocessing = false
+    private var reprocessingFilename: String?
     
-    init() {
+    override init() {
         // Create status item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        
+        // Create menu
+        menu = NSMenu()
+        
+        super.init()
         
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "message.circle", accessibilityDescription: "MeetingScribe")
         }
-        
-        // Create menu
-        menu = NSMenu()
         
         let startItem = NSMenuItem(title: "Start Recording", action: #selector(startRecording), keyEquivalent: "")
         startItem.target = self
@@ -57,6 +63,10 @@ class MenuBarController {
         stopItem.target = self
         stopItem.isHidden = true
         menu.addItem(stopItem)
+        
+        let reprocessItem = NSMenuItem(title: "Reprocess Recording...", action: #selector(reprocessRecording), keyEquivalent: "")
+        reprocessItem.target = self
+        menu.addItem(reprocessItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -95,6 +105,29 @@ class MenuBarController {
         onToggleAutoRecording?()
     }
     
+    @objc private func reprocessRecording() {
+        // Show file picker
+        let panel = NSOpenPanel()
+        panel.title = "Select Recording to Reprocess"
+        panel.allowedContentTypes = [.wav, .audio]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        
+        // Default to recordings directory
+        let recordingsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents/MeetingScribe/recordings")
+        if FileManager.default.fileExists(atPath: recordingsDir.path) {
+            panel.directoryURL = recordingsDir
+        }
+        
+        panel.begin { [weak self] response in
+            if response == .OK, let url = panel.url {
+                self?.onReprocessRecording?(url.path)
+            }
+        }
+    }
+    
     @objc private func openPreferences() {
         PreferencesWindowController.show()
     }
@@ -118,6 +151,13 @@ class MenuBarController {
     func updateAutoRecordingState(_ enabled: Bool) {
         autoRecordingEnabled = enabled
         updateAutoRecordingMenuItem()
+    }
+    
+    func updateReprocessingState(_ reprocessing: Bool, filename: String?) {
+        isReprocessing = reprocessing
+        reprocessingFilename = filename
+        updateReprocessMenuItem()
+        updateIconFromMenuBarState()
     }
     
     private func updateMenuState() {
@@ -201,6 +241,24 @@ class MenuBarController {
         for item in menu.items {
             if item.title.contains("Auto Recording") {
                 item.title = title
+                break
+            }
+        }
+    }
+    
+    private func updateReprocessMenuItem() {
+        for item in menu.items {
+            if item.title.contains("Reprocess") || item.title.contains("Processing:") {
+                if isReprocessing, let filename = reprocessingFilename {
+                    // Truncate filename for cleaner display
+                    let displayName = filename.count > 30 ? String(filename.prefix(27)) + "..." : filename
+                    item.title = "Processing: \(displayName)"
+                    item.isEnabled = false
+                } else {
+                    item.title = "Reprocess Recording..."
+                    // Disable if currently recording
+                    item.isEnabled = !currentMenuBarState.isRecording
+                }
                 break
             }
         }
@@ -320,6 +378,11 @@ class MenuBarController {
         stopItem.isHidden = !isRecording
         menu.addItem(stopItem)
         
+        let reprocessItem = NSMenuItem(title: "Reprocess Recording...", action: #selector(reprocessRecording), keyEquivalent: "")
+        reprocessItem.target = self
+        reprocessItem.isEnabled = !isRecording
+        menu.addItem(reprocessItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         let toggleAutoTitle = autoRecordingEnabled ? "Disable Auto Recording" : "Enable Auto Recording"
@@ -352,6 +415,14 @@ class MenuBarController {
         stopItem.target = self
         stopItem.isHidden = !currentMenuBarState.isRecording
         menu.addItem(stopItem)
+        
+        let reprocessTitle = isReprocessing && reprocessingFilename != nil 
+            ? "Processing: \(reprocessingFilename!.count > 30 ? String(reprocessingFilename!.prefix(27)) + "..." : reprocessingFilename!)"
+            : "Reprocess Recording..."
+        let reprocessItem = NSMenuItem(title: reprocessTitle, action: #selector(reprocessRecording), keyEquivalent: "")
+        reprocessItem.target = self
+        reprocessItem.isEnabled = !currentMenuBarState.isRecording && !isReprocessing
+        menu.addItem(reprocessItem)
         
         menu.addItem(NSMenuItem.separator())
         
