@@ -5,15 +5,22 @@ Fast speaker diarization script for MeetingScribe.
 This script uses SpeechBrain ECAPA-TDNN embeddings + MeanShift clustering
 for 6-7x faster diarization compared to pyannote.audio pipelines.
 
+Optionally integrates smart prompt generation for speaker-adaptive vocabulary:
+- Use --smart-prompt to enable speaker-based prompt generation
+- Matches speakers against a local database for vocabulary caching
+- Falls back gracefully to static prompts on any failure
+
 Requirements:
 - speechbrain
 - scikit-learn
 - openai-whisper
 - torch
 - torchaudio
+- (optional) tiktoken, spacy for smart prompts
 
 Usage:
     python diarize_audio_fast.py <audio_file> [options]
+    python diarize_audio_fast.py <audio_file> --smart-prompt [--speaker-db-path PATH]
 """
 
 import argparse
@@ -174,15 +181,19 @@ def extract_embeddings_with_speechbrain(
 
 def cluster_speakers(
     embeddings: np.ndarray,
-    distance_threshold: float = 0.90
+    distance_threshold: float = 0.25
 ) -> np.ndarray:
     """
     Cluster speaker embeddings using Agglomerative Clustering.
     
     Args:
         embeddings: Array of shape (num_windows, embedding_dim)
-        distance_threshold: Cosine distance threshold for clustering (0.3-0.8)
-                           Lower = more speakers, Higher = fewer speakers
+        distance_threshold: Cosine DISTANCE threshold for clustering.
+                           This is 1 - cosine_similarity, so:
+                           - 0.15 = merge if similarity > 0.85 (strict, more speakers)
+                           - 0.25 = merge if similarity > 0.75 (moderate, default)
+                           - 0.40 = merge if similarity > 0.60 (loose, fewer speakers)
+                           Typical range: 0.15-0.40
     
     Returns:
         labels: Array of speaker labels for each window
@@ -319,54 +330,142 @@ def transcribe_with_whisper(
     return result
 
 
+def _find_speaker_at_time(
+    time: float,
+    dia_segments: List[DiarizationSegment],
+    dia_starts: List[float]
+) -> str:
+    """
+    Find the speaker at a given time using binary search.
+    
+    Args:
+        time: The timestamp to look up
+        dia_segments: List of diarization segments (sorted by start time)
+        dia_starts: Pre-computed list of segment start times for binary search
+    
+    Returns:
+        Speaker label, or "UNKNOWN" if no segment covers this time
+    """
+    import bisect
+    
+    # Find the rightmost segment that starts at or before this time
+    idx = bisect.bisect_right(dia_starts, time) - 1
+    
+    if idx < 0:
+        # Time is before all segments - assign to first segment if close
+        if dia_segments and time < dia_segments[0].start + 0.5:
+            return dia_segments[0].speaker
+        return "UNKNOWN"
+    
+    seg = dia_segments[idx]
+    
+    # Check if time falls within this segment
+    if time <= seg.end:
+        return seg.speaker
+    
+    # Time is in a gap - assign to nearest segment
+    # Check distance to current segment's end vs next segment's start
+    if idx + 1 < len(dia_segments):
+        next_seg = dia_segments[idx + 1]
+        dist_to_current = time - seg.end
+        dist_to_next = next_seg.start - time
+        if dist_to_next < dist_to_current:
+            return next_seg.speaker
+    
+    return seg.speaker
+
+
 def align_transcription_with_diarization(
     transcription: Dict[str, Any],
     diarization_segments: List[DiarizationSegment],
-    min_overlap: float = 0.3
+    min_overlap: float = 0.3  # Kept for API compatibility, not used in new logic
 ) -> List[Dict[str, Any]]:
     """
-    Align Whisper transcription with diarization segments.
+    Align Whisper transcription with diarization segments using word-level timestamps.
+    
+    This function splits Whisper segments at speaker boundaries to preserve
+    speaker turns even when Whisper doesn't segment at speaker changes.
     """
+    if not diarization_segments:
+        # No diarization - return segments with UNKNOWN speaker
+        return [
+            {
+                "start": seg["start"],
+                "end": seg["end"],
+                "speaker": "UNKNOWN",
+                "text": seg["text"].strip()
+            }
+            for seg in transcription.get("segments", [])
+            if seg["text"].strip()
+        ]
+    
+    # Sort diarization segments by start time and pre-compute starts for binary search
+    dia_sorted = sorted(diarization_segments, key=lambda s: s.start)
+    dia_starts = [s.start for s in dia_sorted]
+    
     aligned_segments = []
     
     for segment in transcription.get("segments", []):
-        seg_start = segment["start"]
-        seg_end = segment["end"]
-        seg_text = segment["text"].strip()
+        words = segment.get("words", [])
         
-        if not seg_text:
-            continue
-        
-        # Find best matching diarization segment
-        max_overlap = 0
-        assigned_speaker = "UNKNOWN"
-        
-        for dia_seg in diarization_segments:
-            overlap_start = max(seg_start, dia_seg.start)
-            overlap_end = min(seg_end, dia_seg.end)
-            overlap_duration = max(0, overlap_end - overlap_start)
-            
-            segment_duration = seg_end - seg_start
-            if segment_duration > 0:
-                overlap_ratio = overlap_duration / segment_duration
-                
-                if overlap_ratio > max_overlap:
-                    max_overlap = overlap_ratio
-                    assigned_speaker = dia_seg.speaker
-        
-        if max_overlap >= min_overlap:
+        if not words:
+            # Fallback: no word timestamps, use segment-level assignment
+            seg_text = segment["text"].strip()
+            if not seg_text:
+                continue
+            seg_mid = (segment["start"] + segment["end"]) / 2
+            speaker = _find_speaker_at_time(seg_mid, dia_sorted, dia_starts)
             aligned_segments.append({
-                "start": seg_start,
-                "end": seg_end,
-                "speaker": assigned_speaker,
+                "start": segment["start"],
+                "end": segment["end"],
+                "speaker": speaker,
                 "text": seg_text
             })
-        else:
+            continue
+        
+        # Group consecutive words by speaker
+        current_speaker = None
+        current_words = []
+        current_start = None
+        current_end = None
+        
+        for word_info in words:
+            word_text = word_info.get("word", "").strip()
+            if not word_text:
+                continue
+            
+            word_start = word_info.get("start", 0)
+            word_end = word_info.get("end", word_start)
+            
+            # Use word start time to determine speaker
+            speaker = _find_speaker_at_time(word_start, dia_sorted, dia_starts)
+            
+            if speaker == current_speaker:
+                # Same speaker - extend current group
+                current_words.append(word_text)
+                current_end = word_end
+            else:
+                # Speaker changed - emit current group and start new one
+                if current_words:
+                    aligned_segments.append({
+                        "start": current_start,
+                        "end": current_end,
+                        "speaker": current_speaker,
+                        "text": "".join(current_words).strip()
+                    })
+                
+                current_speaker = speaker
+                current_words = [word_text]
+                current_start = word_start
+                current_end = word_end
+        
+        # Emit final group
+        if current_words:
             aligned_segments.append({
-                "start": seg_start,
-                "end": seg_end,
-                "speaker": "UNKNOWN",
-                "text": seg_text
+                "start": current_start,
+                "end": current_end,
+                "speaker": current_speaker,
+                "text": "".join(current_words).strip()
             })
     
     return aligned_segments
@@ -434,13 +533,45 @@ def main():
     parser.add_argument(
         "--distance-threshold",
         type=float,
-        default=0.90,
-        help="Agglomerative clustering distance threshold (default: 0.90, range: 0.85-0.95)"
+        default=0.25,
+        help="Cosine DISTANCE threshold for clustering (default: 0.25). "
+             "This is 1 - similarity, so 0.25 means merge if similarity > 0.75. "
+             "Lower values = stricter matching = more speakers. Range: 0.15-0.40"
     )
     parser.add_argument(
         "--output",
         "-o",
         help="Output JSON file path (default: stdout)"
+    )
+    
+    # Smart prompt arguments
+    parser.add_argument(
+        "--smart-prompt",
+        action="store_true",
+        help="Enable smart prompt generation based on speaker identification"
+    )
+    parser.add_argument(
+        "--speaker-db-path",
+        type=str,
+        default=os.path.expanduser("~/.meetingscribe/speaker.db"),
+        help="Path to speaker database (default: ~/.meetingscribe/speaker.db)"
+    )
+    parser.add_argument(
+        "--rag-endpoint",
+        type=str,
+        default="",
+        help="RAG API endpoint for vocabulary enrichment (optional)"
+    )
+    parser.add_argument(
+        "--iterative-refinement",
+        action="store_true",
+        help="Enable two-pass quick transcription for better term extraction"
+    )
+    parser.add_argument(
+        "--quick-transcribe-seconds",
+        type=float,
+        default=45.0,
+        help="Duration for quick transcription in smart prompt mode (default: 45)"
     )
     
     args = parser.parse_args()
@@ -479,24 +610,240 @@ def main():
     speakers = sorted(set(seg.speaker for seg in diarization_segments))
     print(f"Identified speakers: {speakers}", file=sys.stderr)
     
-    # Step 5: Transcribe with Whisper
+    # Debug: show segment distribution to verify clustering is balanced
+    from collections import Counter
+    speaker_counts = Counter(seg.speaker for seg in diarization_segments)
+    print(f"Diarization segment distribution: {dict(speaker_counts)}", file=sys.stderr)
+    
+    # Step 5: Generate smart prompt (if enabled) or use static prompt
+    effective_initial_prompt = args.initial_prompt
+    effective_vocabulary_file = args.vocabulary_file
+    smart_prompt_result = None
+    
+    if args.smart_prompt:
+        try:
+            from speaker_db import SpeakerDatabase
+            from prompt_generator import generate_smart_prompt
+            from vocabulary_sources import create_vocabulary_source
+            
+            print("Generating smart prompt based on speaker identification...", file=sys.stderr)
+            
+            # Initialize speaker database
+            speaker_db = SpeakerDatabase(args.speaker_db_path)
+            
+            # Create vocabulary source if RAG endpoint provided
+            rag_client = None
+            if args.rag_endpoint:
+                rag_client = create_vocabulary_source(rag_endpoint=args.rag_endpoint)
+            
+            # Generate smart prompt using embeddings we already extracted
+            # Convert cluster centroids to averaged embeddings for matching
+            from sklearn.preprocessing import normalize
+            embeddings_normalized = normalize(embeddings, axis=1, norm='l2')
+            
+            # Get unique speaker embeddings (average by cluster)
+            unique_labels = np.unique(labels)
+            speaker_embeddings_list = []
+            for label in unique_labels:
+                mask = labels == label
+                cluster_embeddings = embeddings_normalized[mask]
+                centroid = np.mean(cluster_embeddings, axis=0)
+                speaker_embeddings_list.append(centroid)
+            
+            # Match speakers and generate prompt
+            from prompt_generator import (
+                match_speakers, lookup_cache, build_prompt_with_budget,
+                extract_terms, dedupe_terms, merge_vocabulary, count_tokens,
+                write_vocabulary_file, compute_cache_confidence
+            )
+            from term_types import Term, SmartPromptResult
+            
+            match_result = match_speakers(speaker_embeddings_list, speaker_db)
+            known_ids = [m.speaker_id for m in match_result.matched]
+            unknown_count = len(match_result.unknown)
+            
+            print(f"  Matched {len(known_ids)} known speakers, {unknown_count} unknown", file=sys.stderr)
+            
+            # Try cache lookup
+            cache_result = lookup_cache(speaker_db, known_ids, unknown_count)
+            
+            if cache_result.match_type == "full" and cache_result.confidence > 0.8:
+                # Cache hit!
+                print(f"  Cache hit (confidence={cache_result.confidence:.2f})", file=sys.stderr)
+                speaker_db.record_cache_hit(cache_result.prompt.cache_key)
+                effective_initial_prompt = cache_result.prompt.prompt_text
+                # Note: cached vocab terms would need to be written to file if we want to use them
+                smart_prompt_result = SmartPromptResult(
+                    initial_prompt=cache_result.prompt.prompt_text,
+                    vocabulary_file_path=None,
+                    source="cache_full",
+                    speaker_ids=known_ids,
+                    confidence=cache_result.confidence,
+                    prompt_token_count=count_tokens(cache_result.prompt.prompt_text),
+                    vocab_term_count=len(cache_result.prompt.vocabulary_terms) if cache_result.prompt.vocabulary_terms else 0
+                )
+            else:
+                # Cache miss - generate new prompt
+                print(f"  Cache miss, generating prompt...", file=sys.stderr)
+                
+                # Get known speaker terms
+                known_terms = speaker_db.get_speaker_terms(known_ids, cooccurring_ids=known_ids) if known_ids else []
+                
+                # Quick transcribe for term extraction (if enabled)
+                extracted_terms = []
+                extracted_names = []
+                if args.iterative_refinement:
+                    try:
+                        from prompt_generator import refined_quick_transcribe
+                        refined = refined_quick_transcribe(
+                            args.audio_file,
+                            duration=args.quick_transcribe_seconds,
+                            known_speaker_terms=[t.text for t in known_terms]
+                        )
+                        extracted_terms = refined.all_terms
+                        extracted_names = refined.extracted_names
+                        print(f"  Extracted {len(extracted_terms)} terms, {len(extracted_names)} names", file=sys.stderr)
+                    except Exception as e:
+                        print(f"  Quick transcription failed: {e}", file=sys.stderr)
+                
+                # Query RAG if available
+                rag_terms = []
+                if rag_client and (known_ids or extracted_names):
+                    try:
+                        from vocabulary_sources import fetch_rag_vocabulary_parallel
+                        speaker_names = [speaker_db.get_speaker(sid).name for sid in known_ids 
+                                        if speaker_db.get_speaker(sid) and speaker_db.get_speaker(sid).name]
+                        rag_terms = fetch_rag_vocabulary_parallel(
+                            rag_client,
+                            speaker_names=speaker_names,
+                            extracted_names=extracted_names,
+                            timeout=2.0
+                        )
+                        print(f"  Retrieved {len(rag_terms)} terms from RAG", file=sys.stderr)
+                    except Exception as e:
+                        print(f"  RAG query failed: {e}", file=sys.stderr)
+                
+                # Merge vocabulary from all sources
+                vocabulary = merge_vocabulary(
+                    sources=[
+                        (extracted_terms, 1.0) if extracted_terms else ([], 0),
+                        (known_terms, 0.8),
+                        (rag_terms, 0.6),
+                    ],
+                    max_terms=100,
+                    dedupe=True
+                )
+                
+                # Build prompt with token budget
+                prompt_output = build_prompt_with_budget(
+                    vocabulary=vocabulary,
+                    names=extracted_names
+                )
+                
+                effective_initial_prompt = prompt_output.initial_prompt
+                
+                # Write vocabulary file if we have overflow terms
+                if prompt_output.vocabulary_terms:
+                    from pathlib import Path
+                    vocab_file_path = write_vocabulary_file(
+                        prompt_output.vocabulary_terms,
+                        output_dir=Path(args.audio_file).parent / '.meetingscribe_temp'
+                    )
+                    effective_vocabulary_file = vocab_file_path
+                
+                # Compute confidence for caching
+                confidence = compute_cache_confidence(
+                    known_speaker_ratio=len(known_ids) / (len(known_ids) + unknown_count) if (known_ids or unknown_count) else 0,
+                    match_quality=sum(m.confidence_gap for m in match_result.matched) / len(match_result.matched) if match_result.matched else 0,
+                    has_ambiguous=len(match_result.ambiguous) > 0
+                )
+                
+                # Cache the result
+                speaker_db.save_prompt(
+                    known_ids=known_ids,
+                    unknown_count=unknown_count,
+                    prompt=prompt_output.initial_prompt,
+                    vocabulary=[t.text for t in vocabulary],
+                    confidence=confidence
+                )
+                
+                # Register unknown speakers
+                new_speakers = 0
+                for emb in match_result.unknown:
+                    new_id = speaker_db.create_speaker(centroid=np.array(emb))
+                    new_speakers += 1
+                    if len(match_result.unknown) == 1 and len(extracted_names) == 1:
+                        speaker_db.suggest_name(
+                            speaker_id=new_id,
+                            suggested_name=extracted_names[0],
+                            source='transcript',
+                            confidence=0.5,
+                            context=None
+                        )
+                
+                smart_prompt_result = SmartPromptResult(
+                    initial_prompt=prompt_output.initial_prompt,
+                    vocabulary_file_path=effective_vocabulary_file,
+                    source="generated",
+                    speaker_ids=known_ids,
+                    confidence=confidence,
+                    new_speakers_created=new_speakers,
+                    prompt_token_count=prompt_output.prompt_token_count,
+                    vocab_term_count=prompt_output.terms_in_vocab_file
+                )
+                
+                print(f"  Generated prompt: {len(effective_initial_prompt)} chars, {prompt_output.prompt_token_count} tokens", file=sys.stderr)
+            
+            speaker_db.close()
+            
+        except ImportError as e:
+            print(f"Warning: Smart prompt dependencies not available ({e}), using static prompt", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Smart prompt generation failed ({e}), using static prompt", file=sys.stderr)
+    
+    # Step 6: Transcribe with Whisper
     transcription = transcribe_with_whisper(
         args.audio_file,
         model_name=args.whisper_model,
-        initial_prompt=args.initial_prompt,
-        vocabulary_file=args.vocabulary_file,
+        initial_prompt=effective_initial_prompt,
+        vocabulary_file=effective_vocabulary_file,
         audio_duration_seconds=audio_duration_seconds
     )
     
-    # Step 6: Align transcription with diarization
+    # Step 7: Align transcription with diarization
     print("Aligning transcription with diarization...", file=sys.stderr)
     aligned_segments = align_transcription_with_diarization(
         transcription,
         diarization_segments
     )
     
-    # Step 7: Merge consecutive segments
+    # Step 8: Merge consecutive segments
     merged_segments = merge_consecutive_segments(aligned_segments)
+    
+    # Step 9: Update speaker terms after successful transcription (if smart prompt enabled)
+    if args.smart_prompt and smart_prompt_result and smart_prompt_result.speaker_ids:
+        try:
+            from speaker_db import SpeakerDatabase
+            from prompt_generator import extract_terms
+            
+            speaker_db = SpeakerDatabase(args.speaker_db_path)
+            
+            # Extract terms from final transcription
+            full_text = " ".join(seg["text"] for seg in merged_segments)
+            new_terms = extract_terms(full_text, use_ner=True)
+            
+            # Update terms for all matched speakers
+            for speaker_id in smart_prompt_result.speaker_ids:
+                speaker_db.update_speaker_terms(
+                    speaker_id,
+                    new_terms[:50],  # Limit to top 50
+                    cooccurring_speaker_ids=smart_prompt_result.speaker_ids
+                )
+            
+            speaker_db.close()
+            print(f"Updated speaker vocabulary with {len(new_terms)} terms", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Failed to update speaker terms: {e}", file=sys.stderr)
     
     # Prepare output
     output_data = {
@@ -505,6 +852,17 @@ def main():
         "num_speakers": len(speakers),
         "audio_file": args.audio_file
     }
+    
+    # Include smart prompt metadata if available
+    if smart_prompt_result:
+        output_data["smart_prompt"] = {
+            "source": smart_prompt_result.source,
+            "confidence": smart_prompt_result.confidence,
+            "known_speakers": len(smart_prompt_result.speaker_ids),
+            "new_speakers": smart_prompt_result.new_speakers_created,
+            "prompt_tokens": smart_prompt_result.prompt_token_count,
+            "vocab_terms": smart_prompt_result.vocab_term_count
+        }
     
     # Write output
     output_json = json.dumps(output_data, indent=2, ensure_ascii=False)

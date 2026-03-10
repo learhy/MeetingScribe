@@ -387,6 +387,25 @@ class TranscriptionService {
             }
         }
         
+        // Add smart prompt flags if enabled
+        let smartPromptConfig = config.config.transcription.smartPrompt
+        if smartPromptConfig.enabled {
+            arguments.append("--smart-prompt")
+            arguments.append(contentsOf: ["--speaker-db-path", config.expandPath(smartPromptConfig.speakerDbPath).path])
+            
+            if !smartPromptConfig.ragEndpoint.isEmpty {
+                arguments.append(contentsOf: ["--rag-endpoint", smartPromptConfig.ragEndpoint])
+            }
+            
+            if smartPromptConfig.enableIterativeRefinement {
+                arguments.append("--iterative-refinement")
+            }
+            
+            arguments.append(contentsOf: ["--quick-transcribe-seconds", String(smartPromptConfig.quickTranscribeSeconds)])
+            
+            logger.info("Smart prompt generation enabled (version \(smartPromptConfig.version))")
+        }
+        
         // Note: min/max speakers not supported by fast diarization
         // It auto-detects based on distance threshold
         

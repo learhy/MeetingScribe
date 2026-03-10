@@ -49,6 +49,11 @@ mkdir -p "$APP_DIR/Contents/Resources/scripts"
 cp scripts/diarize_audio_fast.py "$APP_DIR/Contents/Resources/scripts/"
 cp scripts/requirements-diarization.txt "$APP_DIR/Contents/Resources/scripts/"
 
+# Copy speaker management CLI (for Smart Prompts feature)
+cp scripts/speaker_cli.py "$APP_DIR/Contents/Resources/scripts/"
+cp scripts/speaker_db.py "$APP_DIR/Contents/Resources/scripts/"
+cp scripts/term_types.py "$APP_DIR/Contents/Resources/scripts/"
+
 # Copy CLI control script to Resources (for optional installation)
 cp scripts/meetingscribe-ctl.sh "$APP_DIR/Contents/Resources/scripts/"
 

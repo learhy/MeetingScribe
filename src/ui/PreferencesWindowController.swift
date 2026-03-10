@@ -51,7 +51,7 @@ class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     init() {
         // Create window
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
@@ -61,7 +61,7 @@ class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         logger.info("init PreferencesWindowController instance=\(instanceId)")
         logger.info("attachedSheet at init=\(String(describing: window.attachedSheet))")
         window.title = "MeetingScribe Preferences"
-        window.minSize = NSSize(width: 600, height: 500)
+        window.minSize = NSSize(width: 800, height: 500)
         window.center()
         
         // super.init moved above to allow delegate assignment
@@ -88,6 +88,7 @@ class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         addTab(DetectionTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(TranscriptionTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(GlossaryTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
+        addTab(SpeakerManagementTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(NotesTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(LLMProvidersTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))
         addTab(TemplateEditorTab(frame: NSRect(x: 0, y: 0, width: 600, height: 450)))

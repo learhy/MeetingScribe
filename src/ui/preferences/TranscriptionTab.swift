@@ -292,12 +292,12 @@ class TranscriptionTab: BasePreferencesTab {
         diarizationContainer.addSubview(thresholdLabel)
         
         distanceThresholdField = NSTextField(frame: NSRect(x: 150, y: yPos, width: 80, height: 22))
-        distanceThresholdField.placeholderString = "0.90"
+        distanceThresholdField.placeholderString = "0.25"
         distanceThresholdField.target = self
         distanceThresholdField.action = #selector(fieldChanged)
         diarizationContainer.addSubview(distanceThresholdField)
         
-        let thresholdHelp = NSTextField(labelWithString: "(0.85-0.95)")
+        let thresholdHelp = NSTextField(labelWithString: "(0.15-0.40)")
         thresholdHelp.font = NSFont.systemFont(ofSize: 10)
         thresholdHelp.textColor = .secondaryLabelColor
         thresholdHelp.frame = NSRect(x: 240, y: yPos + 2, width: 100, height: 20)
@@ -449,7 +449,7 @@ class TranscriptionTab: BasePreferencesTab {
         config.transcription.diarization.whisperModel = whisperModelPopup.titleOfSelectedItem ?? "base"
         config.transcription.diarization.minSpeakers = Int(minSpeakersField.stringValue)
         config.transcription.diarization.maxSpeakers = Int(maxSpeakersField.stringValue)
-        config.transcription.diarization.distanceThreshold = Double(distanceThresholdField.stringValue) ?? 0.90
+        config.transcription.diarization.distanceThreshold = Double(distanceThresholdField.stringValue) ?? 0.25
         config.transcription.diarization.vocabularyFile = vocabularyFileField.stringValue
         config.transcription.diarization.initialPrompt = initialPromptField.stringValue
         

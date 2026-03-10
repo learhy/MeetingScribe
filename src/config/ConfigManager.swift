@@ -39,9 +39,50 @@ struct AppConfiguration: Codable {
             var pythonPath: String = "python3"
             var scriptPath: String = "/Applications/MeetingScribe.app/Contents/Resources/scripts/diarize_audio_fast.py"
             var whisperModel: String = "turbo"  // tiny, base, small, medium, large, turbo
-            var distanceThreshold: Double = 0.90  // Agglomerative clustering threshold (0.85-0.95)
+            var distanceThreshold: Double = 0.25  // Cosine DISTANCE threshold (1 - similarity). 0.25 = merge if similarity > 0.75. Range: 0.15-0.40
             var vocabularyFile: String = ""  // Optional path to vocabulary file with domain terms
             var initialPrompt: String = ""  // Optional initial prompt for Whisper (e.g., "Glossary: QBR, MBR, GTM")
+        }
+        
+        struct SmartPrompt: Codable {
+            var enabled: Bool = false
+            var version: Int = 1  // Increment when behavior changes significantly
+            var speakerDbPath: String = "~/.meetingscribe/speaker.db"
+            var ragEndpoint: String = ""  // Empty = disabled
+            var quickTranscribeSeconds: Double = 45.0
+            var cacheConfidenceThreshold: Double = 0.8
+            var enableIterativeRefinement: Bool = true  // Two-pass quick transcription
+            
+            // Custom decoder for backwards compatibility
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+                version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+                speakerDbPath = try container.decodeIfPresent(String.self, forKey: .speakerDbPath) ?? "~/.meetingscribe/speaker.db"
+                ragEndpoint = try container.decodeIfPresent(String.self, forKey: .ragEndpoint) ?? ""
+                quickTranscribeSeconds = try container.decodeIfPresent(Double.self, forKey: .quickTranscribeSeconds) ?? 45.0
+                cacheConfidenceThreshold = try container.decodeIfPresent(Double.self, forKey: .cacheConfidenceThreshold) ?? 0.8
+                enableIterativeRefinement = try container.decodeIfPresent(Bool.self, forKey: .enableIterativeRefinement) ?? true
+            }
+            
+            init() {}
+            
+            init(enabled: Bool = false, version: Int = 1, speakerDbPath: String = "~/.meetingscribe/speaker.db",
+                 ragEndpoint: String = "", quickTranscribeSeconds: Double = 45.0,
+                 cacheConfidenceThreshold: Double = 0.8, enableIterativeRefinement: Bool = true) {
+                self.enabled = enabled
+                self.version = version
+                self.speakerDbPath = speakerDbPath
+                self.ragEndpoint = ragEndpoint
+                self.quickTranscribeSeconds = quickTranscribeSeconds
+                self.cacheConfidenceThreshold = cacheConfidenceThreshold
+                self.enableIterativeRefinement = enableIterativeRefinement
+            }
+            
+            private enum CodingKeys: String, CodingKey {
+                case enabled, version, speakerDbPath, ragEndpoint, quickTranscribeSeconds
+                case cacheConfidenceThreshold, enableIterativeRefinement
+            }
         }
         
         struct PostProcessing: Codable {
@@ -97,6 +138,7 @@ struct AppConfiguration: Codable {
         var diarization: Diarization = Diarization()
         var postProcessing: PostProcessing = PostProcessing()
         var glossary: Glossary = Glossary()
+        var smartPrompt: SmartPrompt = SmartPrompt()
     }
     
     struct Notes: Codable {
