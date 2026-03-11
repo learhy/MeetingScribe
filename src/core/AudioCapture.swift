@@ -10,6 +10,9 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
     private let application: SCRunningApplication
     private let outputDirOverride: URL?
     private let micEnabled: Bool
+    private let mixMode: MixMode
+    private let sysGain: Float
+    private let micGain: Float
 
     private var stream: SCStream?
 
@@ -40,10 +43,13 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
     private var systemAudioBufferCount = 0
     private var hasDetectedSignificantAudio = false
 
-    init(application: SCRunningApplication, outputDir: URL?, micEnabled: Bool) {
+    init(application: SCRunningApplication, outputDir: URL?, micEnabled: Bool, mixMode: MixMode = .stereoSeparated, sysGain: Float = 1.0, micGain: Float = 1.0) {
         self.application = application
         self.outputDirOverride = outputDir
         self.micEnabled = micEnabled
+        self.mixMode = mixMode
+        self.sysGain = sysGain
+        self.micGain = micGain
         super.init()
     }
 
@@ -177,8 +183,8 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
                 let mixedURL = baseDir.appendingPathComponent("meeting_\(ts)_mixed.wav")
                 let mixedWriter = try WAVStreamWriter(fileURL: mixedURL, sampleRate: 48_000, channels: 2, bitsPerSample: 16)
                 
-                // Create AudioMixer with system gain=2.0x, mic gain=0.8x
-                self.mixer = AudioMixer(writer: mixedWriter, sysGain: 2.0, micGain: 0.8)
+                // Create AudioMixer with configured mode and gains
+                self.mixer = AudioMixer(writer: mixedWriter, mode: self.mixMode, sysGain: self.sysGain, micGain: self.micGain)
                 self.mixedAudioFilePath = mixedURL.path
                 self.logger.info("✅ Mixed WAV: \(mixedURL.path)")
 
@@ -196,7 +202,7 @@ class StreamHandler: NSObject, SCStreamDelegate, SCStreamOutput {
                         self.micCapture = nil
                     }
                 } else {
-                    self.logger.warning("Microphone permission not granted; writing system-only track")
+                    self.logger.info("Microphone disabled (permission=\(self.micEnabled)); writing system-only track")
                 }
             } catch {
                 self.logger.error("Failed to initialize recording: \(error.localizedDescription)")

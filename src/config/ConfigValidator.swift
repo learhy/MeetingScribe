@@ -28,6 +28,18 @@ class ConfigValidator {
         return nil
     }
     
+    /// Validate that a path is a regular file (not a directory)
+    static func validateIsFile(_ path: String, field: String) -> ValidationError? {
+        let expandedPath = NSString(string: path).expandingTildeInPath
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDirectory) {
+            if isDirectory.boolValue {
+                return ValidationError(field: field, message: "\(field): Must be a file, not a directory")
+            }
+        }
+        return nil
+    }
+    
     /// Validate that a path is a directory
     static func validateIsDirectory(_ path: String, field: String) -> ValidationError? {
         let expandedPath = NSString(string: path).expandingTildeInPath
@@ -143,6 +155,9 @@ class ConfigValidator {
                 errors.append(error)
             }
             if let error = validateNonEmpty(transcription.local.modelPath, field: "Model Path") {
+                errors.append(error)
+            }
+            if let error = validateIsFile(transcription.local.modelPath, field: "Model Path") {
                 errors.append(error)
             }
             

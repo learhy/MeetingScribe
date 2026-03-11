@@ -16,6 +16,30 @@ struct AppConfiguration: Codable {
         var sampleRate: Int = 48000
         var bitDepth: Int = 16
         var channels: Int = 2
+        var mixMode: String = "stereo_separated"  // "stereo_separated" | "mono_mixed"
+        var microphoneEnabled: Bool = true  // Explicit mic toggle (ANDed with OS permission)
+        var systemGain: Double = 1.0  // Per-channel volume for system audio
+        var micGain: Double = 1.0  // Per-channel volume for microphone audio
+        
+        // Custom decoder for backwards compatibility with existing config files
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            outputDirectory = try container.decodeIfPresent(String.self, forKey: .outputDirectory) ?? "~/Documents/MeetingScribe/recordings/"
+            sampleRate = try container.decodeIfPresent(Int.self, forKey: .sampleRate) ?? 48000
+            bitDepth = try container.decodeIfPresent(Int.self, forKey: .bitDepth) ?? 16
+            channels = try container.decodeIfPresent(Int.self, forKey: .channels) ?? 2
+            mixMode = try container.decodeIfPresent(String.self, forKey: .mixMode) ?? "stereo_separated"
+            microphoneEnabled = try container.decodeIfPresent(Bool.self, forKey: .microphoneEnabled) ?? true
+            systemGain = try container.decodeIfPresent(Double.self, forKey: .systemGain) ?? 1.0
+            micGain = try container.decodeIfPresent(Double.self, forKey: .micGain) ?? 1.0
+        }
+        
+        init() {}
+        
+        private enum CodingKeys: String, CodingKey {
+            case outputDirectory, sampleRate, bitDepth, channels
+            case mixMode, microphoneEnabled, systemGain, micGain
+        }
     }
     
     struct Transcription: Codable {

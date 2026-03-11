@@ -349,7 +349,7 @@ class TranscriptionTab: BasePreferencesTab {
     @objc private func browseWhisper() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
-        panel.canChooseDirectories = true
+        panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.message = "Select whisper.cpp binary"
         let defaultDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".meetingscribe")
@@ -369,7 +369,7 @@ class TranscriptionTab: BasePreferencesTab {
     @objc private func browseModel() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
-        panel.canChooseDirectories = true
+        panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.message = "Select model file"
         let defaultDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".meetingscribe")

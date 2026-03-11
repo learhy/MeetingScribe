@@ -132,9 +132,15 @@ class LocalWhisperProvider: TranscriptionProvider {
             throw TranscriptionError.apiError("Whisper binary not found at: \(whisperBinaryPath.path)")
         }
         
-        // Verify model exists
-        guard FileManager.default.fileExists(atPath: modelPath.path) else {
-            throw TranscriptionError.apiError("Whisper model not found at: \(modelPath.path)")
+        // Verify model exists and is a file (not a directory)
+        var modelIsDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: modelPath.path, isDirectory: &modelIsDir),
+              !modelIsDir.boolValue else {
+            throw TranscriptionError.apiError(
+                "Whisper model path is not a valid file: \(modelPath.path). " +
+                "Please set modelPath to a specific .bin model file " +
+                "(e.g., .../models/ggml-large-v3-turbo.bin)"
+            )
         }
         
         // Verify audio file exists

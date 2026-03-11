@@ -1,5 +1,10 @@
 import Foundation
 
+enum MixMode: String {
+    case stereoSeparated = "stereo_separated"
+    case monoMixed = "mono_mixed"
+}
+
 final class AudioMixer {
     private let logger = DualLogger(category: "AudioMixer")
 
@@ -9,9 +14,11 @@ final class AudioMixer {
     private var sysRead: Int = 0
     private var micRead: Int = 0
 
-    // Gains applied before mixing. Tunable.
+    // Per-channel gain controls.
     private let sysGain: Float
     private let micGain: Float
+
+    private let mode: MixMode
 
     // Simple level telemetry
     private var sysPeak: Int16 = 0
@@ -25,15 +32,17 @@ final class AudioMixer {
 
     // Mix on a stable cadence to avoid jitter/choppiness caused by irregular buffer arrival patterns.
     private var timer: DispatchSourceTimer?
-    private let chunkSamples: Int
+    private let chunkSamples: Int  // interleaved stereo sample count per 10ms chunk
 
-    init(writer: WAVStreamWriter, sysGain: Float = 2.0, micGain: Float = 0.8, sampleRate: Int = 48_000, channels: Int = 2) {
+    init(writer: WAVStreamWriter, mode: MixMode = .stereoSeparated, sysGain: Float = 1.0, micGain: Float = 1.0, sampleRate: Int = 48_000, channels: Int = 2) {
         self.writer = writer
+        self.mode = mode
         self.sysGain = sysGain
         self.micGain = micGain
         // 10ms @ 48kHz => 480 frames. Stereo interleaved => 960 int16 samples.
         self.chunkSamples = (sampleRate / 100) * channels
 
+        logger.info("Mixer mode: \(mode.rawValue)")
         logger.info("Mixer gains: system=\(sysGain)x mic=\(micGain)x")
         logger.info("Mixer cadence: 10ms, chunkSamples=\(self.chunkSamples)")
 
@@ -85,14 +94,71 @@ final class AudioMixer {
     }
 
     private func mixOneChunkLocked(flush: Bool) {
+        switch mode {
+        case .stereoSeparated:
+            mixStereoSeparatedLocked(flush: flush)
+        case .monoMixed:
+            mixMonoMixedLocked(flush: flush)
+        }
+    }
+
+    /// Stereo separation: system audio → left channel, mic audio → right channel.
+    /// Input buffers are interleaved stereo (L,R,L,R…). We extract the left (even-index)
+    /// sample from each source as its mono signal and write them to separate output channels.
+    private func mixStereoSeparatedLocked(flush: Bool) {
+        // Available interleaved samples in each buffer
         let sysAvail = sys.count - sysRead
         let micAvail = mic.count - micRead
 
-        // If not flushing and there's nothing to output yet, do nothing.
         if !flush && sysAvail <= 0 && micAvail <= 0 { return }
 
-        // Always output a fixed-size chunk while running to keep playback smooth.
-        // On flush, output whatever remains.
+        // Work in frames (1 frame = 2 interleaved samples: L + R)
+        let outCount = flush ? max(sysAvail, micAvail) : chunkSamples
+        if outCount <= 0 { return }
+
+        // Ensure outCount is even (complete frames)
+        let frameAlignedCount = outCount & ~1
+        if frameAlignedCount <= 0 { return }
+
+        var out = Array(repeating: Int16(0), count: frameAlignedCount)
+
+        // Step through interleaved pairs: index 0,1 = frame 0 (L,R), index 2,3 = frame 1 (L,R), etc.
+        var i = 0
+        while i < frameAlignedCount {
+            // System → left channel (even index in output)
+            // Take the left sample (even index) from the interleaved system buffer
+            let sysL: Int16 = (i < sysAvail) ? sys[sysRead + i] : 0
+            out[i] = Self.applyGain(sysL, gain: self.sysGain)
+
+            // Mic → right channel (odd index in output)
+            // Take the left sample (even index) from the interleaved mic buffer as its mono signal
+            let micL: Int16 = (i < micAvail) ? mic[micRead + i] : 0
+            out[i + 1] = Self.applyGain(micL, gain: self.micGain)
+
+            i += 2
+        }
+
+        sysRead += min(frameAlignedCount, sysAvail)
+        micRead += min(frameAlignedCount, micAvail)
+
+        out.withUnsafeBufferPointer { buf in
+            do {
+                try self.writer.appendInterleavedInt16(buf)
+            } catch {
+                self.logger.error("Failed writing stereo-separated audio: \(error.localizedDescription)")
+            }
+        }
+
+        compactLocked(force: false)
+    }
+
+    /// Legacy mono mixing: sum system + mic into both channels (original behavior).
+    private func mixMonoMixedLocked(flush: Bool) {
+        let sysAvail = sys.count - sysRead
+        let micAvail = mic.count - micRead
+
+        if !flush && sysAvail <= 0 && micAvail <= 0 { return }
+
         let outCount = flush ? max(sysAvail, micAvail) : chunkSamples
         if outCount <= 0 { return }
 
@@ -115,7 +181,6 @@ final class AudioMixer {
             }
         }
 
-        // Consume what we actually read.
         sysRead += min(outCount, sysAvail)
         micRead += min(outCount, micAvail)
 
@@ -158,7 +223,8 @@ final class AudioMixer {
             return String(format: "%.1f", db)
         }
 
-        logger.info("Levels (peak dBFS): system=\(dbfs(sysPeak)) mic=\(dbfs(micPeak))")
+        let modeLabel = mode == .stereoSeparated ? "L=sys R=mic" : "mixed"
+        logger.info("Levels (\(modeLabel), peak dBFS): system=\(dbfs(sysPeak)) mic=\(dbfs(micPeak))")
         sysPeak = 0
         micPeak = 0
     }

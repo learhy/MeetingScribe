@@ -1147,11 +1147,18 @@ class MeetingScribeService {
             let outputDir = config.expandPath(config.config.audio.outputDirectory)
             try? FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
             
-            // Create StreamHandler
+            // Create StreamHandler with config-aware audio settings
+            let audioConfig = config.config.audio
+            let micEnabled = micPermissionGranted && audioConfig.microphoneEnabled
+            let mixMode = MixMode(rawValue: audioConfig.mixMode) ?? .stereoSeparated
+            
             audioCapture = StreamHandler(
                 application: app,
                 outputDir: outputDir,
-                micEnabled: micPermissionGranted
+                micEnabled: micEnabled,
+                mixMode: mixMode,
+                sysGain: Float(audioConfig.systemGain),
+                micGain: Float(audioConfig.micGain)
             )
             
             // Start capture

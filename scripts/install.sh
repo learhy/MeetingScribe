@@ -40,6 +40,7 @@ if [ "$INSTALL_MODE" = "system" ]; then
     sudo rm -rf "$APP_DEST"
     sudo cp -R "$APP_SRC" "$APP_DEST"
     sudo chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
+    sudo chmod -R a+rX "$APP_DEST/Contents/Resources/python"
 else
     mkdir -p "$APP_DEST_DIR"
     rm -rf "$APP_DEST"

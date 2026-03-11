@@ -44,6 +44,12 @@ echo "Copying Python bundle to app..."
 mkdir -p "$APP_DIR/Contents/Resources"
 cp -R build/python-bundle "$APP_DIR/Contents/Resources/python"
 
+# Normalize Python stdlib permissions — the python-build-standalone tarball
+# may contain files with restrictive modes (e.g. urllib/__init__.py at 600).
+# After first-run-installer.sh chowns the app bundle to root:wheel, the
+# current user would lose read access to those files.
+chmod -R a+rX "$APP_DIR/Contents/Resources/python"
+
 # Copy diarization script to Resources
 mkdir -p "$APP_DIR/Contents/Resources/scripts"
 cp scripts/diarize_audio_fast.py "$APP_DIR/Contents/Resources/scripts/"
