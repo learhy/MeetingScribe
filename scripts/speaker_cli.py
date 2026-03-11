@@ -449,6 +449,85 @@ def create_backup(db: SpeakerDatabase, json_mode: bool):
         print(f"✓ Backup created: {backup_path}")
 
 
+# =============================================================================
+# Contact Commands
+# =============================================================================
+
+def list_contacts(db: SpeakerDatabase, json_mode: bool):
+    """Show all contacts."""
+    contacts = db.get_all_contacts()
+    
+    if json_mode:
+        output([asdict(c) for c in contacts], json_mode)
+    else:
+        if not contacts:
+            print("No contacts in database.")
+            return
+        
+        print(f"\n{'Email':<35} {'Display Name':<25} {'Preferred':<15} {'Source':<10}")
+        print("-" * 90)
+        for c in contacts:
+            display = c.display_name or "(none)"
+            preferred = c.preferred_name or ""
+            print(f"{c.email:<35} {display:<25} {preferred:<15} {c.source:<10}")
+        print(f"\nTotal: {len(contacts)} contacts")
+
+
+def add_contact(db: SpeakerDatabase, email: str, json_mode: bool,
+               display_name: str = None, preferred_name: str = None,
+               pronunciation: str = None, aliases: list[str] = None,
+               role: str = None, team: str = None, source: str = 'manual'):
+    """Add or update a contact."""
+    db.upsert_contact(
+        email=email,
+        display_name=display_name,
+        preferred_name=preferred_name,
+        pronunciation=pronunciation,
+        aliases=aliases,
+        role=role,
+        team=team,
+        source=source
+    )
+    
+    if json_mode:
+        output({
+            'upserted': True,
+            'email': email,
+            'source': source
+        }, json_mode)
+    else:
+        print(f"\u2713 Contact {email} added/updated (source={source})")
+
+
+def delete_contact(db: SpeakerDatabase, email: str, json_mode: bool):
+    """Delete a contact."""
+    try:
+        db.delete_contact(email)
+        if json_mode:
+            output({'deleted': True, 'email': email}, json_mode)
+        else:
+            print(f"\u2713 Deleted contact {email}")
+    except ValueError as e:
+        error(str(e), json_mode)
+
+
+def associate_email(db: SpeakerDatabase, speaker_id: str, email: str, json_mode: bool):
+    """Associate an email address with a speaker."""
+    try:
+        db.associate_email(speaker_id, email)
+        
+        if json_mode:
+            output({
+                'associated': True,
+                'speaker_id': speaker_id,
+                'email': email
+            }, json_mode)
+        else:
+            print(f"\u2713 Associated email {email} with speaker {speaker_id}")
+    except ValueError as e:
+        error(str(e), json_mode)
+
+
 def export_speaker(db: SpeakerDatabase, speaker_id: str, json_mode: bool, output_path: Optional[str] = None):
     """Export speaker data (for GDPR compliance)."""
     try:
@@ -555,6 +634,40 @@ Examples:
     export_parser.add_argument('speaker_id', help="Speaker ID to export")
     export_parser.add_argument('--output', '-o', help="Output file path (default: stdout)")
     
+    # list-contacts
+    subparsers.add_parser('list-contacts', help="Show all contacts")
+    
+    # add-contact
+    add_contact_parser = subparsers.add_parser('add-contact', help="Add or update a contact")
+    add_contact_parser.add_argument('email', help="Contact email (primary key)")
+    add_contact_parser.add_argument('--name', dest='display_name', help="Full display name")
+    add_contact_parser.add_argument('--preferred-name', help="Preferred name / nickname")
+    add_contact_parser.add_argument('--pronunciation', help="Phonetic pronunciation guide")
+    add_contact_parser.add_argument('--aliases', nargs='*', help="Alias/misspelling variants")
+    add_contact_parser.add_argument('--role', help="Job title")
+    add_contact_parser.add_argument('--team', help="Department/team")
+    add_contact_parser.add_argument('--source', default='manual', choices=['manual', 'calendar', 'auto'],
+                                   help="Source of the contact (default: manual)")
+    
+    # update-contact (alias for add-contact)
+    update_contact_parser = subparsers.add_parser('update-contact', help="Update an existing contact")
+    update_contact_parser.add_argument('email', help="Contact email")
+    update_contact_parser.add_argument('--name', dest='display_name', help="Full display name")
+    update_contact_parser.add_argument('--preferred-name', help="Preferred name / nickname")
+    update_contact_parser.add_argument('--pronunciation', help="Phonetic pronunciation guide")
+    update_contact_parser.add_argument('--aliases', nargs='*', help="Alias/misspelling variants")
+    update_contact_parser.add_argument('--role', help="Job title")
+    update_contact_parser.add_argument('--team', help="Department/team")
+    
+    # delete-contact
+    del_contact_parser = subparsers.add_parser('delete-contact', help="Delete a contact")
+    del_contact_parser.add_argument('email', help="Contact email to delete")
+    
+    # associate-email
+    assoc_parser = subparsers.add_parser('associate-email', help="Associate an email with a speaker")
+    assoc_parser.add_argument('speaker_id', help="Speaker ID")
+    assoc_parser.add_argument('email', help="Email address to associate")
+    
     # Also support legacy 'show' command as alias for 'get-speaker'
     show_parser = subparsers.add_parser('show', help="Show details for a speaker (alias for get-speaker)")
     show_parser.add_argument('speaker_id', help="Speaker ID to show")
@@ -600,6 +713,23 @@ Examples:
             check_integrity(db, json_mode)
         elif args.command == 'backup':
             create_backup(db, json_mode)
+        elif args.command == 'list-contacts':
+            list_contacts(db, json_mode)
+        elif args.command in ('add-contact', 'update-contact'):
+            add_contact(
+                db, args.email, json_mode,
+                display_name=args.display_name,
+                preferred_name=args.preferred_name,
+                pronunciation=args.pronunciation,
+                aliases=args.aliases,
+                role=args.role,
+                team=getattr(args, 'team', None),
+                source=getattr(args, 'source', 'manual')
+            )
+        elif args.command == 'delete-contact':
+            delete_contact(db, args.email, json_mode)
+        elif args.command == 'associate-email':
+            associate_email(db, args.speaker_id, args.email, json_mode)
         elif args.command == 'export':
             export_speaker(db, args.speaker_id, json_mode, output_path=args.output)
     except Exception as e:

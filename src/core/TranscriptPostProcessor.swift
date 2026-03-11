@@ -40,6 +40,10 @@ class TranscriptPostProcessor {
     private var phoneticIndex = PhoneticIndex()
     private var indexBuilt = false
     
+    /// Optional KNOWN PEOPLE section to inject into the correction prompt.
+    /// Set before calling process() with contacts for current meeting participants.
+    var knownPeopleContext: String?
+    
     // Metrics for observability
     private(set) var lastProcessingLatency: TimeInterval = 0
     private(set) var lastCorrectionCount: Int = 0
@@ -71,13 +75,50 @@ class TranscriptPostProcessor {
     /// Rebuild the phonetic index from current glossary config
     func rebuildPhoneticIndex() {
         let glossaryConfig = config.config.transcription.glossary
-        if glossaryConfig.enabled && !glossaryConfig.entries.isEmpty {
-            phoneticIndex.build(from: glossaryConfig.entries)
+        let entries = config.glossaryEntries
+        if glossaryConfig.enabled && !entries.isEmpty {
+            phoneticIndex.build(from: entries)
             indexBuilt = true
-            logger.info("Phonetic index rebuilt with \(glossaryConfig.entries.count) entries")
+            logger.info("Phonetic index rebuilt with \(entries.count) entries")
         } else {
             indexBuilt = false
         }
+    }
+    
+    /// Format contacts as a KNOWN PEOPLE section for injection into the correction prompt.
+    /// Similar to formatGlossary() but for people names.
+    static func formatKnownPeople(_ contacts: [ContactInfo]) -> String {
+        guard !contacts.isEmpty else { return "" }
+        
+        let formatted = contacts.compactMap { contact -> String? in
+            guard let name = contact.bestName else { return nil }
+            
+            var parts: [String] = []
+            if let pronunciation = contact.pronunciation, !pronunciation.isEmpty {
+                parts.append("pronunciation: \(pronunciation)")
+            }
+            if let aliases = contact.aliases, !aliases.isEmpty {
+                parts.append("aliases: \(aliases.joined(separator: ", "))")
+            }
+            if let role = contact.role, !role.isEmpty {
+                parts.append("role: \(role)")
+            }
+            
+            if parts.isEmpty {
+                return name
+            } else {
+                return "\(name) (\(parts.joined(separator: "; ")))"
+            }
+        }.joined(separator: " | ")
+        
+        guard !formatted.isEmpty else { return "" }
+        
+        return """
+        
+        ## KNOWN PEOPLE (correct to these names when phonetically similar)
+        \(formatted)
+        
+        """
     }
     
     /// Format glossary entries for injection into prompt
@@ -119,11 +160,12 @@ class TranscriptPostProcessor {
     ) -> [AppConfiguration.Transcription.GlossaryEntry] {
         let startTime = Date()
         let glossaryConfig = config.config.transcription.glossary
+        let entries = config.glossaryEntries
         
         // If filtering disabled, return all entries (legacy behavior)
         guard glossaryConfig.filteringEnabled else {
-            logger.info("Glossary filtering disabled, using all \(glossaryConfig.entries.count) entries")
-            return glossaryConfig.entries
+            logger.info("Glossary filtering disabled, using all \(entries.count) entries")
+            return entries
         }
         
         // Tokenize and dedupe transcript words
@@ -227,6 +269,7 @@ class TranscriptPostProcessor {
     func process(transcript: String) async throws -> String {
         let postProcessingConfig = config.config.transcription.postProcessing
         let glossaryConfig = config.config.transcription.glossary
+        let glossaryEntries = config.glossaryEntries
         
         guard postProcessingConfig.enabled else {
             logger.info("Post-processing disabled, returning original transcript")
@@ -242,17 +285,23 @@ class TranscriptPostProcessor {
         
         // Build system prompt with optional glossary injection
         var systemPrompt = postProcessingConfig.systemPrompt
-        if glossaryConfig.enabled && !glossaryConfig.entries.isEmpty {
+        if glossaryConfig.enabled && !glossaryEntries.isEmpty {
             // Filter glossary to relevant terms for this transcript
             let filteredEntries = filterByTranscript(transcript, maxTokens: glossaryConfig.maxGlossaryTokens)
             
             if !filteredEntries.isEmpty {
                 let glossaryText = formatGlossary(filteredEntries)
                 systemPrompt = systemPrompt + glossaryText
-                logger.info("Injected \(filteredEntries.count) filtered glossary terms (from \(glossaryConfig.entries.count) total)")
+                logger.info("Injected \(filteredEntries.count) filtered glossary terms (from \(glossaryEntries.count) total)")
             } else {
                 logger.info("No relevant glossary terms found for this transcript")
             }
+        }
+        
+        // Inject KNOWN PEOPLE section if available
+        if let peopleContext = knownPeopleContext, !peopleContext.isEmpty {
+            systemPrompt = systemPrompt + peopleContext
+            logger.info("Injected KNOWN PEOPLE context into correction prompt")
         }
         
         // For shorter transcripts, process in one go

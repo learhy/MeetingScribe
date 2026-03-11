@@ -1,5 +1,6 @@
 """Unit tests for the speaker database module."""
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -57,7 +58,7 @@ class TestSpeakerDatabaseBasics(unittest.TestCase):
         embedding_model = self.db._get_metadata('embedding_model')
         embedding_dim = self.db._get_metadata('embedding_dim')
         
-        self.assertEqual(schema_version, '1')
+        self.assertEqual(schema_version, '2')
         self.assertEqual(embedding_model, 'speechbrain/spkrec-ecapa-voxceleb')
         self.assertEqual(embedding_dim, str(EMBEDDING_DIM))
 
@@ -489,6 +490,260 @@ class TestDatabaseMaintenance(unittest.TestCase):
         self.assertEqual(stats['named_speaker_count'], 1)
         self.assertEqual(stats['embedding_count'], 1)
         self.assertGreater(stats['db_size_mb'], 0)
+
+
+class TestContacts(unittest.TestCase):
+    """Test contacts CRUD operations."""
+    
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.temp_dir, "test_speaker.db")
+        self.db = SpeakerDatabase(self.db_path)
+    
+    def tearDown(self):
+        self.db.close()
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        for ext in ['-wal', '-shm']:
+            path = self.db_path + ext
+            if os.path.exists(path):
+                os.remove(path)
+        os.rmdir(self.temp_dir)
+    
+    def test_contacts_table_exists(self):
+        """Test that contacts table is created in schema v2."""
+        cursor = self.db.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+        )
+        self.assertIsNotNone(cursor.fetchone())
+    
+    def test_upsert_contact_insert(self):
+        """Test inserting a new contact."""
+        self.db.upsert_contact(
+            email='alice@example.com',
+            display_name='Alice Smith',
+            preferred_name='Alice',
+            pronunciation='AL-iss',
+            aliases=['Alicia'],
+            role='Engineer',
+            team='Platform',
+            source='manual'
+        )
+        
+        contact = self.db.get_contact('alice@example.com')
+        self.assertIsNotNone(contact)
+        self.assertEqual(contact.email, 'alice@example.com')
+        self.assertEqual(contact.display_name, 'Alice Smith')
+        self.assertEqual(contact.preferred_name, 'Alice')
+        self.assertEqual(contact.pronunciation, 'AL-iss')
+        self.assertEqual(contact.aliases, ['Alicia'])
+        self.assertEqual(contact.role, 'Engineer')
+        self.assertEqual(contact.team, 'Platform')
+        self.assertEqual(contact.source, 'manual')
+    
+    def test_upsert_contact_update(self):
+        """Test updating an existing contact."""
+        self.db.upsert_contact(email='bob@example.com', display_name='Bob')
+        self.db.upsert_contact(email='bob@example.com', display_name='Robert', role='Manager')
+        
+        contact = self.db.get_contact('bob@example.com')
+        self.assertEqual(contact.display_name, 'Robert')
+        self.assertEqual(contact.role, 'Manager')
+    
+    def test_calendar_never_overwrites_manual(self):
+        """Test that calendar-sourced updates cannot overwrite manual contacts."""
+        self.db.upsert_contact(
+            email='dan@example.com',
+            display_name='Dan Rohan',
+            preferred_name='Dan',
+            source='manual'
+        )
+        
+        # Attempt calendar overwrite
+        self.db.upsert_contact(
+            email='dan@example.com',
+            display_name='Daniel',
+            source='calendar'
+        )
+        
+        # Manual entry should be preserved
+        contact = self.db.get_contact('dan@example.com')
+        self.assertEqual(contact.display_name, 'Dan Rohan')
+        self.assertEqual(contact.preferred_name, 'Dan')
+        self.assertEqual(contact.source, 'manual')
+    
+    def test_get_all_contacts(self):
+        """Test retrieving all contacts."""
+        self.db.upsert_contact(email='a@x.com', display_name='Alice')
+        self.db.upsert_contact(email='b@x.com', display_name='Bob')
+        self.db.upsert_contact(email='c@x.com', display_name='Charlie')
+        
+        contacts = self.db.get_all_contacts()
+        self.assertEqual(len(contacts), 3)
+        names = {c.display_name for c in contacts}
+        self.assertEqual(names, {'Alice', 'Bob', 'Charlie'})
+    
+    def test_get_contacts_by_emails(self):
+        """Test filtering contacts by email list."""
+        self.db.upsert_contact(email='a@x.com', display_name='Alice')
+        self.db.upsert_contact(email='b@x.com', display_name='Bob')
+        self.db.upsert_contact(email='c@x.com', display_name='Charlie')
+        
+        result = self.db.get_contacts_by_emails(['a@x.com', 'c@x.com'])
+        self.assertEqual(len(result), 2)
+        emails = {c.email for c in result}
+        self.assertEqual(emails, {'a@x.com', 'c@x.com'})
+    
+    def test_get_contacts_by_emails_empty(self):
+        """Test that empty email list returns empty result."""
+        self.db.upsert_contact(email='a@x.com', display_name='Alice')
+        result = self.db.get_contacts_by_emails([])
+        self.assertEqual(len(result), 0)
+    
+    def test_delete_contact(self):
+        """Test deleting a contact."""
+        self.db.upsert_contact(email='delete@x.com', display_name='ToDelete')
+        self.assertIsNotNone(self.db.get_contact('delete@x.com'))
+        
+        self.db.delete_contact('delete@x.com')
+        self.assertIsNone(self.db.get_contact('delete@x.com'))
+    
+    def test_delete_contact_not_found(self):
+        """Test that deleting a nonexistent contact raises ValueError."""
+        with self.assertRaises(ValueError):
+            self.db.delete_contact('nonexistent@x.com')
+    
+    def test_associate_email(self):
+        """Test associating an email with a speaker."""
+        np.random.seed(42)
+        emb = np.random.randn(EMBEDDING_DIM).astype(np.float32)
+        speaker_id = self.db.create_speaker(emb, name='TestUser')
+        
+        # Initially no email
+        speaker = self.db.get_speaker(speaker_id)
+        self.assertIsNone(speaker.email)
+        
+        # Associate email
+        self.db.associate_email(speaker_id, 'test@example.com')
+        
+        speaker = self.db.get_speaker(speaker_id)
+        self.assertEqual(speaker.email, 'test@example.com')
+    
+    def test_associate_email_not_found(self):
+        """Test that associating email with nonexistent speaker raises ValueError."""
+        with self.assertRaises(ValueError):
+            self.db.associate_email('nonexistent-id', 'test@example.com')
+
+
+class TestSchemaMigration(unittest.TestCase):
+    """Test database schema migration."""
+    
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+    
+    def tearDown(self):
+        # Clean up all files in temp dir
+        for f in Path(self.temp_dir).glob('*'):
+            f.unlink()
+        # Clean up backups subdir if it exists
+        backup_dir = Path(self.temp_dir) / 'backups'
+        if backup_dir.exists():
+            for f in backup_dir.glob('*'):
+                f.unlink()
+            backup_dir.rmdir()
+        os.rmdir(self.temp_dir)
+    
+    def test_fresh_db_gets_schema_v2(self):
+        """Test that a freshly created database has schema version 2 with contacts."""
+        db_path = os.path.join(self.temp_dir, "fresh.db")
+        db = SpeakerDatabase(db_path)
+        
+        version = db._get_metadata('schema_version')
+        self.assertEqual(version, '2')
+        
+        # Verify contacts table exists
+        cursor = db.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+        )
+        self.assertIsNotNone(cursor.fetchone())
+        db.close()
+    
+    def test_v1_db_migrates_to_v2(self):
+        """Test that a v1 database migrates to v2 with contacts table."""
+        db_path = os.path.join(self.temp_dir, "v1.db")
+        
+        # Create a v1 database manually (without contacts table)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        # Create core tables only (no contacts)
+        conn.executescript("""
+            CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE speakers (
+                speaker_id TEXT PRIMARY KEY, name TEXT, name_confidence REAL,
+                email TEXT, centroid_embedding BLOB, embedding_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP, last_seen_at TIMESTAMP
+            );
+            CREATE TABLE speaker_embeddings (
+                embedding_id TEXT PRIMARY KEY, speaker_id TEXT,
+                embedding BLOB, audio_source TEXT, quality_score REAL, timestamp TIMESTAMP
+            );
+            CREATE TABLE prompt_cache (
+                cache_key TEXT PRIMARY KEY, known_speakers_key TEXT,
+                speaker_ids TEXT, unknown_speaker_count INTEGER,
+                prompt_text TEXT, vocabulary_terms TEXT,
+                created_at TIMESTAMP, last_used_at TIMESTAMP,
+                use_count INTEGER DEFAULT 1, base_confidence REAL, last_quality_score REAL
+            );
+            CREATE TABLE speaker_terms (
+                speaker_id TEXT, term TEXT, category TEXT, frequency INTEGER DEFAULT 1,
+                last_seen_at TIMESTAMP, PRIMARY KEY (speaker_id, term)
+            );
+            CREATE TABLE speaker_term_cooccurrence (
+                speaker_id TEXT, term TEXT, cooccurring_speaker_id TEXT,
+                frequency INTEGER DEFAULT 1, last_seen_at TIMESTAMP,
+                PRIMARY KEY (speaker_id, term, cooccurring_speaker_id)
+            );
+            CREATE TABLE pending_name_associations (
+                suggestion_id TEXT PRIMARY KEY, speaker_id TEXT,
+                suggested_name TEXT, source TEXT, confidence REAL,
+                context TEXT, created_at TIMESTAMP, status TEXT DEFAULT 'pending'
+            );
+        """)
+        conn.execute("INSERT INTO metadata (key, value) VALUES ('schema_version', '1')")
+        conn.execute("INSERT INTO metadata (key, value) VALUES ('embedding_model', 'speechbrain/spkrec-ecapa-voxceleb')")
+        conn.execute("INSERT INTO metadata (key, value) VALUES ('embedding_dim', '192')")
+        # Insert a speaker to verify data survives migration
+        conn.execute(
+            "INSERT INTO speakers (speaker_id, name, embedding_count, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)",
+            ('test-speaker-001', 'PreExisting', 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00')
+        )
+        conn.commit()
+        conn.close()
+        
+        # Open with SpeakerDatabase — should trigger migration
+        db = SpeakerDatabase(db_path)
+        
+        # Verify migration happened
+        self.assertEqual(db._get_metadata('schema_version'), '2')
+        
+        # Verify contacts table was created
+        cursor = db.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+        )
+        self.assertIsNotNone(cursor.fetchone())
+        
+        # Verify pre-existing data survived
+        speaker = db.get_speaker('test-speaker-001')
+        self.assertIsNotNone(speaker)
+        self.assertEqual(speaker.name, 'PreExisting')
+        
+        # Verify contacts work after migration
+        db.upsert_contact(email='post-migration@x.com', display_name='Migrated')
+        contact = db.get_contact('post-migration@x.com')
+        self.assertIsNotNone(contact)
+        self.assertEqual(contact.display_name, 'Migrated')
+        
+        db.close()
 
 
 if __name__ == '__main__':

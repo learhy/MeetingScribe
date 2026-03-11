@@ -91,6 +91,197 @@ final class TranscriptPostProcessorTests: XCTestCase {
     }
 }
 
+// MARK: - Known People Formatting Tests
+
+final class KnownPeopleFormattingTests: XCTestCase {
+    
+    func testFormatKnownPeople_WithFullContacts() throws {
+        let contacts = [
+            ContactInfo(email: "pradeep@ibm.com", displayName: "Pradeep Sekar",
+                       preferredName: "Pradeep", pronunciation: "prah-DEEP",
+                       aliases: ["product", "pretty"], role: "Staff Engineer",
+                       team: "Platform", source: "manual")
+        ]
+        
+        let formatted = TranscriptPostProcessor.formatKnownPeople(contacts)
+        
+        XCTAssertTrue(formatted.contains("KNOWN PEOPLE"))
+        XCTAssertTrue(formatted.contains("Pradeep"))
+        XCTAssertTrue(formatted.contains("pronunciation: prah-DEEP"))
+        XCTAssertTrue(formatted.contains("aliases: product, pretty"))
+        XCTAssertTrue(formatted.contains("role: Staff Engineer"))
+    }
+    
+    func testFormatKnownPeople_WithMinimalContacts() throws {
+        let contacts = [
+            ContactInfo(email: "dan@ibm.com", displayName: "Dan Rohan",
+                       preferredName: nil, pronunciation: nil, aliases: nil,
+                       role: nil, team: nil, source: "calendar")
+        ]
+        
+        let formatted = TranscriptPostProcessor.formatKnownPeople(contacts)
+        
+        XCTAssertTrue(formatted.contains("KNOWN PEOPLE"))
+        XCTAssertTrue(formatted.contains("Dan Rohan"))
+        // No parens for a contact with no metadata
+        XCTAssertFalse(formatted.contains("Dan Rohan ("))
+    }
+    
+    func testFormatKnownPeople_EmptyArray() throws {
+        let formatted = TranscriptPostProcessor.formatKnownPeople([])
+        XCTAssertTrue(formatted.isEmpty)
+    }
+    
+    func testFormatKnownPeople_ContactWithoutName() throws {
+        // Contact with only email, no display_name or preferred_name
+        let contacts = [
+            ContactInfo(email: "noname@ibm.com", displayName: nil,
+                       preferredName: nil, pronunciation: nil, aliases: nil,
+                       role: nil, team: nil, source: "calendar")
+        ]
+        
+        let formatted = TranscriptPostProcessor.formatKnownPeople(contacts)
+        
+        // No name available → should produce empty output
+        XCTAssertTrue(formatted.isEmpty)
+    }
+    
+    func testFormatKnownPeople_MultipleContacts() throws {
+        let contacts = [
+            ContactInfo(email: "a@x.com", displayName: "Alice",
+                       preferredName: nil, pronunciation: nil, aliases: nil,
+                       role: nil, team: nil, source: "manual"),
+            ContactInfo(email: "b@x.com", displayName: "Bob",
+                       preferredName: nil, pronunciation: nil, aliases: nil,
+                       role: "PM", team: nil, source: "calendar")
+        ]
+        
+        let formatted = TranscriptPostProcessor.formatKnownPeople(contacts)
+        
+        XCTAssertTrue(formatted.contains("Alice"))
+        XCTAssertTrue(formatted.contains("Bob (role: PM)"))
+        XCTAssertTrue(formatted.contains(" | "), "Multiple contacts should be pipe-separated")
+    }
+}
+
+// MARK: - Model Decoding Tests
+
+final class PeoplePipelineDecodingTests: XCTestCase {
+    
+    func testContactInfoDecoding() throws {
+        let json = """
+        {
+            "email": "alice@example.com",
+            "display_name": "Alice Smith",
+            "preferred_name": "Alice",
+            "pronunciation": "AL-iss",
+            "aliases": ["Alicia"],
+            "role": "Engineer",
+            "team": "Platform",
+            "source": "manual"
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let contact = try JSONDecoder().decode(ContactInfo.self, from: data)
+        
+        XCTAssertEqual(contact.email, "alice@example.com")
+        XCTAssertEqual(contact.displayName, "Alice Smith")
+        XCTAssertEqual(contact.preferredName, "Alice")
+        XCTAssertEqual(contact.pronunciation, "AL-iss")
+        XCTAssertEqual(contact.aliases, ["Alicia"])
+        XCTAssertEqual(contact.role, "Engineer")
+        XCTAssertEqual(contact.team, "Platform")
+        XCTAssertEqual(contact.bestName, "Alice")  // preferred_name takes priority
+    }
+    
+    func testContactInfoDecoding_MinimalFields() throws {
+        let json = """
+        {
+            "email": "bob@example.com",
+            "display_name": null,
+            "preferred_name": null,
+            "pronunciation": null,
+            "aliases": null,
+            "role": null,
+            "team": null,
+            "source": "calendar"
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let contact = try JSONDecoder().decode(ContactInfo.self, from: data)
+        
+        XCTAssertEqual(contact.email, "bob@example.com")
+        XCTAssertNil(contact.displayName)
+        XCTAssertNil(contact.bestName)
+        XCTAssertEqual(contact.source, "calendar")
+    }
+    
+    func testSpeakerIdentityDecoding() throws {
+        let json = """
+        {
+            "speaker_id": "abc-123",
+            "name": "Dan",
+            "confidence": 0.92
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let identity = try JSONDecoder().decode(SpeakerIdentity.self, from: data)
+        
+        XCTAssertEqual(identity.speakerId, "abc-123")
+        XCTAssertEqual(identity.name, "Dan")
+        XCTAssertEqual(identity.confidence, 0.92, accuracy: 0.001)
+    }
+    
+    func testDiarizedTranscriptDecoding_WithSpeakerMap() throws {
+        let json = """
+        {
+            "segments": [],
+            "speakers": ["SPEAKER_00", "SPEAKER_01"],
+            "num_speakers": 2,
+            "audio_file": "/tmp/test.wav",
+            "speaker_map": {
+                "SPEAKER_00": {"speaker_id": "id-1", "name": "Dan", "confidence": 0.95},
+                "SPEAKER_01": null
+            }
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let transcript = try JSONDecoder().decode(DiarizedTranscript.self, from: data)
+        
+        XCTAssertNotNil(transcript.speakerMap)
+        XCTAssertEqual(transcript.speakerMap?.count, 2)
+        
+        let speaker0 = transcript.speakerMap?["SPEAKER_00"]
+        XCTAssertNotNil(speaker0 as Any?)  // Optional<Optional<SpeakerIdentity>>
+        XCTAssertEqual(speaker0??.name, "Dan")
+        
+        let speaker1 = transcript.speakerMap?["SPEAKER_01"]
+        XCTAssertNotNil(speaker1 as Any?)  // Key exists
+        XCTAssertNil(speaker1 as? SpeakerIdentity)  // But value is nil
+    }
+    
+    func testDiarizedTranscriptDecoding_WithoutSpeakerMap() throws {
+        let json = """
+        {
+            "segments": [],
+            "speakers": ["SPEAKER_00"],
+            "num_speakers": 1,
+            "audio_file": "/tmp/test.wav"
+        }
+        """
+        
+        let data = json.data(using: .utf8)!
+        let transcript = try JSONDecoder().decode(DiarizedTranscript.self, from: data)
+        
+        XCTAssertNil(transcript.speakerMap, "speakerMap should be nil when absent from JSON")
+        XCTAssertEqual(transcript.numSpeakers, 1)
+    }
+}
+
 // MARK: - Glossary-Disabled Behavior (Regression Tests)
 
 final class GlossaryDisabledRegressionTests: XCTestCase {

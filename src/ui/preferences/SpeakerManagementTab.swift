@@ -773,7 +773,13 @@ class SpeakerManagementTab: BasePreferencesTab, NSTableViewDelegate, NSTableView
         // Update speakers tab
         applyFilter()
         speakersTableView.reloadData()
-        speakersCountLabel.stringValue = "\(filteredSpeakers.count) of \(service.speakers.count) speakers"
+        if service.speakers.isEmpty {
+            speakersCountLabel.stringValue = "Record a meeting to start building your speaker database"
+            speakersCountLabel.textColor = .tertiaryLabelColor
+        } else {
+            speakersCountLabel.stringValue = "\(filteredSpeakers.count) of \(service.speakers.count) speakers"
+            speakersCountLabel.textColor = .secondaryLabelColor
+        }
         updateSpeakerButtons()
         
         // Update stats tab

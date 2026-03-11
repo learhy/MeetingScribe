@@ -18,6 +18,7 @@ import numpy as np
 
 from term_types import (
     CachedPrompt,
+    Contact,
     PendingNameSuggestion,
     Speaker,
     SpeakerDBError,
@@ -32,7 +33,7 @@ CURRENT_EMBEDDING_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 EMBEDDING_DIM = 192
 
 # Database schema version for migrations
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # SQL schema
 SCHEMA_SQL = """
@@ -111,6 +112,20 @@ CREATE TABLE IF NOT EXISTS pending_name_associations (
     status TEXT DEFAULT 'pending'
 );
 
+-- Contacts: people metadata linked to speakers via email
+CREATE TABLE IF NOT EXISTS contacts (
+    email TEXT PRIMARY KEY,
+    display_name TEXT,
+    preferred_name TEXT,
+    pronunciation TEXT,
+    aliases TEXT,
+    role TEXT,
+    team TEXT,
+    source TEXT DEFAULT 'manual',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Required indexes for performance
 CREATE INDEX IF NOT EXISTS idx_speaker_embeddings_speaker ON speaker_embeddings(speaker_id);
 CREATE INDEX IF NOT EXISTS idx_speaker_embeddings_timestamp ON speaker_embeddings(timestamp);
@@ -119,6 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_prompt_cache_known_speakers ON prompt_cache(known
 CREATE INDEX IF NOT EXISTS idx_speakers_last_seen ON speakers(last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_pending_names_status ON pending_name_associations(status);
 CREATE INDEX IF NOT EXISTS idx_speaker_terms_speaker ON speaker_terms(speaker_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_display_name ON contacts(display_name);
 """
 
 
@@ -181,7 +197,7 @@ class SpeakerDatabase:
         self.conn.commit()
     
     def _validate_or_migrate(self):
-        """Check embedding model compatibility, migrate or warn if mismatch."""
+        """Check embedding model compatibility and run schema migrations."""
         stored_model = self._get_metadata('embedding_model')
         stored_dim = self._get_metadata('embedding_dim')
         
@@ -197,6 +213,38 @@ class SpeakerDatabase:
                 f"Embedding dimension mismatch: DB has {stored_dim}, "
                 f"current is {EMBEDDING_DIM}. Database reset required."
             )
+        
+        # Run schema migrations
+        stored_version = int(self._get_metadata('schema_version') or '1')
+        if stored_version < SCHEMA_VERSION:
+            self._run_migrations(stored_version)
+    
+    def _run_migrations(self, from_version: int):
+        """Run schema migrations from from_version to SCHEMA_VERSION."""
+        logger.info(f"Migrating database schema from v{from_version} to v{SCHEMA_VERSION}")
+        
+        if from_version < 2:
+            # v1 → v2: Add contacts table
+            self.conn.executescript("""
+                CREATE TABLE IF NOT EXISTS contacts (
+                    email TEXT PRIMARY KEY,
+                    display_name TEXT,
+                    preferred_name TEXT,
+                    pronunciation TEXT,
+                    aliases TEXT,
+                    role TEXT,
+                    team TEXT,
+                    source TEXT DEFAULT 'manual',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_contacts_display_name ON contacts(display_name);
+            """)
+            logger.info("Migration v1→v2: Added contacts table")
+        
+        self._set_metadata('schema_version', str(SCHEMA_VERSION))
+        self.conn.commit()
+        logger.info(f"Database schema migrated to v{SCHEMA_VERSION}")
     
     def close(self):
         """Close database connection."""
@@ -952,6 +1000,30 @@ class SpeakerDatabase:
         self.conn.commit()
         logger.info(f"Set name for speaker {speaker_id}: {name} (source={source}, confidence={confidence})")
     
+    def associate_email(self, speaker_id: str, email: str):
+        """Associate an email address with a speaker.
+        
+        Args:
+            speaker_id: Speaker to associate email with
+            email: Email address to associate
+        
+        Raises:
+            ValueError: If speaker not found
+        """
+        cursor = self.conn.execute(
+            "SELECT speaker_id FROM speakers WHERE speaker_id = ?",
+            (speaker_id,)
+        )
+        if not cursor.fetchone():
+            raise ValueError(f"Speaker {speaker_id} not found")
+        
+        self.conn.execute(
+            "UPDATE speakers SET email = ? WHERE speaker_id = ?",
+            (email, speaker_id)
+        )
+        self.conn.commit()
+        logger.info(f"Associated email {email} with speaker {speaker_id}")
+    
     def get_embeddings(self, speaker_id: str) -> list[dict]:
         """Get all embeddings for a speaker.
         
@@ -979,6 +1051,154 @@ class SpeakerDatabase:
             }
             for row in cursor.fetchall()
         ]
+    
+    # =========================================================================
+    # Contacts
+    # =========================================================================
+    
+    def upsert_contact(
+        self,
+        email: str,
+        display_name: Optional[str] = None,
+        preferred_name: Optional[str] = None,
+        pronunciation: Optional[str] = None,
+        aliases: Optional[list[str]] = None,
+        role: Optional[str] = None,
+        team: Optional[str] = None,
+        source: str = 'manual'
+    ):
+        """Insert or update a contact.
+        
+        Calendar-sourced contacts never overwrite manual entries.
+        
+        Args:
+            email: Contact email (primary key)
+            display_name: Full name
+            preferred_name: First name or nickname
+            pronunciation: Phonetic guide
+            aliases: List of misspellings/variations
+            role: Job title
+            team: Department
+            source: 'manual', 'calendar', or 'auto'
+        """
+        now = datetime.utcnow().isoformat()
+        aliases_json = json.dumps(aliases) if aliases else None
+        
+        # Check if contact exists and its source
+        cursor = self.conn.execute(
+            "SELECT source FROM contacts WHERE email = ?",
+            (email,)
+        )
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Never overwrite manual entries with calendar data
+            if existing['source'] == 'manual' and source == 'calendar':
+                logger.debug(f"Skipping calendar update for manual contact {email}")
+                return
+            
+            # Update existing contact (only non-None fields)
+            updates = []
+            params = []
+            if display_name is not None:
+                updates.append("display_name = ?")
+                params.append(display_name)
+            if preferred_name is not None:
+                updates.append("preferred_name = ?")
+                params.append(preferred_name)
+            if pronunciation is not None:
+                updates.append("pronunciation = ?")
+                params.append(pronunciation)
+            if aliases_json is not None:
+                updates.append("aliases = ?")
+                params.append(aliases_json)
+            if role is not None:
+                updates.append("role = ?")
+                params.append(role)
+            if team is not None:
+                updates.append("team = ?")
+                params.append(team)
+            
+            updates.append("updated_at = ?")
+            params.append(now)
+            params.append(email)
+            
+            if updates:
+                self.conn.execute(
+                    f"UPDATE contacts SET {', '.join(updates)} WHERE email = ?",
+                    params
+                )
+        else:
+            # Insert new contact
+            self.conn.execute(
+                """
+                INSERT INTO contacts (email, display_name, preferred_name, pronunciation,
+                    aliases, role, team, source, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (email, display_name, preferred_name, pronunciation,
+                 aliases_json, role, team, source, now, now)
+            )
+        
+        self.conn.commit()
+    
+    def get_contact(self, email: str) -> Optional[Contact]:
+        """Get a contact by email."""
+        cursor = self.conn.execute(
+            "SELECT * FROM contacts WHERE email = ?",
+            (email,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return self._row_to_contact(row)
+    
+    def get_all_contacts(self) -> list[Contact]:
+        """Get all contacts."""
+        cursor = self.conn.execute(
+            "SELECT * FROM contacts ORDER BY display_name, email"
+        )
+        return [self._row_to_contact(row) for row in cursor.fetchall()]
+    
+    def delete_contact(self, email: str):
+        """Delete a contact by email."""
+        cursor = self.conn.execute(
+            "SELECT email FROM contacts WHERE email = ?",
+            (email,)
+        )
+        if not cursor.fetchone():
+            raise ValueError(f"Contact {email} not found")
+        
+        self.conn.execute("DELETE FROM contacts WHERE email = ?", (email,))
+        self.conn.commit()
+    
+    def get_contacts_by_emails(self, emails: list[str]) -> list[Contact]:
+        """Get contacts for a list of emails (for meeting participant lookup)."""
+        if not emails:
+            return []
+        placeholders = ','.join('?' * len(emails))
+        cursor = self.conn.execute(
+            f"SELECT * FROM contacts WHERE email IN ({placeholders})",
+            emails
+        )
+        return [self._row_to_contact(row) for row in cursor.fetchall()]
+    
+    def _row_to_contact(self, row: sqlite3.Row) -> Contact:
+        """Convert database row to Contact."""
+        aliases_raw = row['aliases']
+        aliases = json.loads(aliases_raw) if aliases_raw else None
+        return Contact(
+            email=row['email'],
+            display_name=row['display_name'],
+            preferred_name=row['preferred_name'],
+            pronunciation=row['pronunciation'],
+            aliases=aliases,
+            role=row['role'],
+            team=row['team'],
+            source=row['source'],
+            created_at=row['created_at'],
+            updated_at=row['updated_at']
+        )
     
     # =========================================================================
     # Statistics and Maintenance

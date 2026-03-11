@@ -1,12 +1,14 @@
 import AppKit
 
-class DetectionTab: BasePreferencesTab {
+class DetectionTab: BasePreferencesTab, NSTextFieldDelegate {
     override var tabName: String { "Detection" }
     
     private var pollIntervalField: NSTextField!
     private var confidenceSlider: NSSlider!
     private var confidenceField: NSTextField!
     private var debounceField: NSTextField!
+    private var pollErrorLabel: NSTextField!
+    private var debounceErrorLabel: NSTextField!
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -35,6 +37,7 @@ class DetectionTab: BasePreferencesTab {
         
         pollIntervalField = NSTextField(frame: NSRect(x: 210, y: yPos, width: 60, height: 22))
         pollIntervalField.placeholderString = "2"
+        pollIntervalField.delegate = self
         pollIntervalField.target = self
         pollIntervalField.action = #selector(textFieldChanged)
         addSubview(pollIntervalField)
@@ -44,7 +47,14 @@ class DetectionTab: BasePreferencesTab {
         pollHelp.textColor = .secondaryLabelColor
         pollHelp.frame = NSRect(x: 280, y: yPos + 2, width: 290, height: 20)
         addSubview(pollHelp)
-        yPos -= 40
+        yPos -= 18
+        
+        pollErrorLabel = NSTextField(labelWithString: "")
+        pollErrorLabel.font = NSFont.systemFont(ofSize: 10)
+        pollErrorLabel.textColor = .systemRed
+        pollErrorLabel.frame = NSRect(x: 210, y: yPos, width: 350, height: 14)
+        addSubview(pollErrorLabel)
+        yPos -= 22
         
         // Confidence Threshold
         let confidenceLabel = NSTextField(labelWithString: "Confidence Threshold (%):")
@@ -82,6 +92,7 @@ class DetectionTab: BasePreferencesTab {
         
         debounceField = NSTextField(frame: NSRect(x: 210, y: yPos, width: 60, height: 22))
         debounceField.placeholderString = "2"
+        debounceField.delegate = self
         debounceField.target = self
         debounceField.action = #selector(textFieldChanged)
         addSubview(debounceField)
@@ -91,6 +102,45 @@ class DetectionTab: BasePreferencesTab {
         debounceHelp.textColor = .secondaryLabelColor
         debounceHelp.frame = NSRect(x: 280, y: yPos + 2, width: 290, height: 20)
         addSubview(debounceHelp)
+        yPos -= 18
+        
+        debounceErrorLabel = NSTextField(labelWithString: "")
+        debounceErrorLabel.font = NSFont.systemFont(ofSize: 10)
+        debounceErrorLabel.textColor = .systemRed
+        debounceErrorLabel.frame = NSRect(x: 210, y: yPos, width: 350, height: 14)
+        addSubview(debounceErrorLabel)
+    }
+    
+    // MARK: - Inline Validation
+    
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let field = obj.object as? NSTextField else { return }
+        if field === pollIntervalField {
+            validatePollInterval()
+        } else if field === debounceField {
+            validateDebounce()
+        }
+        markDirty()
+    }
+    
+    private func validatePollInterval() {
+        if let value = Double(pollIntervalField.stringValue), value >= 1.0 {
+            pollErrorLabel.stringValue = ""
+        } else if pollIntervalField.stringValue.isEmpty {
+            pollErrorLabel.stringValue = ""
+        } else {
+            pollErrorLabel.stringValue = "Must be at least 1 second"
+        }
+    }
+    
+    private func validateDebounce() {
+        if let value = Int(debounceField.stringValue), value >= 1 {
+            debounceErrorLabel.stringValue = ""
+        } else if debounceField.stringValue.isEmpty {
+            debounceErrorLabel.stringValue = ""
+        } else {
+            debounceErrorLabel.stringValue = "Must be at least 1"
+        }
     }
     
     @objc private func textFieldChanged() {

@@ -108,6 +108,8 @@ class SmartPromptResult:
     new_speakers_created: int = 0            # Count of new speaker entries
     prompt_token_count: int = 0              # Tokens used in initial_prompt
     vocab_term_count: int = 0                # Terms written to vocabulary file
+    cache_key: Optional[str] = None          # Cache key used (for quality feedback)
+    speaker_label_map: Optional[dict[str, Optional[str]]] = None  # SPEAKER_XX → speaker_id (for JSON output)
 
 
 @dataclass
@@ -125,6 +127,27 @@ class MatchResult:
     matched: list[SpeakerMatch]
     unknown: list  # List of embeddings with no confident match (np.ndarray)
     ambiguous: list[SpeakerMatch]  # Matches with low confidence gap
+
+
+@dataclass
+class IndexedMatchResult:
+    """Match result that preserves the mapping from cluster index to speaker identity.
+    
+    Each key in `speaker_map` corresponds to a cluster label (e.g., 0 for SPEAKER_00).
+    Values are SpeakerMatch for confident/ambiguous matches, or None for unknown speakers.
+    """
+    speaker_map: dict[int, Optional[SpeakerMatch]]  # cluster_index → match or None
+    matched: list[SpeakerMatch]        # Confident matches (for backward compat)
+    unknown: list                       # Unknown embeddings (np.ndarray)
+    ambiguous: list[SpeakerMatch]       # Ambiguous matches
+    
+    def to_match_result(self) -> MatchResult:
+        """Convert to legacy MatchResult for backward compatibility."""
+        return MatchResult(
+            matched=self.matched,
+            unknown=self.unknown,
+            ambiguous=self.ambiguous
+        )
 
 
 @dataclass
@@ -175,6 +198,21 @@ class PendingNameSuggestion:
     context: Optional[str]
     created_at: str
     status: str  # 'pending', 'accepted', 'rejected'
+
+
+@dataclass
+class Contact:
+    """Contact entry for people metadata."""
+    email: str
+    display_name: Optional[str]
+    preferred_name: Optional[str]
+    pronunciation: Optional[str]
+    aliases: Optional[list[str]]  # Stored as JSON in DB
+    role: Optional[str]
+    team: Optional[str]
+    source: str  # 'manual', 'calendar', 'auto'
+    created_at: str
+    updated_at: str
 
 
 # Custom exceptions

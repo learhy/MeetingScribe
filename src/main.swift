@@ -689,12 +689,17 @@ class MeetingScribeService {
             var participantContext: String? = nil
             var calendarMeetingTitle: String? = nil
             var attendeesList: String = ""
+            var resolvedParticipants: MeetingParticipants? = nil
             
             if let participants = participantResolver.resolveParticipants(
                 recordingStart: startTime,
                 recordingEnd: recordingEnd
             ) {
-                participantContext = participants.formatForLLMContext()
+                resolvedParticipants = participants
+                
+                // Fetch contacts for enhanced participant names/roles
+                let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: participants.attendeeEmails)
+                participantContext = participants.formatForLLMContext(contacts: contacts.isEmpty ? nil : contacts)
                 calendarMeetingTitle = participants.meetingTitle
                 
                 let allNames = [participants.myFirstName] + participants.attendeeFirstNames
@@ -704,12 +709,16 @@ class MeetingScribeService {
                 if let title = calendarMeetingTitle {
                     logger.info("Calendar meeting title: \(title)")
                 }
+                
+                // Auto-populate contacts from calendar attendees
+                SpeakerDatabaseService.shared.populateContactsFromParticipants(participants)
             } else {
                 logger.info("No participant context available for this recording")
             }
             
             // 2. Transcribe
             logger.info("Starting transcription...")
+            transcriptionService.participantEmails = resolvedParticipants?.attendeeEmails
             let transcript = try await transcriptionService.transcribe(audioFileURL: fileURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
             
@@ -1015,12 +1024,17 @@ class MeetingScribeService {
             var participantContext: String? = nil
             var calendarMeetingTitle: String? = nil
             var attendeesList: String = ""
+            var resolvedParticipants: MeetingParticipants? = nil
             
             if let participants = participantResolver.resolveParticipants(
                 recordingStart: startTime,
                 recordingEnd: recordingEnd
             ) {
-                participantContext = participants.formatForLLMContext()
+                resolvedParticipants = participants
+                
+                // Fetch contacts for enhanced participant names/roles
+                let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: participants.attendeeEmails)
+                participantContext = participants.formatForLLMContext(contacts: contacts.isEmpty ? nil : contacts)
                 calendarMeetingTitle = participants.meetingTitle
                 
                 // Format attendees list for template
@@ -1031,15 +1045,29 @@ class MeetingScribeService {
                 if let title = calendarMeetingTitle {
                     logger.info("Calendar meeting title: \(title)")
                 }
+                
+                // Auto-populate contacts from calendar attendees
+                SpeakerDatabaseService.shared.populateContactsFromParticipants(participants)
             } else {
                 logger.info("No participant context available for this recording")
             }
             
             // 2. Transcribe
             logger.info("Starting transcription...")
+            transcriptionService.participantEmails = resolvedParticipants?.attendeeEmails
             let audioURL = URL(fileURLWithPath: audioFilePath)
             let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
+            
+            // 2b. Cross-reference speaker identities with calendar participants
+            if let diarized = transcriptionService.lastDiarizedResult,
+               let speakerMap = diarized.speakerMap,
+               let participants = resolvedParticipants {
+                SpeakerDatabaseService.shared.crossReferenceSpeakerMap(
+                    speakerMap: speakerMap,
+                    participants: participants
+                )
+            }
             
             // 3. Generate notes with participant context
             logger.info("Generating notes...")

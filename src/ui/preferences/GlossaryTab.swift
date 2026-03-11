@@ -238,19 +238,34 @@ class GlossaryTab: BasePreferencesTab, NSTableViewDelegate, NSTableViewDataSourc
             return
         }
         
+        let count = entries.count
+        
         let alert = NSAlert()
-        alert.messageText = "Delete All Entries?"
-        alert.informativeText = "Are you sure you want to delete all \(entries.count) glossary entries? This cannot be undone."
-        alert.alertStyle = .warning
+        alert.messageText = "Permanently delete all \(count) entries?"
+        alert.informativeText = "Type \"delete\" to confirm. This cannot be undone."
+        alert.alertStyle = .critical
         alert.addButton(withTitle: "Delete All")
         alert.addButton(withTitle: "Cancel")
         
-        if alert.runModal() == .alertFirstButtonReturn {
-            entries.removeAll()
-            applyFilter()
-            tableView.reloadData()
-            updateCountLabel()
-            markDirty()
+        let confirmField = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        confirmField.placeholderString = "Type \"delete\" to confirm"
+        alert.accessoryView = confirmField
+        
+        // Disable the Delete All button initially
+        alert.buttons[0].isEnabled = false
+        
+        // Use a simple approach: run modal, then check the text
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn || confirmField.stringValue.lowercased().trimmingCharacters(in: .whitespaces) == "delete" {
+            if confirmField.stringValue.lowercased().trimmingCharacters(in: .whitespaces) == "delete" {
+                entries.removeAll()
+                applyFilter()
+                tableView.reloadData()
+                updateCountLabel()
+                markDirty()
+            } else {
+                showAlert(title: "Not Deleted", message: "You must type \"delete\" to confirm.")
+            }
         }
     }
     
@@ -507,8 +522,13 @@ class GlossaryTab: BasePreferencesTab, NSTableViewDelegate, NSTableViewDataSourc
     
     private func updateCountLabel() {
         let count = entries.count
-        countLabel.stringValue = "\(count) / \(maxSize) terms"
-        countLabel.textColor = count >= maxSize ? .systemRed : .secondaryLabelColor
+        if count == 0 && enabledCheckbox.state == .off {
+            countLabel.stringValue = "Import a glossary or add terms to improve transcription accuracy"
+            countLabel.textColor = .tertiaryLabelColor
+        } else {
+            countLabel.stringValue = "\(count) / \(maxSize) terms"
+            countLabel.textColor = count >= maxSize ? .systemRed : .secondaryLabelColor
+        }
         updateFilteringInfoLabel()
     }
     
@@ -582,7 +602,7 @@ class GlossaryTab: BasePreferencesTab, NSTableViewDelegate, NSTableViewDataSourc
     
     override func loadConfig(_ config: AppConfiguration) {
         enabledCheckbox.state = config.transcription.glossary.enabled ? .on : .off
-        entries = config.transcription.glossary.entries
+        entries = ConfigManager.shared.glossaryEntries
         maxSize = config.transcription.glossary.maxSize
         applyFilter()
         tableView.reloadData()
@@ -597,7 +617,8 @@ class GlossaryTab: BasePreferencesTab, NSTableViewDelegate, NSTableViewDataSourc
     
     override func collectChanges(into config: inout AppConfiguration) {
         config.transcription.glossary.enabled = enabledCheckbox.state == .on
-        config.transcription.glossary.entries = entries
         config.transcription.glossary.maxSize = maxSize
+        // Entries are saved separately to glossary.json
+        ConfigManager.shared.updateGlossaryEntries(entries)
     }
 }

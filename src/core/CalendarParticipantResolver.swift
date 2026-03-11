@@ -18,19 +18,54 @@ struct MeetingParticipants {
     let attendeeFirstNames: [String]
     let participants: [Participant]  // Enhanced mapping with roles
     
-    /// Format participant information for LLM context injection
-    func formatForLLMContext() -> String {
+    /// Format participant information for LLM context injection.
+    /// When contacts are provided, uses preferred/display names and includes role/team.
+    func formatForLLMContext(contacts: [ContactInfo]? = nil) -> String {
+        // Build a lookup from email → contact for quick access
+        let contactsByEmail: [String: ContactInfo]
+        if let contacts = contacts {
+            contactsByEmail = Dictionary(contacts.map { ($0.email.lowercased(), $0) }, uniquingKeysWith: { first, _ in first })
+        } else {
+            contactsByEmail = [:]
+        }
+        
+        /// Resolve best display string for a participant using contacts
+        func displayString(for participant: Participant) -> String {
+            let contact = contactsByEmail[participant.email.lowercased()]
+            let name = contact?.bestName ?? participant.firstName
+            guard !name.isEmpty else { return "" }
+            
+            var result = name
+            if participant.isMe {
+                result += " (me)"
+            } else if let role = contact?.role, !role.isEmpty {
+                result += " (\(role))"
+            }
+            return result
+        }
+        
         var parts: [String] = []
+        var myResolvedName: String = ""
         
         // Add "me" first
-        if !myFirstName.isEmpty {
+        if let me = participants.first(where: { $0.isMe }) {
+            let contact = contactsByEmail[me.email.lowercased()]
+            myResolvedName = contact?.bestName ?? me.firstName
+            let display = displayString(for: me)
+            if !display.isEmpty { parts.append(display) }
+        } else if !myFirstName.isEmpty {
+            myResolvedName = myFirstName
             parts.append("\(myFirstName) (me)")
         }
         
-        // Add other attendees
-        for name in attendeeFirstNames {
-            if name != myFirstName && !name.isEmpty {
-                parts.append(name)
+        // Add other attendees, skipping names that match "me" to avoid duplicates
+        for participant in participants where !participant.isMe {
+            let contact = contactsByEmail[participant.email.lowercased()]
+            let name = contact?.bestName ?? participant.firstName
+            guard !name.isEmpty && name != myResolvedName else { continue }
+            let display = displayString(for: participant)
+            if !parts.contains(display) {
+                parts.append(display)
             }
         }
         

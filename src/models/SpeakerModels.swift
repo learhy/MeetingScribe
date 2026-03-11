@@ -287,3 +287,33 @@ struct BackupResponse: Codable {
         case backupPath = "backup_path"
     }
 }
+
+// MARK: - Contact Models
+
+/// A contact from the people database
+struct ContactInfo: Codable {
+    let email: String
+    let displayName: String?
+    let preferredName: String?
+    let pronunciation: String?
+    let aliases: [String]?
+    let role: String?
+    let team: String?
+    let source: String
+    
+    /// Best available name for this contact
+    var bestName: String? {
+        preferredName ?? displayName
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case email
+        case displayName = "display_name"
+        case preferredName = "preferred_name"
+        case pronunciation
+        case aliases
+        case role
+        case team
+        case source
+    }
+}

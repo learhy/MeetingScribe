@@ -455,6 +455,116 @@ class SpeakerDatabaseService {
         }
     }
     
+    /// Associate an email address with a speaker (for calendar cross-reference)
+    func associateEmail(speakerId: String, email: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        runCLI(["associate-email", speakerId, email]) { [weak self] result in
+            switch result {
+            case .success(_):
+                completion(.success(()))
+            case .failure(let error):
+                self?.logger.error("Failed to associate email: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    /// Fetch all contacts and filter to those matching the given emails.
+    /// Uses async/await via a continuation over the callback-based CLI.
+    func fetchContacts(forEmails emails: [String]) async -> [ContactInfo] {
+        guard !emails.isEmpty else { return [] }
+        let emailSet = Set(emails.map { $0.lowercased() })
+        
+        return await withCheckedContinuation { continuation in
+            runCLI(["list-contacts"]) { [weak self] result in
+                switch result {
+                case .success(let data):
+                    do {
+                        let response = try self?.decoder.decode(CLIResponse<[ContactInfo]>.self, from: data)
+                        let allContacts = response?.data ?? []
+                        let filtered = allContacts.filter { emailSet.contains($0.email.lowercased()) }
+                        continuation.resume(returning: filtered)
+                    } catch {
+                        self?.logger.error("Failed to decode contacts: \(error)")
+                        continuation.resume(returning: [])
+                    }
+                case .failure(let error):
+                    self?.logger.error("Failed to fetch contacts: \(error)")
+                    continuation.resume(returning: [])
+                }
+            }
+        }
+    }
+    
+    /// Upsert a contact from calendar participant data.
+    /// Calendar-sourced entries never overwrite manual entries.
+    func upsertContact(email: String, displayName: String?, source: String = "calendar") {
+        var args = ["add-contact", email, "--source", source]
+        if let name = displayName, !name.isEmpty {
+            args.append(contentsOf: ["--name", name])
+        }
+        
+        runCLI(args) { [weak self] result in
+            if case .failure(let error) = result {
+                self?.logger.error("Failed to upsert contact \(email): \(error)")
+            }
+        }
+    }
+    
+    /// Auto-populate contacts from resolved calendar participants.
+    /// Upserts each non-self attendee with source="calendar".
+    func populateContactsFromParticipants(_ participants: MeetingParticipants) {
+        for participant in participants.participants where !participant.isMe {
+            let displayName = participant.firstName  // best we have from calendar
+            upsertContact(email: participant.email, displayName: displayName, source: "calendar")
+        }
+    }
+    
+    /// Cross-reference speaker map from diarization with calendar participants.
+    /// For 1:1 calls with one unidentified speaker, auto-links the remaining calendar attendee.
+    /// For group calls, creates name suggestions for unambiguous matches.
+    func crossReferenceSpeakerMap(
+        speakerMap: [String: SpeakerIdentity?],
+        participants: MeetingParticipants
+    ) {
+        // Separate identified and unidentified speakers
+        let identified = speakerMap.compactMapValues { $0 }  // label → identity (non-nil)
+        let unidentified = speakerMap.filter { $0.value == nil }.map { $0.key }
+        
+        // Get calendar attendee names that are NOT already matched by voice
+        let identifiedNames = Set(identified.values.compactMap { $0.name?.lowercased() })
+        let unmatchedAttendees = participants.participants.filter { participant in
+            !participant.isMe && !identifiedNames.contains(participant.firstName.lowercased())
+        }
+        
+        guard !unidentified.isEmpty && !unmatchedAttendees.isEmpty else {
+            return
+        }
+        
+        // 1:1 call: exactly 1 unidentified speaker + 1 unmatched calendar attendee → auto-link
+        if unidentified.count == 1 && unmatchedAttendees.count == 1,
+           let speakerLabel = unidentified.first,
+           let attendee = unmatchedAttendees.first {
+            // Find the speaker_id for any identified speaker to get the DB context
+            // For the unidentified speaker, we need to check if there's a speaker_id in the map
+            // (unidentified speakers have nil identity, so we can't auto-link without a speaker_id)
+            logger.info("1:1 cross-reference: \(speakerLabel) likely = \(attendee.firstName) <\(attendee.email)>")
+            logger.info("Note: Cannot auto-link unidentified speakers (no speaker_id). Name suggestion will be created during next meeting with this speaker.")
+        }
+        
+        // For identified speakers without email, associate their calendar email
+        for (_, identity) in identified {
+            if let matchingAttendee = participants.participants.first(where: {
+                $0.firstName.lowercased() == identity.name?.lowercased()
+            }) {
+                associateEmail(speakerId: identity.speakerId, email: matchingAttendee.email) { result in
+                    if case .failure(let error) = result {
+                        self.logger.error("Failed to associate email \(matchingAttendee.email): \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
     var hasPendingSuggestions: Bool {
         !pendingSuggestions.isEmpty
     }

@@ -268,17 +268,35 @@ struct DiarizedSegment: Codable {
     let text: String
 }
 
+/// Identity of a speaker as determined by voice matching against the speaker database
+struct SpeakerIdentity: Codable {
+    let speakerId: String
+    let name: String?
+    let confidence: Double
+    
+    enum CodingKeys: String, CodingKey {
+        case speakerId = "speaker_id"
+        case name
+        case confidence
+    }
+}
+
 struct DiarizedTranscript: Codable {
     let segments: [DiarizedSegment]
     let speakers: [String]
     let numSpeakers: Int
     let audioFile: String
+    /// Maps speaker labels (e.g. "SPEAKER_00") to their voice-matched identity.
+    /// nil when smart prompts are disabled or the Python script is older.
+    /// Values are nil for speakers that couldn't be matched.
+    let speakerMap: [String: SpeakerIdentity?]?
     
     enum CodingKeys: String, CodingKey {
         case segments
         case speakers
         case numSpeakers = "num_speakers"
         case audioFile = "audio_file"
+        case speakerMap = "speaker_map"
     }
 }
 
@@ -287,6 +305,14 @@ class TranscriptionService {
     private let config: ConfigManager
     private let postProcessor: TranscriptPostProcessor
     
+    /// The most recent diarized transcript result, including speaker_map.
+    /// Available after a successful diarized transcription for cross-referencing.
+    private(set) var lastDiarizedResult: DiarizedTranscript?
+    
+    /// Participant emails for the current meeting.
+    /// Set before calling transcribe() to enable KNOWN PEOPLE injection.
+    var participantEmails: [String]?
+    
     init(config: ConfigManager = .shared) {
         self.config = config
         self.postProcessor = TranscriptPostProcessor(config: config)
@@ -294,12 +320,14 @@ class TranscriptionService {
     
     func transcribe(audioFileURL: URL) async throws -> String {
         var transcript: String
+        lastDiarizedResult = nil
         
         // Check if diarization is enabled
         if config.config.transcription.diarization.enabled {
             logger.info("Diarization enabled, attempting diarized transcription")
             do {
                 let diarizedResult = try await transcribeWithDiarization(audioFileURL: audioFileURL)
+                lastDiarizedResult = diarizedResult
                 transcript = formatDiarizedTranscript(diarizedResult)
             } catch {
                 logger.warning("Diarization failed, falling back to standard transcription: \(error.localizedDescription)")
@@ -316,12 +344,25 @@ class TranscriptionService {
         // Apply LLM post-processing if enabled
         if config.config.transcription.postProcessing.enabled {
             logger.info("Applying LLM post-processing to transcript")
+            
+            // Fetch contacts for meeting participants to inject as KNOWN PEOPLE
+            if let emails = participantEmails, !emails.isEmpty {
+                let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: emails)
+                if !contacts.isEmpty {
+                    postProcessor.knownPeopleContext = TranscriptPostProcessor.formatKnownPeople(contacts)
+                    logger.info("Loaded \(contacts.count) contacts for KNOWN PEOPLE injection")
+                }
+            }
+            
             do {
                 transcript = try await postProcessor.process(transcript: transcript)
                 logger.info("Post-processing completed successfully")
             } catch {
                 logger.warning("Post-processing failed, using original transcript: \(error.localizedDescription)")
             }
+            
+            // Clear for next transcription
+            postProcessor.knownPeopleContext = nil
         }
         
         return transcript
@@ -499,11 +540,29 @@ class TranscriptionService {
         }
     }
     
+    /// Minimum confidence threshold for replacing SPEAKER_XX labels with actual names
+    private static let speakerNameConfidenceThreshold = 0.8
+    
     private func formatDiarizedTranscript(_ diarized: DiarizedTranscript) -> String {
-        var formatted = ""
+        // Build a label → display name lookup from speakerMap
+        var speakerDisplayNames: [String: String] = [:]
+        if let speakerMap = diarized.speakerMap {
+            for (label, identity) in speakerMap {
+                if let identity = identity,
+                   let name = identity.name, !name.isEmpty,
+                   identity.confidence >= Self.speakerNameConfidenceThreshold {
+                    speakerDisplayNames[label] = name
+                }
+            }
+            if !speakerDisplayNames.isEmpty {
+                logger.info("Speaker identity mapping: \(speakerDisplayNames)")
+            }
+        }
         
+        var formatted = ""
         for segment in diarized.segments {
-            formatted += "\(segment.speaker): \(segment.text)\n"
+            let displayName = speakerDisplayNames[segment.speaker] ?? segment.speaker
+            formatted += "\(displayName): \(segment.text)\n"
         }
         
         return formatted.trimmingCharacters(in: .whitespacesAndNewlines)

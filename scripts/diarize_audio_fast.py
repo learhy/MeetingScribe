@@ -662,6 +662,12 @@ def main():
             known_ids = [m.speaker_id for m in match_result.matched]
             unknown_count = len(match_result.unknown)
             
+            # Build speaker_label_map: SPEAKER_XX → speaker_id
+            speaker_label_map = {}
+            for cluster_idx, match in match_result.speaker_map.items():
+                label = f"SPEAKER_{cluster_idx:02d}"
+                speaker_label_map[label] = match.speaker_id if match else None
+            
             print(f"  Matched {len(known_ids)} known speakers, {unknown_count} unknown", file=sys.stderr)
             
             # Try cache lookup
@@ -680,7 +686,9 @@ def main():
                     speaker_ids=known_ids,
                     confidence=cache_result.confidence,
                     prompt_token_count=count_tokens(cache_result.prompt.prompt_text),
-                    vocab_term_count=len(cache_result.prompt.vocabulary_terms) if cache_result.prompt.vocabulary_terms else 0
+                    vocab_term_count=len(cache_result.prompt.vocabulary_terms) if cache_result.prompt.vocabulary_terms else 0,
+                    cache_key=cache_result.prompt.cache_key,
+                    speaker_label_map=speaker_label_map,
                 )
             else:
                 # Cache miss - generate new prompt
@@ -781,6 +789,9 @@ def main():
                             context=None
                         )
                 
+                from prompt_generator import compute_full_cache_key
+                generated_cache_key = compute_full_cache_key(known_ids, unknown_count)
+                
                 smart_prompt_result = SmartPromptResult(
                     initial_prompt=prompt_output.initial_prompt,
                     vocabulary_file_path=effective_vocabulary_file,
@@ -789,7 +800,9 @@ def main():
                     confidence=confidence,
                     new_speakers_created=new_speakers,
                     prompt_token_count=prompt_output.prompt_token_count,
-                    vocab_term_count=prompt_output.terms_in_vocab_file
+                    vocab_term_count=prompt_output.terms_in_vocab_file,
+                    cache_key=generated_cache_key,
+                    speaker_label_map=speaker_label_map,
                 )
                 
                 print(f"  Generated prompt: {len(effective_initial_prompt)} chars, {prompt_output.prompt_token_count} tokens", file=sys.stderr)
@@ -820,11 +833,11 @@ def main():
     # Step 8: Merge consecutive segments
     merged_segments = merge_consecutive_segments(aligned_segments)
     
-    # Step 9: Update speaker terms after successful transcription (if smart prompt enabled)
+    # Step 9: Update speaker terms and cache quality after successful transcription
     if args.smart_prompt and smart_prompt_result and smart_prompt_result.speaker_ids:
         try:
             from speaker_db import SpeakerDatabase
-            from prompt_generator import extract_terms
+            from prompt_generator import extract_terms, record_cache_quality
             
             speaker_db = SpeakerDatabase(args.speaker_db_path)
             
@@ -839,6 +852,11 @@ def main():
                     new_terms[:50],  # Limit to top 50
                     cooccurring_speaker_ids=smart_prompt_result.speaker_ids
                 )
+            
+            # Record cache quality feedback (improves prompt cache over time)
+            if smart_prompt_result.cache_key:
+                record_cache_quality(speaker_db, smart_prompt_result.cache_key, full_text)
+                print(f"Recorded cache quality for key {smart_prompt_result.cache_key[:12]}...", file=sys.stderr)
             
             speaker_db.close()
             print(f"Updated speaker vocabulary with {len(new_terms)} terms", file=sys.stderr)
@@ -863,6 +881,36 @@ def main():
             "prompt_tokens": smart_prompt_result.prompt_token_count,
             "vocab_terms": smart_prompt_result.vocab_term_count
         }
+        
+        # Include speaker_map: SPEAKER_XX → {speaker_id, name, confidence}
+        # This allows the Swift side to replace SPEAKER_XX with actual names
+        if smart_prompt_result.speaker_label_map:
+            speaker_map = {}
+            try:
+                from speaker_db import SpeakerDatabase
+                speaker_db = SpeakerDatabase(args.speaker_db_path)
+                for label, sid in smart_prompt_result.speaker_label_map.items():
+                    if sid:
+                        speaker = speaker_db.get_speaker(sid)
+                        # Find confidence from match_result.speaker_map
+                        cluster_idx = int(label.split("_")[1])
+                        match_info = match_result.speaker_map.get(cluster_idx) if 'match_result' in dir() else None
+                        speaker_map[label] = {
+                            "speaker_id": sid,
+                            "name": speaker.name if speaker else None,
+                            "confidence": match_info.similarity if match_info else 0.0,
+                        }
+                    else:
+                        speaker_map[label] = None
+                speaker_db.close()
+            except Exception as e:
+                print(f"Warning: Failed to build speaker_map names: {e}", file=sys.stderr)
+                # Fall back to IDs only (no names)
+                speaker_map = {
+                    label: {"speaker_id": sid, "name": None, "confidence": 0.0} if sid else None
+                    for label, sid in smart_prompt_result.speaker_label_map.items()
+                }
+            output_data["speaker_map"] = speaker_map
     
     # Write output
     output_json = json.dumps(output_data, indent=2, ensure_ascii=False)

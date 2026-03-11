@@ -23,6 +23,7 @@ import numpy as np
 
 from term_types import (
     CacheLookupResult,
+    IndexedMatchResult,
     MatchResult,
     NoSpeakersDetected,
     PromptOutput,
@@ -387,25 +388,30 @@ def merge_vocabulary(
 # Speaker Matching
 # =============================================================================
 
-def match_speakers(embeddings: list[np.ndarray], db: 'SpeakerDatabase') -> MatchResult:
+def match_speakers(embeddings: list[np.ndarray], db: 'SpeakerDatabase') -> IndexedMatchResult:
     """Match embeddings using relative threshold (gap-based) approach.
     
+    Each embedding corresponds to a cluster index (0 = SPEAKER_00, 1 = SPEAKER_01, etc.).
+    Returns an IndexedMatchResult that preserves the cluster index → speaker_id mapping.
+    
     Args:
-        embeddings: List of speaker embeddings to match
+        embeddings: List of speaker embeddings to match (ordered by cluster index)
         db: Speaker database for matching
     
     Returns:
-        MatchResult with matched, unknown, and ambiguous speakers
+        IndexedMatchResult with per-index speaker_map and legacy matched/unknown/ambiguous lists
     """
     matched = []
     unknown = []
     ambiguous = []
+    speaker_map: dict[int, SpeakerMatch | None] = {}
     
-    for emb in embeddings:
+    for idx, emb in enumerate(embeddings):
         candidates = db.get_top_matches(emb, limit=3)
         
         if not candidates:
             unknown.append(emb)
+            speaker_map[idx] = None
             continue
         
         best = candidates[0]
@@ -416,23 +422,33 @@ def match_speakers(embeddings: list[np.ndarray], db: 'SpeakerDatabase') -> Match
         
         # Confident match: large gap OR very high absolute similarity
         if gap > 0.15 or best.similarity > 0.92:
-            matched.append(SpeakerMatch(
+            match = SpeakerMatch(
                 speaker_id=best.speaker_id,
                 similarity=best.similarity,
                 confidence_gap=gap,
                 is_confident=True
-            ))
+            )
+            matched.append(match)
+            speaker_map[idx] = match
         elif best.similarity > 0.75:  # Ambiguous but possible
-            ambiguous.append(SpeakerMatch(
+            match = SpeakerMatch(
                 speaker_id=best.speaker_id,
                 similarity=best.similarity,
                 confidence_gap=gap,
                 is_confident=False
-            ))
+            )
+            ambiguous.append(match)
+            speaker_map[idx] = match
         else:
             unknown.append(emb)
+            speaker_map[idx] = None
     
-    return MatchResult(matched=matched, unknown=unknown, ambiguous=ambiguous)
+    return IndexedMatchResult(
+        speaker_map=speaker_map,
+        matched=matched,
+        unknown=unknown,
+        ambiguous=ambiguous
+    )
 
 
 # =============================================================================
@@ -833,6 +849,12 @@ def generate_smart_prompt(
         known_ids = [m.speaker_id for m in match_result.matched]
         unknown_count = len(match_result.unknown)
         
+        # Build speaker_label_map: SPEAKER_XX → speaker_id
+        speaker_label_map: dict[str, str | None] = {}
+        for cluster_idx, match in match_result.speaker_map.items():
+            label = f"SPEAKER_{cluster_idx:02d}"
+            speaker_label_map[label] = match.speaker_id if match else None
+        
         # 4. Two-tier cache lookup
         cache_result = lookup_cache(speaker_db, known_ids, unknown_count)
         
@@ -848,7 +870,9 @@ def generate_smart_prompt(
                 speaker_ids=known_ids,
                 confidence=cache_result.confidence,
                 prompt_token_count=count_tokens(cached_prompt),
-                vocab_term_count=len(cached_vocab) if cached_vocab else 0
+                vocab_term_count=len(cached_vocab) if cached_vocab else 0,
+                cache_key=cache_result.prompt.cache_key,
+                speaker_label_map=speaker_label_map,
             )
         
         # 5. Cache miss or partial - need to generate/augment
@@ -915,6 +939,7 @@ def generate_smart_prompt(
         )
         
         # 12. Cache result (both full and partial keys)
+        generated_cache_key = compute_full_cache_key(known_ids, unknown_count)
         speaker_db.save_prompt(
             known_ids=known_ids,
             unknown_count=unknown_count,
@@ -947,7 +972,9 @@ def generate_smart_prompt(
             confidence=confidence,
             new_speakers_created=new_speakers,
             prompt_token_count=prompt_output.prompt_token_count,
-            vocab_term_count=prompt_output.terms_in_vocab_file
+            vocab_term_count=prompt_output.terms_in_vocab_file,
+            cache_key=generated_cache_key,
+            speaker_label_map=speaker_label_map,
         )
         
     except SpeakerDBError as e:

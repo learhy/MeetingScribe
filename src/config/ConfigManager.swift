@@ -123,7 +123,7 @@ struct AppConfiguration: Codable {
         
         struct Glossary: Codable {
             var enabled: Bool = false
-            var entries: [GlossaryEntry] = []
+            var entries: [GlossaryEntry] = []  // Legacy: kept for migration, ignored after glossary.json exists
             var maxSize: Int = 1000
             var maxGlossaryTokens: Int = 2000  // Token budget for filtered glossary injection
             var filteringEnabled: Bool = true  // false = inject full glossary (legacy behavior)
@@ -154,6 +154,16 @@ struct AppConfiguration: Codable {
             
             private enum CodingKeys: String, CodingKey {
                 case enabled, entries, maxSize, maxGlossaryTokens, filteringEnabled, phoneticMatchingEnabled
+            }
+        }
+        
+        /// Standalone glossary file structure — entries live here, not in config.json
+        struct GlossaryFile: Codable {
+            var entries: [GlossaryEntry] = []
+            
+            init() {}
+            init(entries: [GlossaryEntry]) {
+                self.entries = entries
             }
         }
         
@@ -231,7 +241,9 @@ class ConfigManager {
     
     private let logger = DualLogger(category: "ConfigManager")
     private let configPath: URL
+    private let glossaryPath: URL
     private(set) var config: AppConfiguration
+    private(set) var glossaryEntries: [GlossaryEntry] = []
     
     /// Callback triggered when configuration is saved
     var onConfigChanged: (() -> Void)?
@@ -241,6 +253,7 @@ class ConfigManager {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let configDir = homeDir.appendingPathComponent(".meetingscribe")
         self.configPath = configDir.appendingPathComponent("config.json")
+        self.glossaryPath = configDir.appendingPathComponent("glossary.json")
         
         // Load or create default config
         if let loadedConfig = Self.loadConfig(from: configPath) {
@@ -249,6 +262,9 @@ class ConfigManager {
             self.config = AppConfiguration()
             Self.saveConfig(config, to: configPath)
         }
+        
+        // Load glossary from standalone file, migrating from config.json if needed
+        loadGlossary()
     }
     
     private static func loadConfig(from url: URL) -> AppConfiguration? {
@@ -274,7 +290,7 @@ class ConfigManager {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(config)
-            try data.write(to: url)
+            try data.write(to: url, options: .atomic)
         } catch {
             print("Error saving config: \(error)")
         }
@@ -285,10 +301,14 @@ class ConfigManager {
             self.config = loadedConfig
             logger.info("Configuration reloaded")
         }
+        loadGlossary()
     }
     
     func save() {
-        Self.saveConfig(config, to: configPath)
+        // Strip entries from config before saving — they live in glossary.json now
+        var configToSave = config
+        configToSave.transcription.glossary.entries = []
+        Self.saveConfig(configToSave, to: configPath)
         logger.info("Configuration saved")
         onConfigChanged?()
     }
@@ -296,6 +316,74 @@ class ConfigManager {
     func updateAndSave(_ newConfig: AppConfiguration) {
         self.config = newConfig
         save()
+    }
+    
+    // MARK: - Glossary Persistence
+    
+    /// Load glossary entries from standalone file, migrating from config.json if needed
+    private func loadGlossary() {
+        if let glossaryFile = Self.loadGlossaryFile(from: glossaryPath) {
+            glossaryEntries = glossaryFile.entries
+            logger.info("Glossary loaded: \(glossaryEntries.count) entries from glossary.json")
+        } else if !config.transcription.glossary.entries.isEmpty {
+            // Migration: entries exist in config.json but no glossary.json yet
+            glossaryEntries = config.transcription.glossary.entries
+            logger.info("Migrating \(glossaryEntries.count) glossary entries from config.json to glossary.json")
+            saveGlossary()
+            
+            // Clear entries from config.json to complete migration
+            config.transcription.glossary.entries = []
+            Self.saveConfig(config, to: configPath)
+            logger.info("Migration complete — entries removed from config.json")
+        } else {
+            glossaryEntries = []
+            logger.info("No glossary entries found")
+        }
+    }
+    
+    private static func loadGlossaryFile(from url: URL) -> AppConfiguration.Transcription.GlossaryFile? {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            return try decoder.decode(AppConfiguration.Transcription.GlossaryFile.self, from: data)
+        } catch {
+            print("Error loading glossary: \(error)")
+            return nil
+        }
+    }
+    
+    /// Save glossary entries to standalone file with backup
+    func saveGlossary() {
+        do {
+            let dir = glossaryPath.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            
+            // Back up existing file before overwriting
+            let backupPath = glossaryPath.appendingPathExtension("bak")
+            if FileManager.default.fileExists(atPath: glossaryPath.path) {
+                try? FileManager.default.removeItem(at: backupPath)
+                try? FileManager.default.copyItem(at: glossaryPath, to: backupPath)
+            }
+            
+            let glossaryFile = AppConfiguration.Transcription.GlossaryFile(entries: glossaryEntries)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(glossaryFile)
+            try data.write(to: glossaryPath, options: .atomic)
+            logger.info("Glossary saved: \(glossaryEntries.count) entries")
+        } catch {
+            logger.error("Error saving glossary: \(error)")
+        }
+    }
+    
+    /// Update glossary entries and save
+    func updateGlossaryEntries(_ entries: [GlossaryEntry]) {
+        self.glossaryEntries = entries
+        saveGlossary()
+        onConfigChanged?()
     }
     
     func updateAutoRecordingEnabled(_ enabled: Bool) {

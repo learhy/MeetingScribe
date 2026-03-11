@@ -426,6 +426,86 @@ final class CalendarParticipantResolverTests: XCTestCase {
         XCTAssertTrue(context.contains("Only the local user"))
     }
     
+    // MARK: - Contacts-Enhanced Formatting Tests
+    
+    func testFormatForLLMContext_WithContacts_UsesPreferredName() {
+        let participants = [
+            Participant(email: "dan.rohan@ibm.com", firstName: "Dan", isMe: true, inferredRole: "local"),
+            Participant(email: "pradeep.sekar1@ibm.com", firstName: "Pradeep", isMe: false, inferredRole: "remote")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
+            myEmail: "dan.rohan@ibm.com",
+            myFirstName: "Dan",
+            attendeeEmails: ["pradeep.sekar1@ibm.com"],
+            attendeeFirstNames: ["Pradeep"],
+            participants: participants
+        )
+        
+        let contacts = [
+            ContactInfo(email: "pradeep.sekar1@ibm.com", displayName: "Pradeep Sekar",
+                       preferredName: "Deep", pronunciation: nil, aliases: nil,
+                       role: nil, team: nil, source: "manual")
+        ]
+        
+        let context = meetingParticipants.formatForLLMContext(contacts: contacts)
+        
+        // Should use preferred name from contacts instead of email-derived "Pradeep"
+        XCTAssertTrue(context.contains("Deep"), "Should use contact preferred_name")
+        XCTAssertTrue(context.contains("Dan (me)"))
+    }
+    
+    func testFormatForLLMContext_WithContacts_IncludesRole() {
+        let participants = [
+            Participant(email: "dan.rohan@ibm.com", firstName: "Dan", isMe: true, inferredRole: "local"),
+            Participant(email: "alice@ibm.com", firstName: "Alice", isMe: false, inferredRole: nil)
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
+            myEmail: "dan.rohan@ibm.com",
+            myFirstName: "Dan",
+            attendeeEmails: ["alice@ibm.com"],
+            attendeeFirstNames: ["Alice"],
+            participants: participants
+        )
+        
+        let contacts = [
+            ContactInfo(email: "alice@ibm.com", displayName: "Alice Johnson",
+                       preferredName: nil, pronunciation: nil, aliases: nil,
+                       role: "Engineering Manager", team: nil, source: "manual")
+        ]
+        
+        let context = meetingParticipants.formatForLLMContext(contacts: contacts)
+        
+        XCTAssertTrue(context.contains("Alice Johnson (Engineering Manager)"),
+                     "Should include role for non-me participants")
+    }
+    
+    func testFormatForLLMContext_WithoutContacts_PreservesExistingBehavior() {
+        let participants = [
+            Participant(email: "dan.rohan@ibm.com", firstName: "Dan", isMe: true, inferredRole: "local"),
+            Participant(email: "pradeep.sekar1@ibm.com", firstName: "Pradeep", isMe: false, inferredRole: "remote")
+        ]
+        
+        let meetingParticipants = MeetingParticipants(
+            meetingTitle: nil,
+            myEmail: "dan.rohan@ibm.com",
+            myFirstName: "Dan",
+            attendeeEmails: ["pradeep.sekar1@ibm.com"],
+            attendeeFirstNames: ["Pradeep"],
+            participants: participants
+        )
+        
+        // nil contacts should behave identically to old no-arg method
+        let context = meetingParticipants.formatForLLMContext(contacts: nil)
+        
+        XCTAssertTrue(context.contains("Dan (me)"))
+        XCTAssertTrue(context.contains("Pradeep"))
+        XCTAssertTrue(context.contains("1:1 conversation"))
+    }
+    
     // MARK: - Time Window Overlap Tests
     
     func testTimeWindowsOverlap_FullyContained() {
