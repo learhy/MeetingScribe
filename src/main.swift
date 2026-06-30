@@ -690,6 +690,7 @@ class MeetingScribeService {
             var calendarMeetingTitle: String? = nil
             var attendeesList: String = ""
             var resolvedParticipants: MeetingParticipants? = nil
+            var resolvedContacts: [ContactInfo] = []
             
             if let participants = participantResolver.resolveParticipants(
                 recordingStart: startTime,
@@ -698,12 +699,12 @@ class MeetingScribeService {
                 resolvedParticipants = participants
                 
                 // Fetch contacts for enhanced participant names/roles
-                let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: participants.attendeeEmails)
-                participantContext = participants.formatForLLMContext(contacts: contacts.isEmpty ? nil : contacts)
+                resolvedContacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: participants.attendeeEmails)
+                participantContext = participants.formatForLLMContext(contacts: resolvedContacts.isEmpty ? nil : resolvedContacts)
                 calendarMeetingTitle = participants.meetingTitle
                 
-                let allNames = [participants.myFirstName] + participants.attendeeFirstNames
-                attendeesList = allNames.filter { !$0.isEmpty }.joined(separator: ", ")
+                // Use NameResolver for attendees list (will be finalized after diarization)
+                attendeesList = NameResolver.attendeesList(participants: participants, labelMap: [:])
                 
                 logger.info("Resolved \(participants.attendeeFirstNames.count + 1) meeting participants")
                 if let title = calendarMeetingTitle {
@@ -722,6 +723,29 @@ class MeetingScribeService {
             let transcript = try await transcriptionService.transcribe(audioFileURL: fileURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
             
+            // 2b. Run NameResolver to merge all name sources
+            let diarized = transcriptionService.lastDiarizedResult
+            let nameResolution = NameResolver.resolve(
+                participants: resolvedParticipants,
+                speakerMap: diarized?.speakerMap,
+                contacts: resolvedContacts,
+                transcript: transcript
+            )
+            
+            // Set the display name map for transcript formatting (already used retroactively
+            // since transcript was already formatted, but use for notes cleaning below)
+            transcriptionService.displayNameMap = NameResolver.displayNameMap(from: nameResolution)
+            
+            // Inject known people into post-processor for future transcribes
+            transcriptionService.knownPeople = nameResolution.knownPeople
+            
+            // Update attendees list with resolved names
+            if let participants = resolvedParticipants {
+                attendeesList = NameResolver.attendeesList(participants: participants, labelMap: nameResolution.labelMap)
+            } else if !nameResolution.labelMap.isEmpty {
+                attendeesList = NameResolver.attendeesList(participants: nil, labelMap: nameResolution.labelMap)
+            }
+            
             // 3. Generate notes with participant context
             logger.info("Generating notes...")
             let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
@@ -730,28 +754,37 @@ class MeetingScribeService {
             // 4. Split notes to get summary
             let splitNotes = GeneratedNotesParser.split(generatedNotes)
             
-            // 5. Determine meeting title
+            // 4b. Clean SPEAKER_XX labels from summary and notes sections
+            let cleanedSummary = NotesLabelCleaner.clean(splitNotes.summary, labelMap: nameResolution.labelMap)
+            let cleanedNotes = NotesLabelCleaner.clean(splitNotes.notes, labelMap: nameResolution.labelMap)
+            
+            // 5. Determine meeting title with validation gate
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
             
             var meetingTitle: String
             if let calendarTitle = calendarMeetingTitle, !calendarTitle.isEmpty {
-                meetingTitle = calendarTitle
-                logger.info("Using calendar meeting title: \(calendarTitle)")
+                // Use calendar title, but validate it's not a refusal
+                meetingTitle = TitleValidator.resolve(llmTitle: nil, calendarTitle: calendarTitle, date: startTime)
+                logger.info("Using calendar meeting title: \(meetingTitle)")
             } else {
                 do {
                     logger.info("No calendar title available, generating meeting title with LLM...")
-                    let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: splitNotes.summary)
-                    if !generatedTitle.isEmpty {
-                        meetingTitle = generatedTitle
-                        logger.info("Generated title: \(generatedTitle)")
-                    } else {
-                        meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
-                    }
+                    let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: cleanedSummary)
+                    // Validate the LLM title through the validation gate
+                    meetingTitle = TitleValidator.resolve(llmTitle: generatedTitle, calendarTitle: calendarMeetingTitle, date: startTime)
+                    logger.info("Resolved title: \(meetingTitle)")
                 } catch {
                     logger.warning("Failed to generate title: \(error.localizedDescription)")
-                    meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
+                    meetingTitle = TitleValidator.resolve(llmTitle: nil, calendarTitle: calendarMeetingTitle, date: startTime)
                 }
+            }
+            
+            // 5b. Disambiguate bare 1:1 pattern titles
+            if TitleValidator.isBareOneOnOnePattern(meetingTitle) {
+                let topic = TitleValidator.extractTopic(from: cleanedSummary)
+                meetingTitle = TitleValidator.disambiguate(title: meetingTitle, topic: topic, date: startTime)
+                logger.info("Disambiguated title: \(meetingTitle)")
             }
             
             // 6. Render template
@@ -764,8 +797,8 @@ class MeetingScribeService {
                 duration: formatDuration(duration),
                 title: meetingTitle,
                 attendees: attendeesList,
-                summary: splitNotes.summary,
-                notes: splitNotes.notes,
+                summary: cleanedSummary,
+                notes: cleanedNotes,
                 transcript: transcript,
                 audioFile: audioPath
             )
@@ -1025,6 +1058,7 @@ class MeetingScribeService {
             var calendarMeetingTitle: String? = nil
             var attendeesList: String = ""
             var resolvedParticipants: MeetingParticipants? = nil
+            var resolvedContacts: [ContactInfo] = []
             
             if let participants = participantResolver.resolveParticipants(
                 recordingStart: startTime,
@@ -1033,13 +1067,12 @@ class MeetingScribeService {
                 resolvedParticipants = participants
                 
                 // Fetch contacts for enhanced participant names/roles
-                let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: participants.attendeeEmails)
-                participantContext = participants.formatForLLMContext(contacts: contacts.isEmpty ? nil : contacts)
+                resolvedContacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: participants.attendeeEmails)
+                participantContext = participants.formatForLLMContext(contacts: resolvedContacts.isEmpty ? nil : resolvedContacts)
                 calendarMeetingTitle = participants.meetingTitle
                 
-                // Format attendees list for template
-                let allNames = [participants.myFirstName] + participants.attendeeFirstNames
-                attendeesList = allNames.filter { !$0.isEmpty }.joined(separator: ", ")
+                // Use NameResolver for attendees list (will be finalized after diarization)
+                attendeesList = NameResolver.attendeesList(participants: participants, labelMap: [:])
                 
                 logger.info("Resolved \(participants.attendeeFirstNames.count + 1) meeting participants")
                 if let title = calendarMeetingTitle {
@@ -1069,6 +1102,28 @@ class MeetingScribeService {
                 )
             }
             
+            // 2c. Run NameResolver to merge all name sources
+            let diarized = transcriptionService.lastDiarizedResult
+            let nameResolution = NameResolver.resolve(
+                participants: resolvedParticipants,
+                speakerMap: diarized?.speakerMap,
+                contacts: resolvedContacts,
+                transcript: transcript
+            )
+            
+            // Set the display name map for transcript formatting
+            transcriptionService.displayNameMap = NameResolver.displayNameMap(from: nameResolution)
+            
+            // Inject known people into post-processor for future transcribes
+            transcriptionService.knownPeople = nameResolution.knownPeople
+            
+            // Update attendees list with resolved names
+            if let participants = resolvedParticipants {
+                attendeesList = NameResolver.attendeesList(participants: participants, labelMap: nameResolution.labelMap)
+            } else if !nameResolution.labelMap.isEmpty {
+                attendeesList = NameResolver.attendeesList(participants: nil, labelMap: nameResolution.labelMap)
+            }
+            
             // 3. Generate notes with participant context
             logger.info("Generating notes...")
             let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
@@ -1077,8 +1132,12 @@ class MeetingScribeService {
             // 4. Split notes to get summary
             let splitNotes = GeneratedNotesParser.split(generatedNotes)
             
-            // 5. Determine meeting title
-            // Priority: Calendar title -> LLM-generated -> Date-based fallback
+            // 4b. Clean SPEAKER_XX labels from summary and notes sections
+            let cleanedSummary = NotesLabelCleaner.clean(splitNotes.summary, labelMap: nameResolution.labelMap)
+            let cleanedNotes = NotesLabelCleaner.clean(splitNotes.notes, labelMap: nameResolution.labelMap)
+            
+            // 5. Determine meeting title with validation gate
+            // Priority: Calendar title -> LLM-generated (validated) -> Date-based fallback
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
             
@@ -1086,24 +1145,28 @@ class MeetingScribeService {
             if isCancelled {
                 meetingTitle = "Cancelled Recording - \(dateFormatter.string(from: startTime))"
             } else if let calendarTitle = calendarMeetingTitle, !calendarTitle.isEmpty {
-                // Use calendar meeting title as primary source
-                meetingTitle = calendarTitle
-                logger.info("Using calendar meeting title: \(calendarTitle)")
+                // Use calendar title, but validate it's not a refusal
+                meetingTitle = TitleValidator.resolve(llmTitle: nil, calendarTitle: calendarTitle, date: startTime)
+                logger.info("Using calendar meeting title: \(meetingTitle)")
             } else {
-                // Fall back to LLM-generated title
+                // Fall back to LLM-generated title with validation
                 do {
                     logger.info("No calendar title available, generating meeting title with LLM...")
-                    let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: splitNotes.summary)
-                    if !generatedTitle.isEmpty {
-                        meetingTitle = generatedTitle
-                        logger.info("Generated title: \(generatedTitle)")
-                    } else {
-                        meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
-                    }
+                    let generatedTitle = try await notesService.generateTitle(transcript: transcript, summary: cleanedSummary)
+                    // Validate the LLM title through the validation gate
+                    meetingTitle = TitleValidator.resolve(llmTitle: generatedTitle, calendarTitle: calendarMeetingTitle, date: startTime)
+                    logger.info("Resolved title: \(meetingTitle)")
                 } catch {
-                    logger.warning("Failed to generate title, using date-based title: \(error.localizedDescription)")
-                    meetingTitle = "Meeting Notes - \(dateFormatter.string(from: startTime))"
+                    logger.warning("Failed to generate title: \(error.localizedDescription)")
+                    meetingTitle = TitleValidator.resolve(llmTitle: nil, calendarTitle: calendarMeetingTitle, date: startTime)
                 }
+            }
+            
+            // 5b. Disambiguate bare 1:1 pattern titles
+            if !isCancelled && TitleValidator.isBareOneOnOnePattern(meetingTitle) {
+                let topic = TitleValidator.extractTopic(from: cleanedSummary)
+                meetingTitle = TitleValidator.disambiguate(title: meetingTitle, topic: topic, date: startTime)
+                logger.info("Disambiguated title: \(meetingTitle)")
             }
             
             // 6. Render template
@@ -1116,8 +1179,8 @@ class MeetingScribeService {
                 duration: formatDuration(duration),
                 title: meetingTitle,
                 attendees: attendeesList,
-                summary: splitNotes.summary,
-                notes: splitNotes.notes,
+                summary: cleanedSummary,
+                notes: cleanedNotes,
                 transcript: transcript,
                 audioFile: audioFilePath
             )

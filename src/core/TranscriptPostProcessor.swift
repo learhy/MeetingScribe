@@ -43,6 +43,11 @@ class TranscriptPostProcessor {
     /// Optional KNOWN PEOPLE section to inject into the correction prompt.
     /// Set before calling process() with contacts for current meeting participants.
     var knownPeopleContext: String?
+
+    /// Optional known people contacts for direct injection (unconditional).
+    /// When set, these are used to build the KNOWN PEOPLE section regardless of
+    /// how the names were sourced (calendar, voice match, etc.).
+    var knownPeople: [ContactInfo]?
     
     // Metrics for observability
     private(set) var lastProcessingLatency: TimeInterval = 0
@@ -299,7 +304,15 @@ class TranscriptPostProcessor {
         }
         
         // Inject KNOWN PEOPLE section if available
-        if let peopleContext = knownPeopleContext, !peopleContext.isEmpty {
+        // Priority: 1) knownPeople contacts (unconditional, from NameResolver)
+        //           2) knownPeopleContext string (legacy, from calendar-only fetch)
+        if let peopleContacts = knownPeople, !peopleContacts.isEmpty {
+            let peopleContext = TranscriptPostProcessor.formatKnownPeople(peopleContacts)
+            if !peopleContext.isEmpty {
+                systemPrompt = systemPrompt + peopleContext
+                logger.info("Injected KNOWN PEOPLE context (unconditional, \(peopleContacts.count) contacts)")
+            }
+        } else if let peopleContext = knownPeopleContext, !peopleContext.isEmpty {
             systemPrompt = systemPrompt + peopleContext
             logger.info("Injected KNOWN PEOPLE context into correction prompt")
         }
