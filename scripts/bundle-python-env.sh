@@ -83,7 +83,7 @@ fi
 echo -e "${YELLOW}→${NC} Extracting standalone Python..."
 tar -xzf "$PYTHON_CACHE/$PYTHON_TARBALL" -C "$BUNDLE_DIR"
 
-if [ ! -f "$BUNDLE_DIR/python/bin/python3" ]; then
+if [ ! -e "$BUNDLE_DIR/python/bin/python3" ]; then
     echo -e "${RED}✗${NC} Failed to extract Python"
     exit 1
 fi
@@ -95,8 +95,17 @@ echo -e "${GREEN}✓${NC} Standalone Python extracted"
 mv "$BUNDLE_DIR/python"/* "$BUNDLE_DIR/"
 rmdir "$BUNDLE_DIR/python"
 
-# Make Python executable
+# Ensure python3.11 binary is executable (tarball may have restrictive modes)
+chmod +x "$BUNDLE_DIR/bin/python3.11"
+
+# Recreate python3 symlink. The python-build-standalone tarball ships python3
+# as a symlink to python3.11, but some filesystems (e.g. Google Drive) silently
+# convert symlinks to regular text files containing the target name. Recreate
+# it explicitly so Process.executableURL can actually execute it.
+rm -f "$BUNDLE_DIR/bin/python3"
+ln -s python3.11 "$BUNDLE_DIR/bin/python3"
 chmod +x "$BUNDLE_DIR/bin/python3"
+
 PYTHON_CMD="$BUNDLE_DIR/bin/python3"
 
 echo -e "${YELLOW}→${NC} Upgrading pip, setuptools, wheel..."

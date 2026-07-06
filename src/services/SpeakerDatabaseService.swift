@@ -82,26 +82,47 @@ class SpeakerDatabaseService {
         // 2. /Applications/MeetingScribe.app (installed app, running from Xcode)
         // 3. ~/Applications/MeetingScribe.app (user install)
         // 4. which python3 (development fallback)
+        //
+        // For each candidate we check isExecutableFile rather than fileExists,
+        // because the python-build-standalone tarball ships python3 as a symlink
+        // to python3.11, and some filesystems (e.g. Google Drive) materialize
+        // symlinks as regular text files that pass fileExists but cause
+        // "Exec format error" when Process tries to run them.
         
         let candidates = [
             (Bundle.main.resourcePath.map { $0 + "/python/bin/python3" },
+             Bundle.main.resourcePath.map { $0 + "/python/bin/python3.11" },
              Bundle.main.resourcePath.map { $0 + "/scripts/speaker_cli.py" }),
             ("/Applications/MeetingScribe.app/Contents/Resources/python/bin/python3",
+             "/Applications/MeetingScribe.app/Contents/Resources/python/bin/python3.11",
              "/Applications/MeetingScribe.app/Contents/Resources/scripts/speaker_cli.py"),
             (NSHomeDirectory() + "/Applications/MeetingScribe.app/Contents/Resources/python/bin/python3",
+             NSHomeDirectory() + "/Applications/MeetingScribe.app/Contents/Resources/python/bin/python3.11",
              NSHomeDirectory() + "/Applications/MeetingScribe.app/Contents/Resources/scripts/speaker_cli.py")
         ]
         
-        for (pythonCandidate, scriptCandidate) in candidates {
-            if let python = pythonCandidate,
-               let script = scriptCandidate,
-               FileManager.default.fileExists(atPath: python),
-               FileManager.default.fileExists(atPath: script) {
-                pythonPath = python
-                scriptPath = script
-                logger.info("Found Python at: \(python)")
-                logger.info("Found script at: \(script)")
-                return
+        let fm = FileManager.default
+        
+        for (pythonCandidate, python311Candidate, scriptCandidate) in candidates {
+            if let script = scriptCandidate,
+               fm.fileExists(atPath: script) {
+                // Prefer python3, fall back to python3.11 if symlink is broken
+                if let python3 = pythonCandidate,
+                   fm.isExecutableFile(atPath: python3) {
+                    pythonPath = python3
+                    scriptPath = script
+                    logger.info("Found Python at: \(python3)")
+                    logger.info("Found script at: \(script)")
+                    return
+                }
+                if let python311 = python311Candidate,
+                   fm.isExecutableFile(atPath: python311) {
+                    pythonPath = python311
+                    scriptPath = script
+                    logger.info("Found Python at: \(python311)")
+                    logger.info("Found script at: \(script)")
+                    return
+                }
             }
         }
         

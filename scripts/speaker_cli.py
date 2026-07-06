@@ -380,6 +380,7 @@ def show_stats(db: SpeakerDatabase, json_mode: bool):
         print(f"  Cached prompts:           {stats['cache_count']}")
         print(f"  Speaker terms:            {stats['term_count']}")
         print(f"  Pending name suggestions: {stats['pending_count']}")
+        print(f"  Contacts:                 {stats['contact_count']}")
         print(f"  Database size:            {stats['db_size_mb']:.2f} MB")
 
 

@@ -50,6 +50,15 @@ cp -R build/python-bundle "$APP_DIR/Contents/Resources/python"
 # current user would lose read access to those files.
 chmod -R a+rX "$APP_DIR/Contents/Resources/python"
 
+# Ensure the real Python binary is executable (cp -R may have stripped modes)
+chmod +x "$APP_DIR/Contents/Resources/python/bin/python3.11"
+
+# Recreate python3 symlink after copy. cp -R on some filesystems (e.g. Google
+# Drive) converts symlinks to regular text files containing the target name,
+# producing a 10-byte "python3.11" text file that causes "Exec format error".
+rm -f "$APP_DIR/Contents/Resources/python/bin/python3"
+ln -s python3.11 "$APP_DIR/Contents/Resources/python/bin/python3"
+
 # Copy diarization script to Resources
 mkdir -p "$APP_DIR/Contents/Resources/scripts"
 cp scripts/diarize_audio_fast.py "$APP_DIR/Contents/Resources/scripts/"
@@ -73,8 +82,12 @@ cp scripts/reset-permissions.sh "$APP_DIR/Contents/Resources/scripts/"
 echo "Embedding first-run installer..."
 ./scripts/embed-installer.sh "$APP_DIR"
 
-# Make bundled Python executable
-chmod +x "$APP_DIR/Contents/Resources/python/bin/python3"
+# Normalize bundle permissions so every file is world-readable and directories are
+# traversable. The bundle is chowned to root at install time but the daemon runs as
+# the user; without this, a restrictive source mode (e.g. the 600-mode Info.plist)
+# stays unreadable at runtime and breaks version/bundle-id lookups (which previously
+# caused an infinite reinstall loop that never reached menu-bar setup).
+chmod -R a+rX "$APP_DIR"
 
 echo "✅ Build complete: build/meetingscribe"
 echo "✅ App bundle ready: $APP_DIR"

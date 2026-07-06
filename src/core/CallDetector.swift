@@ -165,12 +165,14 @@ class AVDeviceDetector {
     struct AVSignals {
         let udpCount: Int
         let mediaPortsCount: Int
+        let tcpCount: Int
         let confident: Bool
     }
     
     func detectAVUsage() -> (platform: String, signals: AVSignals)? {
         var teamsMediaPorts = 0
         var teamsUDP = 0
+        var teamsTCP = 0
         var zoomUDP = 0
         
         // Enumerate all running processes
@@ -217,32 +219,59 @@ class AVDeviceDetector {
                 teamsUDP += udpPortsInfo.count
                 
                 // Check for Teams media ports (50000-50089, no remote)
-                // These indicate active media processing during a call
-                if processName == "MSTeams" {
-                    for portInfo in udpPortsInfo {
-                        // Media ports with no remote connection
-                        if portInfo.localPort >= 50000 && portInfo.localPort <= 50089 && !portInfo.hasRemote {
-                            teamsMediaPorts += 1
-                        }
+                // These indicate active media processing during a call.
+                // Note: media ports may be owned by "MSTeams" or helper
+                // processes like "Microsoft Teams ModuleHost" depending on
+                // the Teams version, so we check all Teams processes.
+                for portInfo in udpPortsInfo {
+                    // Media ports with no remote connection
+                    if portInfo.localPort >= 50000 && portInfo.localPort <= 50089 && !portInfo.hasRemote {
+                        teamsMediaPorts += 1
                     }
                 }
+                
+                // Also count TCP connections for Teams processes.
+                // Teams may fall back to TCP 443 for media transport when UDP
+                // is blocked or unreliable (VPN, firewall, network conditions).
+                // An active call typically has 3+ TCP connections to Microsoft
+                // media/turn servers.
+                teamsTCP += getTCPConnectionCount(forPid: pid)
             } else if isZoom {
                 zoomUDP += udpPortsInfo.count
             }
         }
         
-        logger.debug("AV signals: teams_udp=\(teamsUDP), teams_media_ports=\(teamsMediaPorts), zoom_udp=\(zoomUDP)")
+        logger.debug("AV signals: teams_udp=\(teamsUDP), teams_media_ports=\(teamsMediaPorts), teams_tcp=\(teamsTCP), zoom_udp=\(zoomUDP)")
         
-        // Check Teams - require media ports as primary signal
+        // Check Teams - primary signal is UDP media ports (50000-50089)
         // Idle: 1 media port, In call: 4-5+ media ports
         if teamsMediaPorts >= 3 {
             let teamsCPU = getCPUUsage(platformSubstring: "teams")
-            logger.info("Teams AV signals: udp=\(teamsUDP) media_ports=\(teamsMediaPorts) cpu=\(String(format: "%.1f", teamsCPU))")
+            logger.info("Teams AV signals: udp=\(teamsUDP) media_ports=\(teamsMediaPorts) tcp=\(teamsTCP) cpu=\(String(format: "%.1f", teamsCPU))")
             return ("teams", AVSignals(
                 udpCount: teamsUDP,
                 mediaPortsCount: teamsMediaPorts,
+                tcpCount: teamsTCP,
                 confident: true
             ))
+        }
+        
+        // Fallback: Teams using TCP transport (no UDP media ports).
+        // During a call over TCP, Teams maintains 3+ TCP connections to
+        // Microsoft media/TURN servers and uses significantly more CPU.
+        // Require both TCP count and CPU to avoid false positives from
+        // idle Teams background sync connections.
+        if teamsTCP >= 3 {
+            let teamsCPU = getCPUUsage(platformSubstring: "teams")
+            if teamsCPU > 8.0 {
+                logger.info("Teams AV signals (TCP fallback): udp=\(teamsUDP) media_ports=\(teamsMediaPorts) tcp=\(teamsTCP) cpu=\(String(format: "%.1f", teamsCPU))")
+                return ("teams", AVSignals(
+                    udpCount: teamsUDP,
+                    mediaPortsCount: teamsMediaPorts,
+                    tcpCount: teamsTCP,
+                    confident: true
+                ))
+            }
         }
         
         // Check Zoom (match spike): require 7+ UDP connections and cpu > 15 for confidence
@@ -253,6 +282,7 @@ class AVDeviceDetector {
             return ("zoom", AVSignals(
                 udpCount: zoomUDP,
                 mediaPortsCount: 0,
+                tcpCount: 0,
                 confident: confident
             ))
         }
@@ -324,6 +354,40 @@ class AVDeviceDetector {
         }
         
         return portInfos
+    }
+    
+    /// Count established TCP connections for a process.
+    /// Used to detect Teams calls that fall back to TCP transport.
+    private func getTCPConnectionCount(forPid pid: pid_t) -> Int {
+        var bufferSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+        guard bufferSize > 0 else { return 0 }
+        
+        let fdCount = bufferSize / Int32(MemoryLayout<proc_fdinfo>.size)
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(fdCount))
+        
+        bufferSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, bufferSize)
+        guard bufferSize > 0 else { return 0 }
+        
+        var tcpCount = 0
+        for fd in fds {
+            guard fd.proc_fdtype == PROX_FDTYPE_SOCKET else { continue }
+            
+            var socketInfo = socket_fdinfo()
+            let socketSize = proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, &socketInfo, Int32(MemoryLayout<socket_fdinfo>.size))
+            guard socketSize > 0 else { continue }
+            
+            // Only count TCP sockets (SOCK_STREAM)
+            guard socketInfo.psi.soi_type == SOCK_STREAM else { continue }
+            
+            // Only count established connections
+            let soiState = socketInfo.psi.soi_proto.pri_tcp.tcpsi_state
+            // TSI_S_ESTABLISHED = 4 in macOS TCP states
+            if soiState == 4 {
+                tcpCount += 1
+            }
+        }
+        
+        return tcpCount
     }
 
     private func getCPUUsage(platformSubstring: String) -> Double {

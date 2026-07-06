@@ -1231,6 +1231,10 @@ class SpeakerDatabase:
         cursor = self.conn.execute("SELECT COUNT(*) as cnt FROM pending_name_associations WHERE status = 'pending'")
         stats['pending_count'] = cursor.fetchone()['cnt']
         
+        # Contact count
+        cursor = self.conn.execute("SELECT COUNT(*) as cnt FROM contacts")
+        stats['contact_count'] = cursor.fetchone()['cnt']
+        
         # Database size
         stats['db_size_mb'] = self.db_path.stat().st_size / (1024 * 1024)
         

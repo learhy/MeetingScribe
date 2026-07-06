@@ -38,14 +38,31 @@ fi
 if [ "$INSTALL_MODE" = "system" ]; then
     sudo mkdir -p "$APP_DEST_DIR"
     sudo rm -rf "$APP_DEST"
-    sudo cp -R "$APP_SRC" "$APP_DEST"
+    sudo ditto "$APP_SRC" "$APP_DEST"
     sudo chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
-    sudo chmod -R a+rX "$APP_DEST/Contents/Resources/python"
+    # Ensure the whole bundle is world-readable/traversable. sudo ditto makes it
+    # root-owned while the daemon runs as the user; a restrictive source mode
+    # (e.g. a 600 Info.plist) would otherwise be unreadable at runtime.
+    sudo chmod -R a+rX "$APP_DEST"
+    # Ensure python3.11 binary is executable and python3 symlink is intact.
+    # ditto preserves symlinks, but belt-and-suspenders in case the source
+    # bundle had a broken symlink (Google Drive filesystem issue).
+    sudo chmod +x "$APP_DEST/Contents/Resources/python/bin/python3.11"
+    if [ ! -L "$APP_DEST/Contents/Resources/python/bin/python3" ]; then
+        sudo rm -f "$APP_DEST/Contents/Resources/python/bin/python3"
+        sudo ln -s python3.11 "$APP_DEST/Contents/Resources/python/bin/python3"
+    fi
 else
     mkdir -p "$APP_DEST_DIR"
     rm -rf "$APP_DEST"
-    cp -R "$APP_SRC" "$APP_DEST"
+    ditto "$APP_SRC" "$APP_DEST"
     chmod +x "$APP_DEST/Contents/MacOS/meetingscribe"
+    chmod -R a+rX "$APP_DEST"
+    chmod +x "$APP_DEST/Contents/Resources/python/bin/python3.11"
+    if [ ! -L "$APP_DEST/Contents/Resources/python/bin/python3" ]; then
+        rm -f "$APP_DEST/Contents/Resources/python/bin/python3"
+        ln -s python3.11 "$APP_DEST/Contents/Resources/python/bin/python3"
+    fi
 fi
 
 # Install CLI control script

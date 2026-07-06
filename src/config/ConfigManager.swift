@@ -399,11 +399,29 @@ class ConfigManager {
     
     // MARK: - Bundled Python Detection
     
-    /// Returns the path to bundled Python if it exists in the app bundle
+    /// Returns the path to bundled Python if it exists in the app bundle and is
+    /// actually executable. The python-build-standalone tarball ships python3 as
+    /// a symlink to python3.11, but some filesystems (e.g. Google Drive) convert
+    /// symlinks to regular text files. We check executability and fall back to
+    /// python3.11 if the symlink is broken.
     var bundledPythonPath: String? {
         guard let resourcePath = Bundle.main.resourcePath else { return nil }
-        let pythonPath = "\(resourcePath)/python/bin/python3"
-        return FileManager.default.fileExists(atPath: pythonPath) ? pythonPath : nil
+        let binDir = "\(resourcePath)/python/bin"
+        let python3Path = "\(binDir)/python3"
+        let python311Path = "\(binDir)/python3.11"
+        let fm = FileManager.default
+        
+        // Prefer python3 if it's a real symlink or executable binary
+        if fm.isExecutableFile(atPath: python3Path) {
+            return python3Path
+        }
+        // Fall back to python3.11 directly (the actual Mach-O binary)
+        if fm.isExecutableFile(atPath: python311Path) {
+            return python311Path
+        }
+        // fileExists but not executable means a broken symlink was materialized
+        // as a text file — neither path works.
+        return nil
     }
     
     /// Returns the path to bundled diarization script if it exists in the app bundle

@@ -28,7 +28,12 @@ class FirstRunInstaller {
             if let installedVersion = try? String(contentsOfFile: versionMarkerPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) {
                 logger.info("[PID \(processId)] Installed version: \(installedVersion)")
                 logger.info("[PID \(processId)] Current version: \(currentVersionString)")
-                if installedVersion != currentVersionString {
+                if currentVersion == "unknown" {
+                    // Info.plist is unreadable (e.g. root-owned mode-600 bundle). Do NOT treat
+                    // this as a version change, otherwise the app reinstalls and exits on every
+                    // launch, never reaching menu-bar setup (infinite reinstall loop).
+                    logger.error("[PID \(processId)] Could not read bundle version (Info.plist unreadable?) - skipping version-mismatch reinstall")
+                } else if installedVersion != currentVersionString {
                     logger.info("[PID \(processId)] Version changed - reinstallation needed")
                     needsReinstall = true
                 }

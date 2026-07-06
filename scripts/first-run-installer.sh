@@ -110,6 +110,9 @@ else
         
         # Preserve ownership
         sudo chown -R root:wheel "$EXPECTED_LOCATION"
+        # Keep the bundle world-readable/traversable for the user-level daemon,
+        # otherwise Info.plist (and thus the version/bundle id) becomes unreadable.
+        sudo chmod -R a+rX "$EXPECTED_LOCATION"
         
         # Update APP_PATH to new location
         APP_PATH="$EXPECTED_LOCATION"

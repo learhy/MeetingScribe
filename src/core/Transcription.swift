@@ -112,12 +112,26 @@ class LocalWhisperProvider: TranscriptionProvider {
         if let customPath = whisperBinaryPath {
             self.whisperBinaryPath = customPath
         } else {
-            // Try to find whisper.cpp in sibling directory
+            // Try to find whisper.cpp in sibling directory.
+            // The home directory may use "My Drive" (Dropbox) or "my_drive"
+            // (Google Drive) depending on the cloud sync setup.
+            // whisper.cpp v1.9+ renamed the binary from "main" to "whisper-cli";
+            // prefer whisper-cli when available, fall back to main for older builds.
             let homeDir = FileManager.default.homeDirectoryForCurrentUser
-            let softwareProjects = homeDir.appendingPathComponent("My Drive/software_projects")
-            self.whisperBinaryPath = softwareProjects
-                .appendingPathComponent("whisper.cpp")
-                .appendingPathComponent("main")
+            let fm = FileManager.default
+            let searchDirs = [
+                homeDir.appendingPathComponent("My Drive/software_projects/whisper.cpp"),
+                homeDir.appendingPathComponent("my_drive/software_projects/whisper.cpp"),
+            ]
+            var candidates: [URL] = []
+            for dir in searchDirs {
+                candidates.append(dir.appendingPathComponent("build/bin/whisper-cli"))
+                candidates.append(dir.appendingPathComponent("build-static/bin/whisper-cli"))
+                candidates.append(dir.appendingPathComponent("whisper-cli"))
+                candidates.append(dir.appendingPathComponent("main"))
+            }
+            // Prefer the first candidate that exists and is executable
+            self.whisperBinaryPath = candidates.first(where: { fm.isExecutableFile(atPath: $0.path) }) ?? candidates[0]
         }
     }
     
@@ -127,9 +141,9 @@ class LocalWhisperProvider: TranscriptionProvider {
         logger.info("Model: \(modelPath.path)")
         logger.info("Audio: \(audioFileURL.path)")
         
-        // Verify whisper binary exists
-        guard FileManager.default.fileExists(atPath: whisperBinaryPath.path) else {
-            throw TranscriptionError.apiError("Whisper binary not found at: \(whisperBinaryPath.path)")
+        // Verify whisper binary exists and is executable
+        guard FileManager.default.isExecutableFile(atPath: whisperBinaryPath.path) else {
+            throw TranscriptionError.apiError("Whisper binary not found or not executable at: \(whisperBinaryPath.path)")
         }
         
         // Verify model exists and is a file (not a directory)

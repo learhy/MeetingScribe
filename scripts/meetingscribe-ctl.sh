@@ -66,7 +66,14 @@ print_usage() {
     echo "  speakers stats     Show database statistics"
     echo "  speakers cleanup   Run database maintenance"
     echo ""
+    echo -e "${BOLD}Contact Commands:${NC}"
+    echo "  contacts list      List all contacts"
+    echo "  contacts add       Add or update a contact"
+    echo "  contacts update    Update an existing contact"
+    echo "  contacts delete    Delete a contact"
+    echo ""
     echo -e "Run ${BOLD}meetingscribe-ctl speakers --help${NC} for detailed speaker commands."
+    echo -e "Run ${BOLD}meetingscribe-ctl contacts --help${NC} for detailed contact commands."
     exit 1
 }
 
@@ -96,6 +103,36 @@ print_speakers_usage() {
     echo "  meetingscribe-ctl speakers confirm abc123-def456"
     echo "  meetingscribe-ctl speakers rename spk_789 \"John Smith\""
     echo "  meetingscribe-ctl speakers merge spk_123 spk_456"
+    exit 1
+}
+
+print_contacts_usage() {
+    echo -e "${BOLD}Usage:${NC} meetingscribe-ctl contacts <command> [options]"
+    echo ""
+    echo -e "${BOLD}Commands:${NC}"
+    echo "  list                          List all contacts"
+    echo "  add <email> [options]         Add or update a contact"
+    echo "  update <email> [options]      Update an existing contact"
+    echo "  delete <email>                Delete a contact"
+    echo ""
+    echo -e "${BOLD}Add/Update Options:${NC}"
+    echo "  --name <name>                 Full display name"
+    echo "  --preferred-name <name>       Preferred name / nickname"
+    echo "  --pronunciation <guide>       Phonetic pronunciation guide"
+    echo "  --aliases <a1> [a2] ...       Alias/misspelling variants"
+    echo "  --role <role>                 Job title"
+    echo "  --team <team>                 Department/team"
+    echo "  --source manual|calendar|auto Source of the contact (add only)"
+    echo ""
+    echo -e "${BOLD}Options:${NC}"
+    echo "  --json                        Output in JSON format"
+    echo "  --db <path>                   Use alternate database path"
+    echo ""
+    echo -e "${BOLD}Examples:${NC}"
+    echo "  meetingscribe-ctl contacts list"
+    echo "  meetingscribe-ctl contacts add jane@example.com --name \"Jane Smith\" --team Engineering"
+    echo "  meetingscribe-ctl contacts update jane@example.com --role \"Staff Engineer\""
+    echo "  meetingscribe-ctl contacts delete jane@example.com"
     exit 1
 }
 
@@ -418,6 +455,76 @@ speakers_command() {
 }
 
 # ─────────────────────────────────────────────────────────────────────
+# Contact Commands
+# ─────────────────────────────────────────────────────────────────────
+
+contacts_command() {
+    local subcommand="${1:-}"
+    
+    if [ -z "$subcommand" ] || [ "$subcommand" = "--help" ] || [ "$subcommand" = "-h" ]; then
+        print_contacts_usage
+    fi
+    
+    check_speaker_cli
+    
+    # Check DB exists
+    if [ ! -f "$SPEAKER_DB" ]; then
+        echo -e "${YELLOW}⚠️  Speaker database not found${NC}"
+        echo ""
+        echo "The speaker database is created automatically when Smart Prompts"
+        echo "processes its first meeting. No contacts have been recorded yet."
+        exit 1
+    fi
+    
+    # Map friendly command names to CLI commands
+    case "$subcommand" in
+        list)
+            shift
+            run_speaker_cli list-contacts "$@"
+            ;;
+        add)
+            shift
+            if [ -z "${1:-}" ]; then
+                echo -e "${RED}Error: Missing email${NC}"
+                echo "Usage: meetingscribe-ctl contacts add <email> [--name ...] [--role ...]"
+                exit 1
+            fi
+            run_speaker_cli add-contact "$@"
+            ;;
+        update)
+            shift
+            if [ -z "${1:-}" ]; then
+                echo -e "${RED}Error: Missing email${NC}"
+                echo "Usage: meetingscribe-ctl contacts update <email> [--name ...] [--role ...]"
+                exit 1
+            fi
+            run_speaker_cli update-contact "$@"
+            ;;
+        delete|rm|remove)
+            shift
+            if [ -z "${1:-}" ]; then
+                echo -e "${RED}Error: Missing email${NC}"
+                echo "Usage: meetingscribe-ctl contacts delete <email>"
+                exit 1
+            fi
+            echo -e "${YELLOW}⚠️  This will permanently delete contact $1${NC}"
+            read -p "Continue? [y/N] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                run_speaker_cli delete-contact "$@"
+            else
+                echo "Cancelled."
+                exit 0
+            fi
+            ;;
+        *)
+            echo -e "${RED}Unknown contacts command: $subcommand${NC}"
+            print_contacts_usage
+            ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────────────
 # Main Command Dispatcher
 # ─────────────────────────────────────────────────────────────────────
 
@@ -443,6 +550,10 @@ case "${1:-}" in
     speakers|speaker)
         shift
         speakers_command "$@"
+        ;;
+    contacts|contact)
+        shift
+        contacts_command "$@"
         ;;
     help|--help|-h)
         print_usage
