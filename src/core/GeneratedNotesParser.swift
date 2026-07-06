@@ -70,23 +70,10 @@ struct GeneratedNotesParser {
             "generated meeting notes",
             "here are the meeting notes",
             "here are your meeting notes",
-            "here is the corrected transcript",
-            "here is the meeting notes",
-            "here's the corrected transcript",
-            "here's the meeting notes",
             "meeting notes:",
-            "corrected transcript:",
             "**meeting date:**",
             "meeting date:",
-            "[date fr",  // Incomplete date patterns
-            "once you share the transcript",
-            "i'll generate the notes",
-            "i will generate the notes",
-            "sure, here are",
-            "certainly, here are",
-            "of course, here are",
-            "below are the meeting notes",
-            "the following are meeting notes"
+            "[date fr"  // Incomplete date patterns
         ]
         
         while let firstNonEmptyIndex = lines.firstIndex(where: {

@@ -326,11 +326,6 @@ class TranscriptionService {
     /// Participant emails for the current meeting.
     /// Set before calling transcribe() to enable KNOWN PEOPLE injection.
     var participantEmails: [String]?
-
-    /// Known people for the current meeting, sourced from NameResolver.
-    /// When set, these are injected into the post-processor unconditionally,
-    /// regardless of whether calendar resolution succeeded.
-    var knownPeople: [ContactInfo]?
     
     init(config: ConfigManager = .shared) {
         self.config = config
@@ -364,18 +359,12 @@ class TranscriptionService {
         if config.config.transcription.postProcessing.enabled {
             logger.info("Applying LLM post-processing to transcript")
             
-            // Inject KNOWN PEOPLE from NameResolver (unconditional) if available
-            if let people = knownPeople, !people.isEmpty {
-                postProcessor.knownPeople = people
-                logger.info("Injected \(people.count) known people from NameResolver")
-            } else {
-                // Legacy path: fetch contacts for meeting participants to inject as KNOWN PEOPLE
-                if let emails = participantEmails, !emails.isEmpty {
-                    let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: emails)
-                    if !contacts.isEmpty {
-                        postProcessor.knownPeopleContext = TranscriptPostProcessor.formatKnownPeople(contacts)
-                        logger.info("Loaded \(contacts.count) contacts for KNOWN PEOPLE injection (legacy)")
-                    }
+            // Fetch contacts for meeting participants to inject as KNOWN PEOPLE
+            if let emails = participantEmails, !emails.isEmpty {
+                let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: emails)
+                if !contacts.isEmpty {
+                    postProcessor.knownPeopleContext = TranscriptPostProcessor.formatKnownPeople(contacts)
+                    logger.info("Loaded \(contacts.count) contacts for KNOWN PEOPLE injection")
                 }
             }
             
@@ -388,7 +377,6 @@ class TranscriptionService {
             
             // Clear for next transcription
             postProcessor.knownPeopleContext = nil
-            postProcessor.knownPeople = nil
         }
         
         return transcript
@@ -566,24 +554,13 @@ class TranscriptionService {
         }
     }
     
-    /// Minimum confidence threshold for replacing SPEAKER_XX labels with actual names.
-    /// Lowered from 0.8 to 0.6 to identify more speakers, with fuzzy reconciliation
-    /// in NameResolver catching misspellings. Kept in sync with NameResolver's threshold.
-    private static let speakerNameConfidenceThreshold = NameResolver.voiceMatchConfidenceThreshold
-
-    /// Optional display name map from NameResolver, used for transcript formatting.
-    /// When set, takes priority over the raw speakerMap for name resolution.
-    var displayNameMap: [String: String]?
-
+    /// Minimum confidence threshold for replacing SPEAKER_XX labels with actual names
+    private static let speakerNameConfidenceThreshold = 0.8
+    
     private func formatDiarizedTranscript(_ diarized: DiarizedTranscript) -> String {
-        // Build a label → display name lookup, preferring NameResolver's map
+        // Build a label → display name lookup from speakerMap
         var speakerDisplayNames: [String: String] = [:]
-
-        if let nameMap = displayNameMap, !nameMap.isEmpty {
-            speakerDisplayNames = nameMap
-            logger.info("Using NameResolver display name map: \(speakerDisplayNames)")
-        } else if let speakerMap = diarized.speakerMap {
-            // Fallback: use raw speakerMap with threshold
+        if let speakerMap = diarized.speakerMap {
             for (label, identity) in speakerMap {
                 if let identity = identity,
                    let name = identity.name, !name.isEmpty,
@@ -592,7 +569,7 @@ class TranscriptionService {
                 }
             }
             if !speakerDisplayNames.isEmpty {
-                logger.info("Speaker identity mapping (fallback): \(speakerDisplayNames)")
+                logger.info("Speaker identity mapping: \(speakerDisplayNames)")
             }
         }
         
