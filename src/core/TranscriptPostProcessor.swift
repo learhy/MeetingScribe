@@ -265,8 +265,13 @@ class TranscriptPostProcessor {
         return result
     }
     
-    /// Process a transcript to correct transcription errors using the configured LLM
-    func process(transcript: String) async throws -> String {
+    /// Process a transcript to correct transcription errors using the configured LLM.
+    /// - Parameters:
+    ///   - transcript: The transcript text to correct
+    ///   - knownPeople: Optional list of known people contacts for name correction.
+    ///                  When provided, injects a KNOWN PEOPLE section regardless of
+    ///                  whether participantEmails were set on the service.
+    func process(transcript: String, knownPeople: [ContactInfo]? = nil) async throws -> String {
         let postProcessingConfig = config.config.transcription.postProcessing
         let glossaryConfig = config.config.transcription.glossary
         let glossaryEntries = config.glossaryEntries
@@ -299,9 +304,16 @@ class TranscriptPostProcessor {
         }
         
         // Inject KNOWN PEOPLE section if available
-        if let peopleContext = knownPeopleContext, !peopleContext.isEmpty {
+        // Priority: explicit knownPeople parameter > knownPeopleContext property
+        if let people = knownPeople, !people.isEmpty {
+            let peopleContext = TranscriptPostProcessor.formatKnownPeople(people)
+            if !peopleContext.isEmpty {
+                systemPrompt = systemPrompt + peopleContext
+                logger.info("Injected KNOWN PEOPLE context from parameter (\(people.count) contacts)")
+            }
+        } else if let peopleContext = knownPeopleContext, !peopleContext.isEmpty {
             systemPrompt = systemPrompt + peopleContext
-            logger.info("Injected KNOWN PEOPLE context into correction prompt")
+            logger.info("Injected KNOWN PEOPLE context from property")
         }
         
         // For shorter transcripts, process in one go

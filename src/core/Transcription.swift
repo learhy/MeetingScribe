@@ -312,6 +312,11 @@ class TranscriptionService {
     /// Participant emails for the current meeting.
     /// Set before calling transcribe() to enable KNOWN PEOPLE injection.
     var participantEmails: [String]?
+
+    /// Known people contacts for the current meeting.
+    /// When set, injected into the post-processor prompt unconditionally.
+    /// Takes priority over contacts fetched via participantEmails.
+    var knownPeople: [ContactInfo]?
     
     init(config: ConfigManager = .shared) {
         self.config = config
@@ -345,17 +350,21 @@ class TranscriptionService {
         if config.config.transcription.postProcessing.enabled {
             logger.info("Applying LLM post-processing to transcript")
             
-            // Fetch contacts for meeting participants to inject as KNOWN PEOPLE
-            if let emails = participantEmails, !emails.isEmpty {
+            // Build known people list: explicit knownPeople > fetch from participantEmails
+            var effectiveKnownPeople: [ContactInfo] = []
+            if let explicit = knownPeople, !explicit.isEmpty {
+                effectiveKnownPeople = explicit
+                logger.info("Using \(explicit.count) explicitly provided known people contacts")
+            } else if let emails = participantEmails, !emails.isEmpty {
                 let contacts = await SpeakerDatabaseService.shared.fetchContacts(forEmails: emails)
                 if !contacts.isEmpty {
-                    postProcessor.knownPeopleContext = TranscriptPostProcessor.formatKnownPeople(contacts)
+                    effectiveKnownPeople = contacts
                     logger.info("Loaded \(contacts.count) contacts for KNOWN PEOPLE injection")
                 }
             }
             
             do {
-                transcript = try await postProcessor.process(transcript: transcript)
+                transcript = try await postProcessor.process(transcript: transcript, knownPeople: effectiveKnownPeople)
                 logger.info("Post-processing completed successfully")
             } catch {
                 logger.warning("Post-processing failed, using original transcript: \(error.localizedDescription)")
@@ -363,6 +372,7 @@ class TranscriptionService {
             
             // Clear for next transcription
             postProcessor.knownPeopleContext = nil
+            knownPeople = nil
         }
         
         return transcript
@@ -540,8 +550,10 @@ class TranscriptionService {
         }
     }
     
-    /// Minimum confidence threshold for replacing SPEAKER_XX labels with actual names
-    private static let speakerNameConfidenceThreshold = 0.8
+    /// Minimum confidence threshold for replacing SPEAKER_XX labels with actual names.
+    /// Lowered from 0.8 to 0.6 to resolve more speakers; fuzzy reconciliation in NameResolver
+    /// catches misspellings by cross-checking against contacts.
+    private static let speakerNameConfidenceThreshold = 0.6
     
     private func formatDiarizedTranscript(_ diarized: DiarizedTranscript) -> String {
         // Build a label → display name lookup from speakerMap
