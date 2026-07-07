@@ -69,8 +69,13 @@ class ProcessWindowDetector {
     }
     
     private func getWindowsOnScreenOnly() -> [[String: Any]]? {
+        // Use optionAll instead of optionOnScreenOnly so that minimized/background
+        // Teams windows are still counted. Teams v2 often has all its layer-0 windows
+        // marked as off-screen (Onscreen=false) even when Teams is running and in a call,
+        // which breaks detection with optionOnScreenOnly.
+        // We still filter by layer 0 (normal windows) below.
         guard let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly],
+            [.optionAll],
             kCGNullWindowID
         ) as? [[String: Any]] else {
             return nil
@@ -146,7 +151,15 @@ class ProcessWindowDetector {
             return ownerLower.contains("teams") || ownerLower.contains("msteams")
         }.count
         
-        logger.debug("Teams window count at layer 0: \(teamsWindowCount) (threshold: \(teamsCallWindowThreshold))")
+        // Also log on-screen count for diagnostic comparison
+        let onScreenTeamsCount = windows.filter { window in
+            guard let owner = window[kCGWindowOwnerName as String] as? String else { return false }
+            let ownerLower = owner.lowercased()
+            let isOnscreen = window[kCGWindowIsOnscreen as String] as? Bool ?? false
+            return isOnscreen && (ownerLower.contains("teams") || ownerLower.contains("msteams"))
+        }.count
+        
+        logger.debug("Teams window count at layer 0: \(teamsWindowCount) (on-screen: \(onScreenTeamsCount), threshold: \(teamsCallWindowThreshold))")
         
         if teamsWindowCount >= teamsCallWindowThreshold {
             logger.info("Teams call detected via window count (\(teamsWindowCount) >= \(teamsCallWindowThreshold))")
@@ -217,13 +230,13 @@ class AVDeviceDetector {
                 teamsUDP += udpPortsInfo.count
                 
                 // Check for Teams media ports (50000-50089, no remote)
-                // These indicate active media processing during a call
-                if processName == "MSTeams" {
-                    for portInfo in udpPortsInfo {
-                        // Media ports with no remote connection
-                        if portInfo.localPort >= 50000 && portInfo.localPort <= 50089 && !portInfo.hasRemote {
-                            teamsMediaPorts += 1
-                        }
+                // These indicate active media processing during a call.
+                // IMPORTANT: The media ports are held by "Microsoft Teams ModuleHost",
+                // not "MSTeams". Must check all Teams processes, not just the main one.
+                for portInfo in udpPortsInfo {
+                    // Media ports with no remote connection
+                    if portInfo.localPort >= 50000 && portInfo.localPort <= 50089 && !portInfo.hasRemote {
+                        teamsMediaPorts += 1
                     }
                 }
             } else if isZoom {
