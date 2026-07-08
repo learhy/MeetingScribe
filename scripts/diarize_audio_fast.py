@@ -451,7 +451,7 @@ def align_transcription_with_diarization(
                         "start": current_start,
                         "end": current_end,
                         "speaker": current_speaker,
-                        "text": "".join(current_words).strip()
+                        "text": " ".join(current_words).strip()
                     })
                 
                 current_speaker = speaker
@@ -465,7 +465,7 @@ def align_transcription_with_diarization(
                 "start": current_start,
                 "end": current_end,
                 "speaker": current_speaker,
-                "text": "".join(current_words).strip()
+                "text": " ".join(current_words).strip()
             })
     
     return aligned_segments

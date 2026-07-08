@@ -232,6 +232,105 @@ class TestBundledPython:
                 os.unlink(output_file)
 
 
+class TestWordLevelAlignment:
+    """Test word-level alignment in align_transcription_with_diarization"""
+
+    def test_words_are_space_separated(self):
+        """Regression test: words within a speaker segment must be separated by spaces.
+
+        Bug: "".join(current_words) concatenated words with no spaces, producing
+        transcripts like 'forinstruction.Additionally,lasttermsof...' instead of
+        'for instruction. Additionally, last terms of...'.
+        """
+        # Mock transcription with word-level timestamps
+        transcription = {
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 5.0,
+                    "text": "Hello world this is a test",
+                    "words": [
+                        {"word": "Hello", "start": 0.0, "end": 0.5},
+                        {"word": "world", "start": 0.5, "end": 1.0},
+                        {"word": "this", "start": 1.0, "end": 1.5},
+                        {"word": "is", "start": 1.5, "end": 2.0},
+                        {"word": "a", "start": 2.0, "end": 2.5},
+                        {"word": "test", "start": 2.5, "end": 3.0},
+                    ]
+                }
+            ]
+        }
+
+        # Single speaker segment covering the whole transcription
+        dia_segments = [
+            diarize_audio_fast.DiarizationSegment(
+                start=0.0, end=5.0, speaker="SPEAKER_00"
+            )
+        ]
+
+        result = diarize_audio_fast.align_transcription_with_diarization(
+            transcription, dia_segments
+        )
+
+        assert len(result) == 1
+        text = result[0]["text"]
+        # Words must be space-separated
+        assert " " in text, f"No spaces in output text: '{text}'"
+        assert text == "Hello world this is a test", f"Expected proper spacing, got: '{text}'"
+        # Explicitly check we don't get the bug output
+        assert "Helloworld" not in text, "Words are concatenated without spaces!"
+
+    def test_words_separated_across_speaker_change(self):
+        """Words on either side of a speaker change must also be space-separated."""
+        transcription = {
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 4.0,
+                    "text": "Hello there how are you",
+                    "words": [
+                        {"word": "Hello", "start": 0.0, "end": 0.5},
+                        {"word": "there", "start": 0.5, "end": 1.0},
+                        {"word": "how", "start": 1.0, "end": 1.5},
+                        {"word": "are", "start": 1.5, "end": 2.0},
+                        {"word": "you", "start": 2.0, "end": 2.5},
+                    ]
+                }
+            ]
+        }
+
+        # Two speaker segments - speaker change at t=1.0
+        dia_segments = [
+            diarize_audio_fast.DiarizationSegment(
+                start=0.0, end=1.0, speaker="SPEAKER_00"
+            ),
+            diarize_audio_fast.DiarizationSegment(
+                start=1.0, end=4.0, speaker="SPEAKER_01"
+            ),
+        ]
+
+        result = diarize_audio_fast.align_transcription_with_diarization(
+            transcription, dia_segments
+        )
+
+        assert len(result) == 2, f"Expected 2 segments (speaker change), got {len(result)}"
+
+        for seg in result:
+            text = seg["text"]
+            assert " " in text or len(text.split()) == 1, \
+                f"Multi-word segment has no spaces: '{text}'"
+            # Check no concatenated words
+            words = text.split()
+            assert all(w.isalpha() or any(c.isalpha() for c in w) for w in words), \
+                f"Contains concatenated words: '{text}'"
+
+        # First segment should have "Hello there"
+        assert "Hello" in result[0]["text"]
+        assert "there" in result[0]["text"]
+        assert "Hellothere" not in result[0]["text"], \
+            f"Words concatenated in first segment: '{result[0]['text']}'"
+
+
 class TestSwiftIntegration:
     """Test Swift code can use bundled Python"""
     

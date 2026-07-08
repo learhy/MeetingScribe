@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] - 2026-07-08
+
+### Fixed
+- **Critical**: Diarized transcripts had words concatenated with no spaces (e.g., `forinstruction.Additionally,lasttermsof...` instead of `for instruction. Additionally, last terms of...`). The `align_transcription_with_diarization` function in `diarize_audio_fast.py` used `"".join(current_words)` instead of `" ".join(current_words)` when grouping word-level timestamps by speaker, causing all words in a speaker segment to be merged into a single unbroken string. This bug was introduced in commit 0e707ff (March 2026) and affected all diarized transcriptions since then.
+
 ## [Unreleased] - 2024-12-18
 
 ### Added
