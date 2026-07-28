@@ -16,7 +16,7 @@ struct AppConfiguration: Codable {
         var sampleRate: Int = 48000
         var bitDepth: Int = 16
         var channels: Int = 2
-        var mixMode: String = "stereo_separated"  // "stereo_separated" | "mono_mixed"
+        var mixMode: String = "mono_mixed"  // "stereo_separated" | "mono_mixed" — default mono to prevent stereo desync echo
         var microphoneEnabled: Bool = true  // Explicit mic toggle (ANDed with OS permission)
         var systemGain: Double = 1.0  // Per-channel volume for system audio
         var micGain: Double = 1.0  // Per-channel volume for microphone audio
@@ -28,7 +28,7 @@ struct AppConfiguration: Codable {
             sampleRate = try container.decodeIfPresent(Int.self, forKey: .sampleRate) ?? 48000
             bitDepth = try container.decodeIfPresent(Int.self, forKey: .bitDepth) ?? 16
             channels = try container.decodeIfPresent(Int.self, forKey: .channels) ?? 2
-            mixMode = try container.decodeIfPresent(String.self, forKey: .mixMode) ?? "stereo_separated"
+            mixMode = try container.decodeIfPresent(String.self, forKey: .mixMode) ?? "mono_mixed"
             microphoneEnabled = try container.decodeIfPresent(Bool.self, forKey: .microphoneEnabled) ?? true
             systemGain = try container.decodeIfPresent(Double.self, forKey: .systemGain) ?? 1.0
             micGain = try container.decodeIfPresent(Double.self, forKey: .micGain) ?? 1.0
@@ -65,7 +65,7 @@ struct AppConfiguration: Codable {
             var whisperModel: String = "turbo"  // tiny, base, small, medium, large, turbo
             var distanceThreshold: Double = 0.25  // Cosine DISTANCE threshold (1 - similarity). 0.25 = merge if similarity > 0.75. Range: 0.15-0.40
             var vocabularyFile: String = ""  // Optional path to vocabulary file with domain terms
-            var initialPrompt: String = ""  // Optional initial prompt for Whisper (e.g., "Glossary: QBR, MBR, GTM")
+            var initialPrompt: String = "Boundary, HashiCorp, Rachana, Aman, Sapta, Lauren, Mukesh, Yang Li, Krishnan, Abhijit, Anando, Katie Simmons, Pradeep, Jeff Mitchell, Jim Lambert, Mike Gaffney, Adam Bouhmad, Eric Haberkorn, PEDM, RDP, OIDC, OAuth, JWT, session recording, credential injection, agentic access control"  // Default glossary prompt for Whisper
         }
         
         struct SmartPrompt: Codable {

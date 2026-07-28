@@ -360,8 +360,14 @@ class TranscriptPostProcessor {
     private func processChunkWithFallback(_ chunk: String, provider: LLMProvider, systemPrompt: String) async -> PassResult {
         // Create a correction-specific user message
         let userMessage = """
-        Please correct any transcription errors in the following meeting transcript. 
-        Fix misspelled names, technical terms, and misheard words while preserving speaker labels and the original meaning.
+        Please correct any transcription errors in the following meeting transcript.
+
+        PRIORITIZE: Fix misspelled names first. Use the KNOWN TERMS and KNOWN PEOPLE sections in the system prompt as authoritative references. If a name in the transcript is phonetically similar to a known person, correct it to the exact spelling from the KNOWN PEOPLE list.
+
+        Also fix: technical terms (use KNOWN TERMS), misheard words, and run-together text (add missing spaces between words that have been concatenated, e.g. "I'mgoingtotakealook" should be "I'm going to take a look").
+
+        Preserve: speaker labels (SPEAKER_00, etc.), original meaning, and correctly-written content. Do NOT rephrase for style.
+
         Return only the corrected transcript:
 
         \(chunk)

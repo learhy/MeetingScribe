@@ -17,15 +17,20 @@ protocol TranscriptionProvider {
 class OpenAIWhisperProvider: TranscriptionProvider {
     private let apiKey: String
     private let model: String
+    private let prompt: String  // Optional glossary prompt to bias Whisper toward known names/terms
     private let logger = DualLogger(category: "OpenAIWhisper")
     
-    init(apiKey: String, model: String = "whisper-1") {
+    init(apiKey: String, model: String = "whisper-1", prompt: String = "") {
         self.apiKey = apiKey
         self.model = model
+        self.prompt = prompt
     }
     
     func transcribe(audioFileURL: URL) async throws -> String {
         logger.info("Transcribing audio file: \(audioFileURL.lastPathComponent)")
+        if !prompt.isEmpty {
+            logger.info("Using glossary prompt (\(prompt.count) chars) to bias Whisper transcription")
+        }
         
         let url = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
         var request = URLRequest(url: url)
@@ -39,7 +44,8 @@ class OpenAIWhisperProvider: TranscriptionProvider {
         let httpBody = createMultipartBody(
             boundary: boundary,
             audioFileURL: audioFileURL,
-            model: model
+            model: model,
+            prompt: prompt
         )
         request.httpBody = httpBody
         
@@ -74,13 +80,25 @@ class OpenAIWhisperProvider: TranscriptionProvider {
         }
     }
     
-    private func createMultipartBody(boundary: String, audioFileURL: URL, model: String) -> Data {
+    private func createMultipartBody(boundary: String, audioFileURL: URL, model: String, prompt: String = "") -> Data {
         var body = Data()
         
         // Add model parameter
         body.append("--\(boundary)\r\n")
         body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n")
         body.append("\(model)\r\n")
+        
+        // Add language parameter (pin to English to prevent misdetection on degraded audio)
+        body.append("--\(boundary)\r\n")
+        body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n")
+        body.append("en\r\n")
+        
+        // Add prompt parameter if provided (glossary names to bias Whisper transcription)
+        if !prompt.isEmpty {
+            body.append("--\(boundary)\r\n")
+            body.append("Content-Disposition: form-data; name=\"prompt\"\r\n\r\n")
+            body.append("\(prompt)\r\n")
+        }
         
         // Add file parameter
         body.append("--\(boundary)\r\n")
@@ -589,9 +607,12 @@ class TranscriptionService {
             guard !apiKey.isEmpty else {
                 throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
             }
+            // Build a Whisper prompt from glossary person names to bias transcription
+            let whisperPrompt = Self.buildWhisperPrompt(from: config.glossaryEntries)
             return OpenAIWhisperProvider(
                 apiKey: apiKey,
-                model: transcriptionConfig.openai.model
+                model: transcriptionConfig.openai.model,
+                prompt: whisperPrompt
             )
             
         case "local":
@@ -605,9 +626,12 @@ class TranscriptionService {
             guard !apiKey.isEmpty else {
                 throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
             }
+            // Build a Whisper prompt from glossary person names to bias transcription
+            let whisperPrompt = Self.buildWhisperPrompt(from: config.glossaryEntries)
             return OpenAIWhisperProvider(
                 apiKey: apiKey,
-                model: transcriptionConfig.openai.model
+                model: transcriptionConfig.openai.model,
+                prompt: whisperPrompt
             )
         }
     }
@@ -619,6 +643,29 @@ extension Data {
     mutating func append(_ string: String) {
         if let data = string.data(using: .utf8) {
             append(data)
+
+    /// Build a compact prompt string from glossary person names for Whisper API.
+    /// Whisper's prompt parameter biases transcription toward known vocabulary.
+    /// Limited to ~40 names (fits within Whisper's 224-token prompt limit).
+    static func buildWhisperPrompt(from entries: [AppConfiguration.Transcription.GlossaryEntry]) -> String {
+        // Filter to entries that look like person names
+        let nameEntries = entries.filter { entry in
+            guard let context = entry.context?.lowercased() else { return true }
+            return context.contains("team") || context.contains("colleague") ||
+                   context.contains("person") || context.contains("manager") ||
+                   context.contains("engineer") || context.contains("analyst") ||
+                   context.contains("design") || context.contains("pm") ||
+                   context.contains("lead") || context.contains("director") ||
+                   context.contains("principal") || context.contains("vault")
         }
+
+        // Take first 40 names
+        let names = nameEntries.prefix(40).map { $0.term }
+        let prompt = names.joined(separator: ", ")
+
+        if prompt.isEmpty {
+            return ""
+        }
+        return "The following people may be mentioned in this meeting: " + prompt + "."
     }
 }

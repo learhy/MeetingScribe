@@ -99,7 +99,54 @@ def load_and_preprocess_audio(audio_path: str) -> Tuple[torch.Tensor, int]:
         waveform = resampler(waveform)
         sample_rate = 16000
     
+    # Trim leading and trailing silence to prevent Whisper hallucination on dead air
+    waveform = trim_silence(waveform, sample_rate)
+    
     return waveform, sample_rate
+
+
+def trim_silence(waveform, sample_rate, threshold_db=-40.0):
+    """Trim leading and trailing silence from audio using energy-based VAD.
+    
+    Whisper hallucinates on silence, producing repetitive or nonsensical text.
+    Trimming dead air before transcription significantly reduces hallucinations.
+    """
+    if waveform.numel() == 0:
+        return waveform
+    
+    mono = waveform[0] if waveform.shape[0] > 0 else waveform.squeeze(0)
+    frame_length = int(sample_rate * 0.02)  # 20ms frames
+    if frame_length == 0 or mono.numel() < frame_length:
+        return waveform
+    
+    frames = mono.unfold(0, frame_length, frame_length)
+    energy = torch.sum(frames ** 2, dim=1)
+    
+    if energy.numel() == 0 or energy.max() == 0:
+        return waveform
+    
+    threshold = 10 ** (threshold_db / 10) * energy.max().item()
+    voiced = energy > threshold
+    
+    if not voiced.any():
+        return waveform
+    
+    first_voiced = voiced.nonzero()[0].item() * frame_length
+    last_voiced = (voiced.nonzero()[-1].item() + 1) * frame_length
+    
+    # 100ms buffer to avoid clipping speech
+    buffer = int(sample_rate * 0.1)
+    first_voiced = max(0, first_voiced - buffer)
+    last_voiced = min(waveform.shape[1], last_voiced + buffer)
+    
+    trimmed = waveform[:, first_voiced:last_voiced]
+    
+    trimmed_duration = (last_voiced - first_voiced) / sample_rate
+    original_duration = waveform.shape[1] / sample_rate
+    if trimmed_duration < original_duration:
+        print(f"Trimmed silence: {original_duration:.1f}s -> {trimmed_duration:.1f}s (removed {original_duration - trimmed_duration:.1f}s)", file=sys.stderr)
+    
+    return trimmed
 
 
 def extract_embeddings_with_speechbrain(
@@ -312,13 +359,20 @@ def transcribe_with_whisper(
     
     transcribe_kwargs = {
         "word_timestamps": True,
-        "verbose": False
+        "verbose": False,
+        "language": "en",  # Pin language to prevent misdetection on degraded audio
+        "compression_ratio_threshold": 2.4,  # Reject segments that are too repetitive (hallucination guard)
+        "hallucination_silence_threshold": 2.0,  # Stop transcribing after 2s of silence (prevents hallucination on dead air)
     }
     
     if final_prompt:
         transcribe_kwargs["initial_prompt"] = final_prompt
         # Keep the prompt across segments for consistent vocabulary recognition
         transcribe_kwargs["condition_on_previous_text"] = True
+    else:
+        # Disable conditioning on previous text when no prompt is provided.
+        # This prevents hallucination loops where Whisper repeats garbled text across segments.
+        transcribe_kwargs["condition_on_previous_text"] = False
     
     result = model.transcribe(audio_path, **transcribe_kwargs)
     
