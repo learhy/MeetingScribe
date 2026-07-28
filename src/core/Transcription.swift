@@ -635,14 +635,6 @@ class TranscriptionService {
             )
         }
     }
-}
-
-// MARK: - Data Extension
-
-extension Data {
-    mutating func append(_ string: String) {
-        if let data = string.data(using: .utf8) {
-            append(data)
 
     /// Build a compact prompt string from glossary person names for Whisper API.
     /// Whisper's prompt parameter biases transcription toward known vocabulary.
@@ -667,5 +659,15 @@ extension Data {
             return ""
         }
         return "The following people may be mentioned in this meeting: " + prompt + "."
+    }
+}
+
+// MARK: - Data Extension
+
+extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
     }
 }
