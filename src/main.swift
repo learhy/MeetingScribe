@@ -752,6 +752,39 @@ class MeetingScribeService {
             // (already happened during transcribe, but set for next time)
             transcriptionService.knownPeople = knownPeople
             
+            // 2b-2. P1-3/P1-2: artifact split + verification pass (same as the
+            // live pipeline — this path IS the "re-run with current pipeline"
+            // action for retained meetings).
+            let meetingID = ArtifactWriter.meetingID(audioFilePath: audioPath)
+            let rawArtifactText: String
+            if let diarized = diarized {
+                rawArtifactText = VerificationPass.rawText(of: diarized)
+            } else {
+                rawArtifactText = transcriptionService.lastRawPrePostProcessing ?? transcript
+            }
+            ArtifactWriter.writeRaw(meetingID: meetingID, rawTranscript: rawArtifactText)
+            logger.info("Raw artifact persisted: \(meetingID).raw.md (\(rawArtifactText.count) chars)")
+            
+            var verifiedTranscript = transcript
+            if config.config.transcription.postProcessing.enabled,
+               let verificationProvider = notesService.makeProviderIfConfigured() {
+                let corrections = CorrectionDictionary.correctionsMap(
+                    file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
+                var verified = ""
+                for chunk in chunkedText(transcript, maxSize: 8000) {
+                    let piece = await VerificationPass.verifyChunk(
+                        chunk, provider: verificationProvider,
+                        rosterNames: attendeesList.isEmpty ? NameResolver.attendeesList(participants: resolvedParticipants, labelMap: labelMap, contacts: resolvedContacts) : attendeesList,
+                        corrections: corrections,
+                        labelMap: labelMap)
+                    verified += (verified.isEmpty ? "" : "\n") + piece
+                }
+                verifiedTranscript = verified
+                logger.info("Verification pass complete (\(verifiedTranscript.count) chars)")
+            } else {
+                verifiedTranscript = VerificationPass.normalizeLabels(transcript, labelMap: labelMap)
+            }
+            
             // Build attendees list using NameResolver (display names, not just first names)
             attendeesList = NameResolver.attendeesList(
                 participants: resolvedParticipants,
@@ -761,9 +794,11 @@ class MeetingScribeService {
             
             logger.info("Resolved \(labelMap.count) speaker labels, \(knownPeople.count) known people")
             
-            // 3. Generate notes with participant context
+            // 3. Generate notes with participant context.
+            // P1-3: the notes LLM receives the RAW artifact (transform mandate).
             logger.info("Generating notes...")
-            let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
+            let generatedNotes = try await notesService.generateNotes(
+                transcript: rawArtifactText, participantContext: participantContext)
             logger.info("Notes generation complete")
             
             // 4. Split notes to get summary
@@ -825,11 +860,14 @@ class MeetingScribeService {
                 attendees: attendeesList,
                 summary: cleanedNotes.summary,
                 notes: cleanedNotes.notes,
-                transcript: transcript,
+                transcript: verifiedTranscript,
                 audioFile: audioPath
             )
             
             let renderedNote = try templateEngine.render(noteData: noteData)
+            
+            // P1-3: persist the formatted note artifact (regenerable).
+            ArtifactWriter.writeNote(meetingID: meetingID, note: renderedNote)
             
             // 7. Save to plugin
             logger.info("Saving notes...")
@@ -1116,7 +1154,7 @@ class MeetingScribeService {
                 corrections: CorrectionDictionary.correctionsMap(file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
             )
             let audioURL = URL(fileURLWithPath: audioFilePath)
-            let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
+            var transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
 
             // Clear the roster prompt for the next transcription
