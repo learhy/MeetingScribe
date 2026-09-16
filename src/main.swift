@@ -712,9 +712,20 @@ class MeetingScribeService {
             // 2. Transcribe
             logger.info("Starting transcription...")
             transcriptionService.participantEmails = resolvedParticipants?.attendeeEmails
+            // P0-2/P0-3: build the per-meeting roster prompt (full display names from
+            // contacts, ranked, deduped, capped); falls back to the static glossary
+            // prompt inside TranscriptionService when calendar resolution failed.
+            transcriptionService.meetingRosterPrompt = RosterBuilder.buildPrompt(
+                participants: resolvedParticipants,
+                contacts: resolvedContacts,
+                glossary: config.glossaryEntries
+            )
             let fileURL = URL(fileURLWithPath: audioPath)
             let transcript = try await transcriptionService.transcribe(audioFileURL: fileURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
+
+            // Clear the roster prompt for the next transcription
+            transcriptionService.meetingRosterPrompt = nil
             
             // 2b. Resolve canonical names using NameResolver
             let diarized = transcriptionService.lastDiarizedResult
@@ -1085,9 +1096,20 @@ class MeetingScribeService {
             // 2. Transcribe
             logger.info("Starting transcription...")
             transcriptionService.participantEmails = resolvedParticipants?.attendeeEmails
+            // P0-2/P0-3: build the per-meeting roster prompt (full display names from
+            // contacts, ranked, deduped, capped); falls back to the static glossary
+            // prompt inside TranscriptionService when calendar resolution failed.
+            transcriptionService.meetingRosterPrompt = RosterBuilder.buildPrompt(
+                participants: resolvedParticipants,
+                contacts: resolvedContacts,
+                glossary: config.glossaryEntries
+            )
             let audioURL = URL(fileURLWithPath: audioFilePath)
             let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
             logger.info("Transcription complete: \(transcript.prefix(100))...")
+
+            // Clear the roster prompt for the next transcription
+            transcriptionService.meetingRosterPrompt = nil
             
             // 2b. Cross-reference speaker identities with calendar participants
             if let diarized = transcriptionService.lastDiarizedResult,

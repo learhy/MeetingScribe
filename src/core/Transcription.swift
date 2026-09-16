@@ -335,6 +335,13 @@ class TranscriptionService {
     /// When set, injected into the post-processor prompt unconditionally.
     /// Takes priority over contacts fetched via participantEmails.
     var knownPeople: [ContactInfo]?
+
+    /// Per-meeting roster prompt built by RosterBuilder (P0-2).
+    /// Set before calling transcribe(); when non-empty it replaces the static
+    /// glossary prompt on the OpenAI provider call and the local whisper.cpp
+    /// --initial-prompt. Falls back to the static glossary prompt when nil/empty
+    /// (e.g. calendar resolution failed).
+    var meetingRosterPrompt: String?
     
     init(config: ConfigManager = .shared) {
         self.config = config
@@ -445,9 +452,17 @@ class TranscriptionService {
             "--distance-threshold", String(diarizationConfig.distanceThreshold)
         ]
         
-        // Add initial prompt if configured
-        if !diarizationConfig.initialPrompt.isEmpty {
-            arguments.append(contentsOf: ["--initial-prompt", diarizationConfig.initialPrompt])
+        // Add initial prompt if configured — prefer the per-meeting roster prompt
+        // (P0-2) over the static glossary default.
+        let initialPrompt: String
+        if let rosterPrompt = meetingRosterPrompt, !rosterPrompt.isEmpty {
+            initialPrompt = rosterPrompt
+            logger.info("Using meeting roster prompt for whisper.cpp initial prompt")
+        } else {
+            initialPrompt = diarizationConfig.initialPrompt
+        }
+        if !initialPrompt.isEmpty {
+            arguments.append(contentsOf: ["--initial-prompt", initialPrompt])
             logger.info("Using initial prompt for Whisper")
         }
         
@@ -600,34 +615,43 @@ class TranscriptionService {
     
     private func createProvider() throws -> TranscriptionProvider {
         let transcriptionConfig = config.config.transcription
-        
+
+        // P0-2: meeting-aware roster prompt takes priority; static glossary
+        // prompt is the fallback when calendar resolution failed.
+        let whisperPrompt: String
+        if let rosterPrompt = meetingRosterPrompt, !rosterPrompt.isEmpty {
+            whisperPrompt = rosterPrompt
+            logger.info("Using meeting roster prompt (\(rosterPrompt.count) chars) for Whisper biasing")
+        } else {
+            whisperPrompt = Self.buildWhisperPrompt(from: config.glossaryEntries)
+            if !whisperPrompt.isEmpty {
+                logger.info("Calendar roster unavailable, using static glossary prompt (\(whisperPrompt.count) chars)")
+            }
+        }
+
         switch transcriptionConfig.provider {
         case "openai":
             let apiKey = transcriptionConfig.openai.apiKey
             guard !apiKey.isEmpty else {
                 throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
             }
-            // Build a Whisper prompt from glossary person names to bias transcription
-            let whisperPrompt = Self.buildWhisperPrompt(from: config.glossaryEntries)
             return OpenAIWhisperProvider(
                 apiKey: apiKey,
                 model: transcriptionConfig.openai.model,
                 prompt: whisperPrompt
             )
-            
+
         case "local":
             let modelPath = config.expandPath(transcriptionConfig.local.modelPath)
             let binaryPath = config.expandPath(transcriptionConfig.local.whisperBinaryPath)
             return LocalWhisperProvider(modelPath: modelPath, whisperBinaryPath: binaryPath)
-            
+
         default:
             logger.warning("Unknown provider '\(transcriptionConfig.provider)', falling back to OpenAI")
             let apiKey = transcriptionConfig.openai.apiKey
             guard !apiKey.isEmpty else {
                 throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
             }
-            // Build a Whisper prompt from glossary person names to bias transcription
-            let whisperPrompt = Self.buildWhisperPrompt(from: config.glossaryEntries)
             return OpenAIWhisperProvider(
                 apiKey: apiKey,
                 model: transcriptionConfig.openai.model,
