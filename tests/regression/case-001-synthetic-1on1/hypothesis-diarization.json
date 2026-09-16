@@ -1,0 +1,16 @@
+{
+  "segments": [
+    {"start": 0.0, "end": 13.8, "speaker": "SPEAKER_00", "text": "thanks for joining Rachana I wanted to walk through the PEDM rollout plan"},
+    {"start": 14.2, "end": 29.5, "speaker": "SPEAKER_01", "text": "sure the main milestone is the credential injection integration"},
+    {"start": 30.1, "end": 41.7, "speaker": "SPEAKER_02", "text": "I reviewed the session recording specs yesterday"},
+    {"start": 42.3, "end": 55.9, "speaker": "SPEAKER_03", "text": "I can take the RDP questions after this call"},
+    {"start": 56.4, "end": 69.8, "speaker": "SPEAKER_00", "text": "let's confirm the timeline on Thursday"},
+    {"start": 70.5, "end": 87.6, "speaker": "SPEAKER_01", "text": "I'll send the summary to Anando as well"}
+  ],
+  "speaker_map": {
+    "SPEAKER_00": {"name": "Dan", "confidence": 0.92},
+    "SPEAKER_01": {"name": "Rachana Reddy", "confidence": 0.85},
+    "SPEAKER_02": {"name": "Krishnan", "confidence": 0.78},
+    "SPEAKER_03": null
+  }
+}

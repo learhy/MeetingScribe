@@ -1,0 +1,6 @@
+Boundary / HashiCorp weekly sync
+Dan/Anando 1:1: PEDM vs Agentic roadmap
+Sprint review — Vault plugins
+Rachana & Mukesh Marodia: onboarding plan
+Meeting Notes - September 16, 2026
+PEDM credential injection — internal beta plan

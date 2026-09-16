@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MeetingScribe eval corpus case",
+  "type": "object",
+  "required": ["id", "audio", "reference"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable case id, e.g. 'case-001-rachana-1on1'. Referenced in reports."
+    },
+    "audio": {
+      "type": "string",
+      "description": "Path to the meeting clip (WAV, >=30 s, 48 kHz preferred). Relative to this file."
+    },
+    "reference": {
+      "type": "string",
+      "description": "Path to the hand-checked reference transcript (.txt, plain text, one utterance per line optional). Relative to this file."
+    },
+    "roster": {
+      "type": "string",
+      "description": "Path to roster.txt: one attendee display name per line, organizer first. Relative to this file. Used by diarize_audit.py for name-event scoring; omit if diarization scoring is not run for this case."
+    },
+    "engine": {
+      "type": "string",
+      "description": "Engine that produced the hypothesis, e.g. 'whisper-1', 'whisper-1+p0-2', 'gpt-4o-transcribe'. Free-form."
+    },
+    "prompt": {
+      "type": "string",
+      "description": "The biasing prompt sent with the request (empty for baseline). Recorded so A/B results are attributable."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-form notes: which hard names this case exercises, diarization failure flags, etc."
+    },
+    "hard_names": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Known-hard names this case is designed to exercise (Rachana, Sapta/Saptaparni, Anando, Mukesh Marodia, Krishnan, ...)."
+    }
+  }
+}

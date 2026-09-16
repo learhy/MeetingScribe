@@ -1,0 +1,10 @@
+{
+  "events": [
+    {"start": 0.0, "end": 14.0, "name": "Dan", "text": "thanks for joining, Rachana..."},
+    {"start": 14.0, "end": 30.0, "name": "Rachana", "text": "The main milestone..."},
+    {"start": 30.0, "end": 42.0, "name": "Krishnan", "text": "I reviewed the session recording specs..."},
+    {"start": 42.0, "end": 56.0, "name": "Mukesh Marodia", "text": "I can take the RDP questions..."},
+    {"start": 56.0, "end": 70.0, "name": "Dan", "text": "Let's confirm the timeline..."},
+    {"start": 70.0, "end": 88.0, "name": "Rachana", "text": "I'll send the summary to Anando..."}
+  ]
+}

@@ -53,6 +53,8 @@ recordings/
 # BUT keep test fixtures
 !tests/fixtures/*.wav
 *.txt
+!tests/regression/**/*.txt
+!tools/eval/**/*.txt
 *.md.bak
 
 # macOS specific

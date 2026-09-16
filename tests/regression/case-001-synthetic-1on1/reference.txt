@@ -1,0 +1,11 @@
+Dan: thanks for joining, Rachana. I wanted to walk through the PEDM rollout plan for this quarter.
+
+Rachana: Sure. The main milestone is the credential injection integration. We are targeting the end of the month for the internal beta.
+
+Krishnan: I reviewed the session recording specs yesterday. Two open questions on the RDP flow.
+
+Mukesh Marodia: I can take the RDP questions after this call and follow up with Krishnan.
+
+Dan: Great. Let's confirm the timeline on Thursday with Saptaparni's team before we commit.
+
+Rachana: I'll send the summary to Anando as well so he can weigh in on the agentic access control piece.
