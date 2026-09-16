@@ -14,6 +14,16 @@ enum NameSource: Int, Comparable {
     }
 }
 
+// MARK: - Attribution Basis (P2-2)
+
+/// How a speaker label got its name. Calendar-inferred names render with a
+/// "(likely)" suffix in Summary/Notes (plan §2 P2-2 presentation rule);
+/// voice-matched names render bare.
+enum AttributionBasis: String, Codable {
+    case voiceMatch          // acoustic voice-match against the speaker DB
+    case calendarInference   // 1:1 fallback: exactly one unmatched speaker + one unmatched attendee
+}
+
 // MARK: - Canonical Name
 
 /// A resolved canonical name for a speaker label.
@@ -23,14 +33,17 @@ struct CanonicalName {
     let source: NameSource
     let confidence: Double
     let email: String?
+    /// P2-2: voice vs calendar-inference — drives the "(likely)" suffix.
+    let basis: AttributionBasis
 
     /// Creates a canonical name from a contact's best name.
-    init(displayName: String, firstName: String? = nil, source: NameSource, confidence: Double, email: String? = nil) {
+    init(displayName: String, firstName: String? = nil, source: NameSource, confidence: Double, email: String? = nil, basis: AttributionBasis = .voiceMatch) {
         self.displayName = displayName
         self.firstName = firstName ?? CanonicalName.extractFirstName(from: displayName)
         self.source = source
         self.confidence = confidence
         self.email = email
+        self.basis = basis
     }
 
     /// Extracts the first word from a display name as the first name.
@@ -108,6 +121,9 @@ struct NameResolver {
                         email: reconciled.email
                     )
                     labelMap[label] = canonical
+                    logAssignmentBasis(
+                        label: label, name: reconciled.name, basis: .voiceMatch,
+                        confidence: canonical.confidence, detail: "voice match (speaker DB)")
 
                     if let email = reconciled.email, let contact = contactsByEmail[email.lowercased()] {
                         if !usedEmails.contains(email.lowercased()) {
@@ -130,6 +146,10 @@ struct NameResolver {
             }
 
             // 1:1 case: exactly 1 unmatched speaker + 1 unmatched attendee
+            // P2-2: APPLIED (was logged-only — June plan Task 1 rule 3).
+            // The assignment lands in the labelMap with basis
+            // .calendarInference, which drives the "(likely)" presentation
+            // suffix and per-speaker basis logging.
             if unmatchedLabels.count == 1 && unmatchedAttendees.count == 1,
                let label = unmatchedLabels.first,
                let attendee = unmatchedAttendees.first {
@@ -140,9 +160,13 @@ struct NameResolver {
                     displayName: displayName,
                     source: contact != nil ? .contacts : .calendar,
                     confidence: 0.7,
-                    email: attendee.email
+                    email: attendee.email,
+                    basis: .calendarInference
                 )
                 labelMap[label] = canonical
+                logAssignmentBasis(
+                    label: label, name: displayName, basis: .calendarInference,
+                    confidence: 0.7, detail: "1:1 fallback — sole unmatched attendee \(attendee.email)")
 
                 if let contact = contact, !usedEmails.contains(attendee.email.lowercased()) {
                     knownPeople.append(contact)
@@ -162,8 +186,12 @@ struct NameResolver {
                     displayName: displayName,
                     source: contact != nil ? .contacts : .calendar,
                     confidence: 0.7,
-                    email: me.email
+                    email: me.email,
+                    basis: .calendarInference
                 )
+                logAssignmentBasis(
+                    label: label, name: displayName, basis: .calendarInference,
+                    confidence: 0.7, detail: "sole unmatched label matched to me (\(me.email))")
 
                 if let contact = contact, !usedEmails.contains(me.email.lowercased()) {
                     knownPeople.append(contact)
@@ -183,6 +211,30 @@ struct NameResolver {
         }
 
         return (labelMap, knownPeople)
+    }
+
+    // MARK: - P2-2: assignment-basis logging
+
+    /// Log HOW each speaker got its name (voice match vs calendar inference).
+    /// Pure format/log helper — no state, safe to mirror in Python.
+    static func assignmentBasisLine(
+        label: String, name: String, basis: AttributionBasis, confidence: Double, detail: String
+    ) -> String {
+        let basisName: String
+        switch basis {
+        case .voiceMatch: basisName = "voice"
+        case .calendarInference: basisName = "calendar-inference"
+        }
+        return "[SpeakerAttribution] \(label) → \(name) basis=\(basisName) confidence=\(String(format: "%.2f", confidence)) (\(detail))"
+    }
+
+    private static func logAssignmentBasis(
+        label: String, name: String, basis: AttributionBasis, confidence: Double, detail: String
+    ) {
+        // Struct has no logger instance; DualLogger is created per call site
+        // in Swift — the line format is what the regression suite asserts on.
+        DualLogger(category: "NameResolver").info(assignmentBasisLine(
+            label: label, name: name, basis: basis, confidence: confidence, detail: detail))
     }
 
     // MARK: - Fuzzy Reconciliation

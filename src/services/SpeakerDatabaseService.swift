@@ -544,10 +544,13 @@ class SpeakerDatabaseService {
         if unidentified.count == 1 && unmatchedAttendees.count == 1,
            let speakerLabel = unidentified.first,
            let attendee = unmatchedAttendees.first {
-            // Find the speaker_id for any identified speaker to get the DB context
-            // For the unidentified speaker, we need to check if there's a speaker_id in the map
-            // (unidentified speakers have nil identity, so we can't auto-link without a speaker_id)
-            logger.info("1:1 cross-reference: \(speakerLabel) likely = \(attendee.firstName) <\(attendee.email)>")
+            // P2-2: the name assignment itself is now APPLIED by
+            // NameResolver.resolve (basis .calendarInference, "(likely)"
+            // presentation). This cross-reference pass only handles the
+            // speaker-DB side: unidentified speakers have no speaker_id yet,
+            // so the DB link still happens on the next meeting with this
+            // speaker once the suggestion is confirmed.
+            logger.info("1:1 cross-reference: \(speakerLabel) likely = \(attendee.firstName) <\(attendee.email)> (name applied by NameResolver with basis=calendar-inference)")
             logger.info("Note: Cannot auto-link unidentified speakers (no speaker_id). Name suggestion will be created during next meeting with this speaker.")
         }
         

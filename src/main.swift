@@ -805,11 +805,17 @@ class MeetingScribeService {
             let splitNotes = GeneratedNotesParser.split(generatedNotes)
             
             // 4b. Clean SPEAKER_XX labels from summary and notes sections
+            // P2-2: same guarantee as the live pipeline — raw labels never
+            // reach Summary/Notes; calendar-inferred names get "(likely)".
             let cleanedNotes = NotesLabelCleaner.cleanSummaryAndNotes(
                 summary: splitNotes.summary,
                 notes: splitNotes.notes,
                 labelMap: labelMap
             )
+            #if DEBUG
+            assert(!cleanedNotes.summary.contains("SPEAKER_") && !cleanedNotes.notes.contains("SPEAKER_"),
+                   "P2-2 invariant violated: raw SPEAKER_XX leaked into Summary/Notes")
+            #endif
             
             // 5. Determine meeting title using TitleValidator
             let dateFormatter = DateFormatter()
@@ -1249,17 +1255,26 @@ class MeetingScribeService {
             let splitNotes = GeneratedNotesParser.split(generatedNotes)
             
             // 4b. Clean SPEAKER_XX labels from summary and notes sections
+            // P2-2 guarantee: raw SPEAKER_XX never reaches Summary/Notes —
+            // resolved labels become names ("(likely)" when the basis is
+            // calendar inference), unresolved labels become "Speaker N".
+            // This goes through the P1-2 VerificationPass normalization path
+            // (NotesLabelCleaner) — no duplicate cleaner.
             let cleanedNotes = NotesLabelCleaner.cleanSummaryAndNotes(
                 summary: splitNotes.summary,
                 notes: splitNotes.notes,
                 labelMap: labelMap
             )
-            
+            #if DEBUG
+            assert(!cleanedNotes.summary.contains("SPEAKER_") && !cleanedNotes.notes.contains("SPEAKER_"),
+                   "P2-2 invariant violated: raw SPEAKER_XX leaked into Summary/Notes")
+            #endif
+
             // 5. Determine meeting title using TitleValidator
             // Priority: Calendar title -> LLM-generated -> Date-based fallback
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
-            
+
             var meetingTitle: String
             if isCancelled {
                 meetingTitle = "Cancelled Recording - \(dateFormatter.string(from: startTime))"

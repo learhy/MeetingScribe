@@ -33,9 +33,19 @@ struct NotesLabelCleaner {
 
             // Try to find a resolved name
             if let canonical = labelMap[fullLabel] {
+                // P2-2 presentation rule: calendar-inferred names get a
+                // "(likely)" suffix — they were inferred from the calendar,
+                // not confirmed by voice. Voice-matched names render bare.
+                let display: String
+                if canonical.basis == .calendarInference {
+                    let name = canonical.displayName
+                    display = name.hasSuffix("(likely)") ? name : "\(name) (likely)"
+                } else {
+                    display = canonical.displayName
+                }
                 result = (result as NSString).replacingCharacters(
                     in: matchRange,
-                    with: canonical.displayName
+                    with: display
                 )
             } else {
                 // No resolved name — use "Speaker N" (human-readable)
