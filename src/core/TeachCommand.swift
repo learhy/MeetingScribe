@@ -13,7 +13,7 @@ import Foundation
 /// mirrored in tools/eval/run_regression.py for this host.
 enum TeachCommand {
 
-    static let handledSubcommands: Set<String> = ["teach", "dictionary", "retention"]
+    static let handledSubcommands: Set<String> = ["teach", "dictionary", "retention", "hygiene"]
 
     static func handles(_ subcommand: String) -> Bool {
         handledSubcommands.contains(subcommand.lowercased())
@@ -36,11 +36,62 @@ enum TeachCommand {
             return runDictionary(rest, path: path)
         case "retention":
             return runRetention(rest)
+        case "hygiene":
+            return runHygiene(rest, path: path)
         default:
             print("Unknown subcommand: \(subcommand)")
             printUsage()
             return 1
         }
+    }
+
+    // MARK: - hygiene (P2-3)
+
+    /// `meetingscribe hygiene` — audit corrections.json + glossary, report.
+    /// `meetingscribe hygiene --apply` — backup-then-prune (never destructive
+    /// without a backup copy first).
+    private static func runHygiene(_ args: [String], path: URL) -> Int32 {
+        let apply = args.contains("--apply")
+
+        let corrections = CorrectionDictionary.load(path: path)
+        let glossary = ConfigManager.shared.glossaryEntries
+        let report = DictionaryHygiene.audit(corrections: corrections, glossary: glossary)
+
+        // Advisory prompt-composition line only when a roster prompt exists is
+        // not possible headlessly (no meeting) — show dictionary totals only.
+        print(DictionaryHygiene.renderReport(report, composition: nil))
+
+        guard apply else {
+            print("\nDry run — no changes made. Re-run with --apply to prune \(report.pruneSuggestions.count) term(s).")
+            return 0
+        }
+
+        guard !report.pruneSuggestions.isEmpty else {
+            print("Nothing to prune.")
+            return 0
+        }
+
+        // Backup first — never destructive without a backup copy.
+        let backupPath = path.appendingPathExtension("bak-\(Int(Date().timeIntervalSince1970))")
+        do {
+            try FileManager.default.copyItem(at: path, to: backupPath)
+            print("Backup written: \(backupPath.path)")
+        } catch {
+            if FileManager.default.fileExists(atPath: path.path) {
+                print("Error: could not write backup, aborting prune: \(error.localizedDescription)")
+                return 2
+            }
+            // No dictionary file on disk yet — nothing to back up, prune is safe.
+            print("No existing dictionary file to back up; proceeding.")
+        }
+
+        let updated = DictionaryHygiene.pruned(corrections, removing: report.pruneSuggestions)
+        guard CorrectionDictionary.save(updated, path: path) else {
+            print("Error: could not write pruned dictionary at \(path.path)")
+            return 2
+        }
+        print("Pruned \(report.pruneSuggestions.count) term(s); \(updated.entries.count) entries remain.")
+        return 0
     }
 
     // MARK: - retention (P1-4)
@@ -166,6 +217,8 @@ enum TeachCommand {
           meetingscribe dictionary remove "WrongName"    Remove a correction
           meetingscribe retention sweep                  Delete WAVs older than the retention window
           meetingscribe retention list                   List meetings re-runnable with the current pipeline
+          meetingscribe hygiene                          Audit corrections + glossary (unused/duplicates/phonetic collisions)
+          meetingscribe hygiene --apply                  Prune suggested terms (backup written first)
         """)
     }
 }

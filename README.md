@@ -375,6 +375,27 @@ meeting-scribe/
 └── README.md
 ```
 
+## Dictionary maintenance (P1-1 / P2-3)
+
+Teach the name-correction flywheel and keep the dictionary healthy:
+
+```bash
+meetingscribe teach "Ratchna->Rachana"   # teach a wrong→right mapping
+meetingscribe dictionary list            # review what's taught
+meetingscribe hygiene                    # monthly audit (read-only report)
+meetingscribe hygiene --apply            # prune suggested terms (backup first)
+```
+
+**Monthly cadence (manual — no timer):** once a month run
+`meetingscribe hygiene`. It flags taught corrections unused for 90+ days,
+duplicates/case-collisions, and phonetic collisions with glossary terms
+(these are report-only). `--apply` writes a timestamped backup of
+`~/.meetingscribe/corrections.json` before pruning — never destructive
+without a backup. The report also shows the active prompt-list composition
+(taught corrections → attendee names → glossary) against the 200-word roster
+budget: oversized biasing lists hurt accuracy, so prune when the dictionary
+creeps toward the cap.
+
 ## Privacy & Legal
 
 ⚠️ **IMPORTANT**: This tool captures ALL audio from meetings, including other participants.

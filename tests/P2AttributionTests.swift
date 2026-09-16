@@ -66,15 +66,18 @@ final class P2AttributionTests: XCTestCase {
         XCTAssertNil(labelMap["SPEAKER_01"])
     }
 
-    func testBelowThresholdVoiceMatchStaysUnmatched() {
+    func testBelowThresholdVoiceMatchStaysUnresolved() {
         let participants = participants([("dan@x.com", "Dan", true), ("rachana@x.com", "Rachana", false)])
         let speakerMap: [String: SpeakerIdentity?] = ["SPEAKER_00": SpeakerIdentity(speakerId: "s0", name: "Rachana", confidence: 0.4)]
 
         let (labelMap, _) = NameResolver.resolve(
             participants: participants, speakerMap: speakerMap, contacts: [], transcript: "")
 
-        // Below 0.6 threshold -> treated as unmatched -> 1:1 inference applies.
-        XCTAssertEqual(labelMap["SPEAKER_00"]?.basis, .calendarInference)
+        // Below the 0.6 threshold the identity is unusable — but it is not
+        // nil, so step 2's "voice match failed" rule (which counts nil labels
+        // only) does not fire. Conservative: no name is invented over a weak
+        // voice hint; the label stays unresolved.
+        XCTAssertNil(labelMap["SPEAKER_00"])
     }
 
     // MARK: - Assignment-basis logging

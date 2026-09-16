@@ -28,7 +28,8 @@ sys.path.insert(0, str(EVAL))
 import score_wer          # noqa: E402
 import diarize_audit      # noqa: E402
 import refusal_gate       # noqa: E402
-import p1_logic           # noqa: E402 (P1 mirrors of the Swift pure-logic types)
+import p1_logic          # noqa: E402 (P1 mirrors of the Swift pure-logic types)
+import p2_logic          # noqa: E402 (P2 mirrors: keyterms, attribution, hygiene)
 
 FAILURES = []
 
@@ -437,6 +438,230 @@ def test_p1_config_keys():
     check("P1-4: guards key decodes with default true", "audioGuardsEnabled) ?? true" in cm)
 
 
+# ---------------------------------------------------------------------------
+# 11. P2-1: engine seam (keyterms mapping + config plumbing)
+# ---------------------------------------------------------------------------
+
+def test_p2_engine_seam():
+    # Roster prompt -> keyterms mapping (mirror of the Swift provider logic)
+    roster = (
+        "The following people may be mentioned in this meeting: "
+        "Dan Rohan, Rachana Reddy, Mukesh Marodia. "
+        "Common corrections: Ratchna→Rachana, Marodi→Marodia. "
+        "Technical terms that may come up: PEDM, credential injection."
+    )
+    keyterms = p2_logic.keyterms_from_roster_prompt(roster)
+    check("P2-1: attendee names mapped first (roster rank order)",
+          keyterms[:3] == ["Dan Rohan", "Rachana Reddy", "Mukesh Marodia"], str(keyterms))
+    check("P2-1: correction RIGHT sides become keyterms",
+          "Rachana" in keyterms and "Marodia" in keyterms, str(keyterms))
+    check("P2-1: wrong spellings never become keyterms",
+          not any("→" in k or k == "Ratchna" for k in keyterms), str(keyterms))
+    check("P2-1: glossary terms appended", "PEDM" in keyterms, str(keyterms))
+
+    check("P2-1: empty roster -> empty keyterms",
+          p2_logic.keyterms_from_roster_prompt("") == [])
+    check("P2-1: case-insensitive dedupe",
+          p2_logic.keyterms_from_roster_prompt(
+              "The following people may be mentioned in this meeting: Rachana, rachana.") == ["Rachana"])
+
+    names80 = ", ".join(f"Attendee{i}" for i in range(80))
+    keyterms80 = p2_logic.keyterms_from_roster_prompt(
+        f"The following people may be mentioned in this meeting: {names80}.")
+    check("P2-1: keyterms capped at 50", len(keyterms80) == 50, str(len(keyterms80)))
+
+    # Swift sources: provider + seam exist, default unchanged
+    prov = (REPO / "src" / "core" / "AssemblyAIProvider.swift").read_text()
+    check("P2-1: AssemblyAI provider implements TranscriptionProvider",
+          "class AssemblyAIUniversal3Provider: TranscriptionProvider" in prov)
+    check("P2-1: provider uses keyterms parameter", "keyterms" in prov)
+    check("P2-1: provider handles async job model (upload + poll)",
+          "/upload" in prov and "/transcript" in prov and "status" in prov)
+
+    ts = (REPO / "src" / "core" / "Transcription.swift").read_text()
+    check("P2-1: createProvider seams assemblyai", 'case "assemblyai"' in ts)
+    check("P2-1: default provider untouched (whisper-1 first)",
+          ts.find('case "openai"') < ts.find('case "assemblyai"'))
+
+    cm = (REPO / "src" / "config" / "ConfigManager.swift").read_text()
+    check("P2-1: config block transcription.assemblyai with back-compat decode",
+          "struct AssemblyAI" in cm and "decodeIfPresent" in cm)
+    check("P2-1: keychain fallback for AssemblyAI key",
+          "assemblyai.apiKey" in ts)
+
+    cv = (REPO / "src" / "config" / "ConfigValidator.swift").read_text()
+    check("P2-1: config validation on load for assemblyai",
+          'case "assemblyai"' in cv)
+
+    ab = (REPO / "tools" / "eval" / "run_engine_ab.sh").read_text()
+    check("P2-1: A/B script scores both engines on same corpus",
+          "whisper-1" in ab and "assemblyai" in ab and "score_wer.py" in ab)
+    check("P2-1: A/B script encodes §3 adoption thresholds",
+          ">= 0.01" in ab and "REVIEW MANUALLY" in ab)
+
+    stub = (REPO / "src" / "core" / "ParakeetStub.swift").read_text()
+    check("P2-1: local candidates stubbed (interface + plumbing only)",
+          "class ParakeetTDTProvider" in stub and "class AppleSpeechAnalyzerProvider" in stub
+          and "TODO(future swap task)" in stub)
+
+    swap = (REPO / "docs" / "engine-swap.md").read_text()
+    check("P2-1: runbook documents runtime/memory requirements for locals",
+          "NeMo-Speech.cpp" in swap and "1.3 GB" in swap and "macOS 26" in swap)
+
+
+# ---------------------------------------------------------------------------
+# 12. P2-2: calendar-primed attribution + presentation rules
+# ---------------------------------------------------------------------------
+
+def test_p2_attribution():
+    from p2_logic import Participant, SpeakerIdentity, CanonicalName  # noqa
+
+    # 1:1 inference is APPLIED
+    people = [Participant("dan@x.com", "Dan", is_me=True),
+              Participant("rachana@x.com", "Rachana")]
+    smap = {"SPEAKER_00": SpeakerIdentity("Dan", 0.9), "SPEAKER_01": None}
+    labels = p2_logic.resolve_attribution(people, smap)
+    check("P2-2: 1:1 fallback applied to labelMap",
+          labels.get("SPEAKER_01") is not None, str(labels))
+    check("P2-2: applied name is the sole unmatched attendee",
+          labels["SPEAKER_01"].display_name == "Rachana")
+    check("P2-2: assignment basis is calendar-inference",
+          labels["SPEAKER_01"].basis == "calendarInference")
+
+    # Voice match keeps voice basis
+    smap_voice = {"SPEAKER_00": SpeakerIdentity("Rachana", 0.85)}
+    labels_voice = p2_logic.resolve_attribution(people, smap_voice)
+    check("P2-2: voice-matched speaker has voice basis",
+          labels_voice["SPEAKER_00"].basis == "voiceMatch", str(labels_voice))
+
+    # Below-threshold voice match: identity present but unusable. This is NOT
+    # "voice match failed" (a weak hint exists) — Swift step 2 counts only
+    # nil-identity labels as unmatched, so no 1:1 inference fires and the
+    # label stays unresolved (conservative: never invent a name over a weak
+    # voice hint).
+    smap_weak = {"SPEAKER_00": SpeakerIdentity("Rachana", 0.4)}
+    labels_weak = p2_logic.resolve_attribution(people, smap_weak)
+    check("P2-2: below-threshold match stays unresolved (no invented name)",
+          "SPEAKER_00" not in labels_weak, str(labels_weak))
+
+    # Multi-speaker meeting: NO 1:1 inference
+    group = people + [Participant("a@x.com", "Amy"), Participant("b@x.com", "Bob")]
+    smap_group = {"SPEAKER_00": None, "SPEAKER_01": None}
+    labels_group = p2_logic.resolve_attribution(group, smap_group)
+    check("P2-2: no inference when 2 unmatched speakers vs 1 unmatched attendee",
+          len(labels_group) == 0, str(labels_group))
+
+    # Basis logging format (mirror of NameResolver.assignmentBasisLine)
+    line = p2_logic.assignment_basis_line("SPEAKER_01", "Rachana", "calendarInference", 0.7, "1:1 fallback")
+    check("P2-2: basis log line marks calendar-inference",
+          "basis=calendar-inference" in line and "SPEAKER_01" in line, line)
+
+    # Presentation rules
+    name = p2_logic.display_label(
+        CanonicalName("Rachana Reddy", "voiceMatch", 0.85), "SPEAKER_00")
+    check("P2-2: voice-matched name renders bare", name == "Rachana Reddy", name)
+
+    likely = p2_logic.display_label(
+        CanonicalName("Rachana", "calendar", 0.7, basis="calendarInference"), "SPEAKER_01")
+    check("P2-2: calendar-inferred name renders with (likely)",
+          likely == "Rachana (likely)", likely)
+
+    sp = p2_logic.display_label(None, "SPEAKER_02")
+    check("P2-2: unresolved label renders Speaker N", sp == "Speaker 2", sp)
+
+    out = p2_logic.normalize_labels(
+        "SPEAKER_00 opened. SPEAKER_01 agreed. SPEAKER_02 concluded.",
+        {"SPEAKER_00": CanonicalName("Dan Rohan", "calendar", 0.7, basis="calendarInference"),
+         "SPEAKER_01": CanonicalName("Rachana Reddy", "voiceMatch", 0.9)})
+    check("P2-2: (likely) suffix only on calendar-inferred",
+          "Dan Rohan (likely) opened." in out and "Rachana Reddy agreed." in out, out)
+    check("P2-2: no raw SPEAKER_XX survives normalization", "SPEAKER_" not in out, out)
+
+    # Swift sources: invariant comment + assert present on both pipeline paths
+    main = (REPO / "src" / "main.swift").read_text()
+    check("P2-2: raw-label leak assert on both pipeline paths",
+          main.count("raw SPEAKER_XX leaked into Summary/Notes") == 2)
+    nr = (REPO / "src" / "core" / "NameResolver.swift").read_text()
+    check("P2-2: NameResolver logs assignment basis per speaker",
+          "logAssignmentBasis" in nr and "AttributionBasis" in nr)
+    nlc = (REPO / "src" / "core" / "NotesLabelCleaner.swift").read_text()
+    check("P2-2: presentation integrates via NotesLabelCleaner (no duplicate)",
+          '(likely)' in nlc and "calendarInference" in nlc)
+
+
+# ---------------------------------------------------------------------------
+# 13. P2-3: dictionary hygiene audit
+# ---------------------------------------------------------------------------
+
+def test_p2_hygiene():
+    import time as _time
+
+    now = _time.time()
+
+    def entry(wrong, right, days_ago=0.0):
+        return {"wrong": wrong, "right": right, "source": "manual",
+                "updatedAt": now - days_ago * 86400}
+
+    entries = [
+        entry("Ratchna", "Rachana", days_ago=120),   # unused > 90 days
+        entry("Recent", "Krishnan", days_ago=5),     # fine
+        entry("same", "Same"),                        # case-collision no-op
+    ]
+    entries.append(dict(entry("ratchna", "Rachana")))  # duplicate of Ratchna
+
+    glossary = ["Boundary", "Vault", "PEDM"]
+    findings, prune = p2_logic.audit_hygiene(entries, glossary, now_ts=now)
+
+    kinds = {(f.kind, f.term) for f in findings}
+    check("P2-3: flags 120-day-unused entry",
+          ("unused", "Ratchna") in kinds, str(kinds))
+    check("P2-3: flags case-insensitive duplicate",
+          ("duplicate", "ratchna") in kinds, str(kinds))
+    check("P2-3: flags case-collision no-op mapping",
+          ("case_collision", "same") in kinds, str(kinds))
+    check("P2-3: recent entry not flagged unused",
+          not any(f.kind == "unused" and f.term == "Recent" for f in findings))
+    check("P2-3: prune list has unused + dupes + no-ops, nothing else",
+          set(prune) == {"Ratchna", "ratchna", "same"}, str(prune))
+
+    # Phonetic collision is report-only (never in prune list)
+    entries_ph = [entry("Boundry", "Boundary", days_ago=1)]
+    findings_ph, prune_ph = p2_logic.audit_hygiene(entries_ph, ["Boundary"], now_ts=now)
+    check("P2-3: phonetic collisions never auto-pruned", prune_ph == [], str(prune_ph))
+
+    # Clean dictionary
+    findings_clean, prune_clean = p2_logic.audit_hygiene(
+        [entry("Ratchna", "Rachana", days_ago=3)], ["PEDM"], now_ts=now)
+    check("P2-3: clean dictionary has no findings",
+          not findings_clean and not prune_clean)
+
+    # Prompt composition vs 200-word budget (RosterBuilder cap)
+    roster = ("The following people may be mentioned in this meeting: Dan Rohan, Rachana Reddy. "
+              "Common corrections: Ratchna→Rachana. "
+              "Technical terms that may come up: PEDM.")
+    comp = p2_logic.prompt_composition(roster)
+    check("P2-3: composition counts corrections first (priority tier)",
+          len(comp.corrections) == 1, str(comp))
+    check("P2-3: composition within 200-word budget", comp.within_budget(), str(comp.word_count))
+
+    big = p2_logic.prompt_composition(
+        "The following people may be mentioned in this meeting: " +
+        ", ".join(f"Name{i} Surname{i}" for i in range(120)) + ".")
+    check("P2-3: oversized roster flagged over budget", not big.within_budget(), str(big.word_count))
+
+    # Swift sources
+    dh = (REPO / "src" / "core" / "DictionaryHygiene.swift").read_text()
+    check("P2-3: audit covers unused/duplicates/case-collisions/phonetic",
+          all(k in dh for k in ["unused", "duplicate", "caseCollision", "phoneticCollision"]))
+    check("P2-3: uses RosterBuilder's 200-word budget", "RosterBuilder.wordBudget" in dh)
+    tc = (REPO / "src" / "core" / "TeachCommand.swift").read_text()
+    check("P2-3: hygiene subcommand registered", '"hygiene"' in tc and "runHygiene" in tc)
+    check("P2-3: --apply backs up before pruning",
+          "Backup written" in tc and "copyItem" in tc)
+    readme = (REPO / "README.md").read_text()
+    check("P2-3: README documents monthly cadence", "Monthly cadence" in readme and "hygiene" in readme)
+
+
 if __name__ == "__main__":
     print(f"MeetingScribe regression suite — repo root: {REPO}")
     print("=" * 60)
@@ -457,6 +682,9 @@ if __name__ == "__main__":
         (tmp / "retention").mkdir()
         test_p1_retention(tmp / "retention")
         test_p1_config_keys()
+    test_p2_engine_seam()
+    test_p2_attribution()
+    test_p2_hygiene()
     print("=" * 60)
     if FAILURES:
         print(f"{len(FAILURES)} FAILURE(S): {FAILURES}")
