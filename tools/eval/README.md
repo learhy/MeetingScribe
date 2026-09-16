@@ -12,6 +12,9 @@ tools/eval/
     export_corpus.sh       Mac-side: create corpus cases from retained WAVs
     score_wer.py           WER + per-name accuracy scorer
     diarize_audit.py       name-event F1 + per-name assignment accuracy
+    refusal_gate.py        P0-4 gate: 0 refusal outputs in titles
+    p1_logic.py            Python mirrors of the P1 Swift pure-logic types
+    run_regression.py      CI regression suite (88 checks, synthetic only)
     README.md              this file
 corpus/                    (local-only, git-ignored) Dan's real clips
 tests/regression/          synthetic fixtures + CI regression suite
