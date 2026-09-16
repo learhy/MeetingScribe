@@ -683,13 +683,62 @@ class TranscriptionService {
                 prompt: whisperPrompt
             )
 
+        // P2-1: AssemblyAI Universal-3 Pro — EVAL-ONLY. The roster prompt
+        // (RosterBuilder output) is mapped to AssemblyAI's keyterms parameter
+        // (plan §3: strongest biasing surface among cloud APIs). Default
+        // provider is unchanged; adoption is harness-gated (docs/engine-swap.md).
+        case "assemblyai":
+            let assemblyConfig = transcriptionConfig.assemblyai
+            var apiKey = assemblyConfig.apiKey
+            if apiKey.isEmpty {
+                // Keychain storage preferred over plaintext config (same
+                // SecretsManager service as the OpenAI key).
+                if let keychainKey = try? SecretsManager.shared.retrieveSecret(forKey: AssemblyAIUniversal3Provider.keychainAccount) {
+                    apiKey = keychainKey
+                    logger.info("Using AssemblyAI key from Keychain")
+                }
+            }
+            guard !apiKey.isEmpty else {
+                throw TranscriptionError.apiError(
+                    "AssemblyAI API key not configured. Add transcription.assemblyai.apiKey to ~/.meetingscribe/config.json " +
+                    "or store it in the Keychain (account '\(AssemblyAIUniversal3Provider.keychainAccount)', service 'com.meetingscribe'). " +
+                    "Note: EVAL-ONLY provider — default stays whisper-1 (docs/engine-swap.md).")
+            }
+            var keyterms = assemblyConfig.extraKeyterms
+            if assemblyConfig.keytermsFromRoster, !whisperPrompt.isEmpty {
+                let mapped = AssemblyAIUniversal3Provider.keyterms(fromRosterPrompt: whisperPrompt)
+                logger.info("Mapped \(mapped.count) roster keyterms for AssemblyAI biasing")
+                keyterms = mapped + keyterms
+            }
+            return AssemblyAIUniversal3Provider(
+                apiKey: apiKey,
+                model: assemblyConfig.model,
+                keyterms: keyterms,
+                pollIntervalSeconds: assemblyConfig.pollIntervalSeconds,
+                maxPollAttempts: assemblyConfig.maxPollAttempts
+            )
+
         case "local":
             let modelPath = config.expandPath(transcriptionConfig.local.modelPath)
             let binaryPath = config.expandPath(transcriptionConfig.local.whisperBinaryPath)
             return LocalWhisperProvider(modelPath: modelPath, whisperBinaryPath: binaryPath)
 
+        // P2-1: reserved local-candidate stub ids (plan §3 step 4) — config
+        // plumbing exists so the future swap task has the seam ready; at
+        // runtime they degrade to the whisper-1 default per the fallback chain.
+        case "parakeet", "apple-speechanalyzer":
+            logger.warning("Provider '\(transcriptionConfig.provider)' is a stub (plan §3 step 4); falling back to OpenAI whisper-1")
+            let apiKey = transcriptionConfig.openai.apiKey
+            guard !apiKey.isEmpty else {
+                throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")
+            }
+            return OpenAIWhisperProvider(
+                apiKey: apiKey,
+                model: transcriptionConfig.openai.model,
+                prompt: whisperPrompt
+            )
+
         default:
-            logger.warning("Unknown provider '\(transcriptionConfig.provider)', falling back to OpenAI")
             let apiKey = transcriptionConfig.openai.apiKey
             guard !apiKey.isEmpty else {
                 throw TranscriptionError.apiError("OpenAI API key not configured. Add it to ~/.meetingscribe/config.json")

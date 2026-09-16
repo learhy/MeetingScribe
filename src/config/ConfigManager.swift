@@ -62,6 +62,36 @@ struct AppConfiguration: Codable {
             var modelPath: String = ""
             var whisperBinaryPath: String = ""
         }
+
+        /// P2-1: AssemblyAI Universal-3 Pro config block (EVAL-ONLY — the
+        /// default provider stays whisper-1+roster until the harness says
+        /// otherwise; see docs/engine-swap.md).
+        struct AssemblyAI: Codable {
+            var apiKey: String = ""          // prefer Keychain (see SecretsManager note)
+            var model: String = "universal-3-pro"
+            var keytermsFromRoster: Bool = true  // map the RosterBuilder prompt to `keyterms`
+            var extraKeyterms: [String] = []     // manual additions beyond the roster
+            var pollIntervalSeconds: Double = 3.0
+            var maxPollAttempts: Int = 600
+
+            // Custom decoder for backwards compatibility with existing config files
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+                model = try container.decodeIfPresent(String.self, forKey: .model) ?? "universal-3-pro"
+                keytermsFromRoster = try container.decodeIfPresent(Bool.self, forKey: .keytermsFromRoster) ?? true
+                extraKeyterms = try container.decodeIfPresent([String].self, forKey: .extraKeyterms) ?? []
+                pollIntervalSeconds = try container.decodeIfPresent(Double.self, forKey: .pollIntervalSeconds) ?? 3.0
+                maxPollAttempts = try container.decodeIfPresent(Int.self, forKey: .maxPollAttempts) ?? 600
+            }
+
+            init() {}
+
+            private enum CodingKeys: String, CodingKey {
+                case apiKey, model, keytermsFromRoster, extraKeyterms
+                case pollIntervalSeconds, maxPollAttempts
+            }
+        }
         
         struct Diarization: Codable {
             var enabled: Bool = false
@@ -177,6 +207,7 @@ struct AppConfiguration: Codable {
         
         var openai: OpenAI = OpenAI()
         var local: Local = Local()
+        var assemblyai: AssemblyAI = AssemblyAI()
         var diarization: Diarization = Diarization()
         var postProcessing: PostProcessing = PostProcessing()
         var glossary: Glossary = Glossary()

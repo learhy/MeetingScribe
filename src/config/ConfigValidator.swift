@@ -168,7 +168,26 @@ class ConfigValidator {
             if let error = validateNonEmpty(transcription.openai.model, field: "OpenAI Model") {
                 errors.append(error)
             }
-            
+
+        // P2-1: AssemblyAI (EVAL-ONLY provider — see docs/engine-swap.md)
+        case "assemblyai":
+            if let error = validateNonEmpty(transcription.assemblyai.apiKey, field: "AssemblyAI API Key") {
+                errors.append(error)
+            }
+            if let error = validateNonEmpty(transcription.assemblyai.model, field: "AssemblyAI Model") {
+                errors.append(error)
+            }
+            if let error = validatePositive(transcription.assemblyai.maxPollAttempts, field: "AssemblyAI Max Poll Attempts") {
+                errors.append(error)
+            }
+
+        // P2-1: reserved local-candidate provider ids — config plumbing only,
+        // no provider implementation yet (plan §3 step 4 stubs).
+        case "parakeet", "apple-speechanalyzer":
+            errors.append(ValidationError(
+                field: "Provider",
+                message: "Provider '\(transcription.provider)' is a reserved stub (plan §3 step 4) — no implementation yet; falling back to whisper-1 at runtime"))
+
         default:
             errors.append(ValidationError(field: "Provider", message: "Invalid transcription provider"))
         }
