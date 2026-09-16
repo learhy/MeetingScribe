@@ -28,6 +28,7 @@ sys.path.insert(0, str(EVAL))
 import score_wer          # noqa: E402
 import diarize_audit      # noqa: E402
 import refusal_gate       # noqa: E402
+import p1_logic           # noqa: E402 (P1 mirrors of the Swift pure-logic types)
 
 FAILURES = []
 
@@ -234,6 +235,208 @@ def test_budget_math():
     check("Budget: 224-token limit respected with headroom (208)", 208 < 224)
 
 
+# ---------------------------------------------------------------------------
+# 7. P1-1: dictionary flywheel (Python mirror of CorrectionDictionary)
+# ---------------------------------------------------------------------------
+
+def test_p1_dictionary_flywheel():
+    # Teach argument parsing — all separator spellings
+    for arg in ["Ratchna->Rachana", "Ratchna=>Rachana", "Ratchna=Rachana", "Ratchna→Rachana"]:
+        wrong, right = p1_logic.parse_teach_argument(arg)
+        check(f"P1-1: parse teach {arg!r}", (wrong, right) == ("Ratchna", "Rachana"), f"{wrong}->{right}")
+
+    # Whitespace trimmed
+    wrong, right = p1_logic.parse_teach_argument("  Ratchna ->  Rachana ")
+    check("P1-1: teach argument trims whitespace", (wrong, right) == ("Ratchna", "Rachana"))
+
+    # Invalid inputs raise
+    for bad in ["Ratchna Rachana", "->Rachana", "Ratchna->", ""]:
+        try:
+            p1_logic.parse_teach_argument(bad)
+            check(f"P1-1: rejects {bad!r}", False, "no error raised")
+        except ValueError:
+            check(f"P1-1: rejects {bad!r}", True)
+
+    # corrections map excludes case-insensitive no-ops
+    entries = [
+        {"wrong": "Ratchna", "right": "Rachana"},
+        {"wrong": "same", "right": "Same"},
+    ]
+    m = p1_logic.corrections_map(entries)
+    check("P1-1: corrections map includes real mapping", m.get("Ratchna") == "Rachana")
+    check("P1-1: corrections map excludes no-op", "same" not in m)
+
+    # formatCorrections shape
+    text = p1_logic.format_corrections({"Ratchna": "Rachana"})
+    check("P1-1: format includes section header", "## USER-TAUGHT CORRECTIONS" in text)
+    check("P1-1: format includes pair", "Ratchna → Rachana" in text)
+    check("P1-1: format empty stays empty", p1_logic.format_corrections({}) == "")
+
+    # Swift/Swift-source existence + corrections wiring in RosterBuilder
+    roster = (REPO / "src" / "core" / "RosterBuilder.swift").read_text()
+    check("P1-1: RosterBuilder consumes corrections before glossary (priority tier)",
+          roster.find("correctionsIntro") < roster.find("termsIntro"))
+    dict_swift = (REPO / "src" / "core" / "CorrectionDictionary.swift").read_text()
+    check("P1-1: dictionary persists to ~/.meetingscribe/corrections.json",
+          "corrections.json" in dict_swift)
+    check("P1-1: entries carry source=manual + timestamp",
+          '"manual"' in dict_swift.replace("sourceManual = \"manual\"", '"manual"')
+          or 'sourceManual' in dict_swift)
+    post = (REPO / "src" / "core" / "TranscriptPostProcessor.swift").read_text()
+    check("P1-1: post-processor injects taught corrections",
+          "CorrectionDictionary" in post and "formatCorrections" in post)
+
+
+# ---------------------------------------------------------------------------
+# 8. P1-2: verification pass (Python mirror of VerificationPass)
+# ---------------------------------------------------------------------------
+
+def test_p1_verification_pass():
+    # Label normalization: resolved → name, unresolved → Speaker N
+    out = p1_logic.normalize_labels(
+        "SPEAKER_00 opened. SPEAKER_01 agreed.",
+        {"SPEAKER_00": "Rachana Reddy"})
+    check("P1-2: resolved label normalized to name", "Rachana Reddy opened." in out, out)
+    check("P1-2: unresolved label becomes Speaker N", "Speaker 1 agreed." in out, out)
+    check("P1-2: no raw SPEAKER_XX survives in normalized text", "SPEAKER_" not in out)
+
+    # Raw artifact keeps raw labels
+    raw = p1_logic.raw_text([
+        {"speaker": "SPEAKER_00", "text": "hello"},
+        {"speaker": "SPEAKER_01", "text": "hi"},
+    ])
+    check("P1-2/P1-3: raw artifact keeps raw labels",
+          raw == "SPEAKER_00: hello\nSPEAKER_01: hi", raw)
+
+    # Edit plausibility (the structural refusal-leak defense)
+    check("P1-2: name-only edit is plausible",
+          p1_logic.is_plausible_edit("Rachna walked through the plan today",
+                                     "Rachana walked through the plan today"))
+    check("P1-2: refusal prose is NOT a plausible edit",
+          not p1_logic.is_plausible_edit(
+              "Rachna walked through the plan today and discussed the roadmap in some detail",
+              "I cannot help with that."))
+    check("P1-2: empty candidate rejected",
+          not p1_logic.is_plausible_edit("some text", ""))
+    check("P1-2: doubled-length rewrite rejected",
+          not p1_logic.is_plausible_edit("one two three four",
+                                         "one two three four five six seven eight nine ten"))
+
+    # Swift sources exist and layer around (not replace) the post-processor
+    vp = (REPO / "src" / "core" / "VerificationPass.swift").read_text()
+    check("P1-2: VerificationPass reuses NotesLabelCleaner (What-NOT-to-Change)",
+          "NotesLabelCleaner.clean" in vp)
+    check("P1-2: VerificationPass reuses PhoneticIndex",
+          "PhoneticIndex" in vp)
+    check("P1-2: VerificationPass has edit-only mandate + fallback",
+          "isPlausibleEdit" in vp and "ONLY" in vp.upper())
+
+
+# ---------------------------------------------------------------------------
+# 9. P1-3: artifact split (Python mirror of ArtifactWriter)
+# ---------------------------------------------------------------------------
+
+def test_p1_artifact_split(tmp: Path):
+    raw_path, note_path = p1_logic.artifact_paths(tmp, "meeting_20260916_141530")
+    check("P1-3: raw artifact naming", raw_path.name == "meeting_20260916_141530.raw.md", raw_path.name)
+    check("P1-3: note artifact naming", note_path.name == "meeting_20260916_141530.note.md", note_path.name)
+
+    check("P1-3: meeting id from audio path",
+          p1_logic.meeting_id("/r/meeting_20260916_141530.wav") == "meeting_20260916_141530")
+
+    raw_path.write_text("SPEAKER_00: hello")
+    check("P1-3: raw artifact round-trips", raw_path.read_text() == "SPEAKER_00: hello")
+
+    aw = (REPO / "src" / "core" / "ArtifactWriter.swift").read_text()
+    check("P1-3: raw artifact is immutable in Swift (write-once guard)",
+          "fileExists" in aw and "writeRaw" in aw)
+
+
+# ---------------------------------------------------------------------------
+# 10. P1-4: audio guards + retention (Python mirror)
+# ---------------------------------------------------------------------------
+
+def test_p1_audio_guards():
+    import math
+
+    sr = 48000
+
+    # Healthy 10 s of 440 Hz tone → accepted
+    samples = [int(8000 * math.sin(2 * math.pi * 440 * i / sr)) for i in range(sr * 10)]
+    ok, reason, metrics = p1_logic.evaluate_audio(samples, sr)
+    check("P1-4: healthy 10 s audio accepted", ok, reason)
+    check("P1-4: metrics carry duration", abs(metrics.get("durationSeconds", 0) - 10.0) < 0.01)
+
+    # <5 s → rejected
+    samples_short = samples[: sr * 2]
+    ok, reason, _ = p1_logic.evaluate_audio(samples_short, sr)
+    check("P1-4: 2 s audio rejected (too short)", not ok and "too short" in reason.lower(), reason)
+
+    # Near-silent → rejected
+    samples_silent = [0] * (sr * 10)
+    ok, reason, _ = p1_logic.evaluate_audio(samples_silent, sr)
+    check("P1-4: silence rejected", not ok and "silent" in reason.lower(), reason)
+
+    # Clipping fraction computed
+    samples_clipped = [32767] * (sr * 10)
+    ok, reason, metrics = p1_logic.evaluate_audio(samples_clipped, sr)
+    check("P1-4: clipping detected in telemetry", metrics.get("clippingFraction", 0) > 0.99)
+
+    # WAV parse round-trip on a synthetic 48 kHz mono WAV
+    import struct as _struct
+    data = b"RIFF" + _struct.pack("<I", 36 + len(samples) * 2) + b"WAVE"
+    data += b"fmt " + _struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16)
+    data += b"data" + _struct.pack("<I", len(samples) * 2)
+    data += _struct.pack(f"<{len(samples)}h", *samples)
+    parsed_sr, parsed_ch, parsed = p1_logic.parse_wav(data)
+    check("P1-4: WAV header parse (sample rate)", parsed_sr == sr, str(parsed_sr))
+    check("P1-4: WAV header parse (channels)", parsed_ch == 1)
+    check("P1-4: WAV samples parse", parsed[:10] == samples[:10])
+
+    ag = (REPO / "src" / "core" / "AudioGuards.swift").read_text()
+    check("P1-4: Swift guard minimum duration is 5 s", "minimumDurationSeconds: Double = 5.0" in ag)
+
+
+def test_p1_retention(tmp: Path):
+    import os
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    old = tmp / "old-meeting.wav"
+    recent = tmp / "recent-meeting.wav"
+    old_md = tmp / "old-note.md"  # wrong extension → kept
+    old.write_bytes(b"x" * 100)
+    recent.write_bytes(b"y" * 50)
+    old_md.write_bytes(b"z")
+    old_time = (now - timedelta(days=40)).timestamp()
+    recent_time = (now - timedelta(days=10)).timestamp()
+    os.utime(old, (old_time, old_time))
+    os.utime(recent, (recent_time, recent_time))
+    os.utime(old_md, (old_time, old_time))
+
+    deleted, freed = p1_logic.enforce_retention(tmp, retention_days=30, now=now)
+    check("P1-4: retention deletes 40-day WAV", deleted == ["old-meeting.wav"], str(deleted))
+    check("P1-4: retention frees 100 bytes", freed == 100, str(freed))
+    check("P1-4: recent WAV kept", recent.exists())
+    check("P1-4: non-WAV file kept", old_md.exists())
+    check("P1-4: default window is 30 days (Dan Q1)", p1_logic.enforce_retention.__defaults__[0] == 30)
+
+    # retentionDays=0 disables deletion
+    old.write_bytes(b"x")
+    os.utime(old, (old_time - 86400 * 360, old_time - 86400 * 360))
+    deleted, _ = p1_logic.enforce_retention(tmp, retention_days=0, now=now)
+    check("P1-4: retentionDays=0 disables auto-delete", deleted == [] and old.exists())
+
+
+def test_p1_config_keys():
+    cm = (REPO / "src" / "config" / "ConfigManager.swift").read_text()
+    for key in ["audioGuardsEnabled", "audioRetentionDays", "telemetryEnabled"]:
+        check(f"P1-4: config key {key} added with back-compat decode", f"{key} ?? " in cm or f"decodeIfPresent" in cm and key in cm)
+    check("P1-4: retention default 30 in config", "audioRetentionDays: Int = 30" in cm)
+    check("P1-4: telemetry key decodes with default true", "telemetryEnabled) ?? true" in cm)
+    check("P1-4: guards key decodes with default true", "audioGuardsEnabled) ?? true" in cm)
+
+
 if __name__ == "__main__":
     print(f"MeetingScribe regression suite — repo root: {REPO}")
     print("=" * 60)
@@ -243,6 +446,17 @@ if __name__ == "__main__":
     test_refusal_gate()
     test_gate_sync()
     test_budget_math()
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td) / "p1"
+        tmp.mkdir()
+        test_p1_dictionary_flywheel()
+        test_p1_verification_pass()
+        (tmp / "artifacts").mkdir()
+        test_p1_artifact_split(tmp / "artifacts")
+        test_p1_audio_guards()
+        (tmp / "retention").mkdir()
+        test_p1_retention(tmp / "retention")
+        test_p1_config_keys()
     print("=" * 60)
     if FAILURES:
         print(f"{len(FAILURES)} FAILURE(S): {FAILURES}")

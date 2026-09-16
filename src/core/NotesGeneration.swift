@@ -359,6 +359,24 @@ class NotesGenerationService {
         }
     }
     
+    /// P1-2: provider access for the verification second pass.
+    /// Returns nil (rather than throwing) when no LLM is configured, so the
+    /// verification pass can degrade gracefully to deterministic label
+    /// normalization only.
+    func makeProviderIfConfigured() -> LLMProvider? {
+        let notesConfig = config.config.notes.llm
+        switch notesConfig.provider {
+        case "openai":
+            return notesConfig.openai.apiKey.isEmpty ? nil : OpenAIProvider(apiKey: notesConfig.openai.apiKey, model: notesConfig.openai.model, timeoutSeconds: 180)
+        case "anthropic":
+            return notesConfig.anthropic.apiKey.isEmpty ? nil : AnthropicProvider(apiKey: notesConfig.anthropic.apiKey, model: notesConfig.anthropic.model, timeoutSeconds: 180)
+        case "ollama":
+            return OllamaProvider(endpoint: notesConfig.ollama.endpoint, model: notesConfig.ollama.model, timeoutSeconds: 300)
+        default:
+            return nil
+        }
+    }
+
     private func createProvider() throws -> LLMProvider {
         let notesConfig = config.config.notes.llm
         
@@ -369,7 +387,6 @@ class NotesGenerationService {
                 throw NotesGenerationError.apiError("OpenAI API key not configured in ~/.meetingscribe/config.json")
             }
             return OpenAIProvider(apiKey: apiKey, model: notesConfig.openai.model, timeoutSeconds: timeoutSeconds)
-            
         case "anthropic":
             let apiKey = notesConfig.anthropic.apiKey
             guard !apiKey.isEmpty else {

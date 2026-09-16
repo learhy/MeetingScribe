@@ -20,7 +20,11 @@ struct AppConfiguration: Codable {
         var microphoneEnabled: Bool = true  // Explicit mic toggle (ANDed with OS permission)
         var systemGain: Double = 1.0  // Per-channel volume for system audio
         var micGain: Double = 1.0  // Per-channel volume for microphone audio
-        
+        // P1-4: audio-quality guards + retention (Dan's Q1 decision: 30 days)
+        var audioGuardsEnabled: Bool = true        // refuse <5 s / near-silent audio
+        var audioRetentionDays: Int = 30           // 0 disables auto-deletion
+        var telemetryEnabled: Bool = true          // log clipping/silence/SNR alongside transcripts
+
         // Custom decoder for backwards compatibility with existing config files
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -32,13 +36,17 @@ struct AppConfiguration: Codable {
             microphoneEnabled = try container.decodeIfPresent(Bool.self, forKey: .microphoneEnabled) ?? true
             systemGain = try container.decodeIfPresent(Double.self, forKey: .systemGain) ?? 1.0
             micGain = try container.decodeIfPresent(Double.self, forKey: .micGain) ?? 1.0
+            audioGuardsEnabled = try container.decodeIfPresent(Bool.self, forKey: .audioGuardsEnabled) ?? true
+            audioRetentionDays = try container.decodeIfPresent(Int.self, forKey: .audioRetentionDays) ?? 30
+            telemetryEnabled = try container.decodeIfPresent(Bool.self, forKey: .telemetryEnabled) ?? true
         }
-        
+
         init() {}
-        
+
         private enum CodingKeys: String, CodingKey {
             case outputDirectory, sampleRate, bitDepth, channels
             case mixMode, microphoneEnabled, systemGain, micGain
+            case audioGuardsEnabled, audioRetentionDays, telemetryEnabled
         }
     }
     

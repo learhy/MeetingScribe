@@ -342,6 +342,29 @@ class TranscriptionService {
     /// --initial-prompt. Falls back to the static glossary prompt when nil/empty
     /// (e.g. calendar resolution failed).
     var meetingRosterPrompt: String?
+
+    /// P1-4: audio-quality telemetry from the last transcribe() call, when the
+    /// guard ran and the WAV header was parseable.
+    private(set) var lastAudioQualityMetrics: AudioGuards.AudioQualityMetrics?
+
+    /// P1-3: the transcript exactly as ASR/diarization produced it, before
+    /// any LLM post-processing. Used as the raw artifact when diarization
+    /// didn't run (otherwise the diarized segments are the raw artifact).
+    private(set) var lastRawPrePostProcessing: String?
+
+    /// P1-4: log audio-quality telemetry alongside the transcript.
+    private func logAudioTelemetry(_ metrics: AudioGuards.AudioQualityMetrics, for url: URL) {
+        guard config.config.audio.telemetryEnabled else { return }
+        logger.info(String(
+            format: "[AudioTelemetry] %@ duration=%.1fs rms=%.6f peak=%.3f clipping=%.4f%% silentFrames=%.1f%% snrEst=%.1fdB",
+            url.lastPathComponent,
+            metrics.durationSeconds,
+            metrics.rms,
+            metrics.peak,
+            metrics.clippingFraction * 100,
+            metrics.silentFrameFraction * 100,
+            metrics.snrEstimateDB))
+    }
     
     init(config: ConfigManager = .shared) {
         self.config = config
@@ -351,7 +374,25 @@ class TranscriptionService {
     func transcribe(audioFileURL: URL) async throws -> String {
         var transcript: String
         lastDiarizedResult = nil
-        
+
+        // P1-4: audio-quality guards — refuse <5 s or near-silent audio
+        // BEFORE spending an API call / pipeline run on it.
+        if config.config.audio.audioGuardsEnabled {
+            if let wavResult = AudioGuards.evaluateWAVFile(url: audioFileURL) {
+                switch wavResult {
+                case .rejected(let reason):
+                    logger.warning("Audio guard rejected transcription: \(reason)")
+                    lastAudioQualityMetrics = nil
+                    throw TranscriptionError.invalidAudioFile
+                case .ok(let metrics):
+                    lastAudioQualityMetrics = metrics
+                    logAudioTelemetry(metrics, for: audioFileURL)
+                }
+            } else {
+                logger.info("Audio guard could not parse WAV header; proceeding without pre-flight check")
+            }
+        }
+
         // Check if diarization is enabled
         if config.config.transcription.diarization.enabled {
             logger.info("Diarization enabled, attempting diarized transcription")
@@ -370,6 +411,7 @@ class TranscriptionService {
             let provider = try createProvider()
             transcript = try await provider.transcribe(audioFileURL: audioFileURL)
         }
+        lastRawPrePostProcessing = transcript
         
         // Apply LLM post-processing if enabled
         if config.config.transcription.postProcessing.enabled {

@@ -315,6 +315,15 @@ class TranscriptPostProcessor {
             systemPrompt = systemPrompt + peopleContext
             logger.info("Injected KNOWN PEOPLE context from property")
         }
+
+        // P1-1: inject user-taught wrong→right corrections as the highest-
+        // authority correction source (above phonetic KNOWN PEOPLE guesses).
+        let taughtCorrections = CorrectionDictionary.correctionsMap(
+            file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
+        if !taughtCorrections.isEmpty {
+            systemPrompt = systemPrompt + CorrectionDictionary.formatCorrections(taughtCorrections)
+            logger.info("Injected \(taughtCorrections.count) user-taught corrections into post-processor prompt")
+        }
         
         // For shorter transcripts, process in one go
         if transcript.count <= maxChunkSize {

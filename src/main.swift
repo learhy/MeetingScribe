@@ -9,6 +9,15 @@ if CommandLine.arguments.contains("--version") || CommandLine.arguments.contains
     exit(0)
 }
 
+// P1-1: manual dictionary flywheel CLI (Dan's Q4 decision — manual teach first).
+// Runs headless before any AppKit initialization so it works over SSH and from
+// the menu bar's "Teach a name…" item, which shells into this same path.
+if CommandLine.arguments.count > 1,
+   let subcommand = CommandLine.arguments.dropFirst().first,
+   TeachCommand.handles(subcommand) {
+    exit(TeachCommand.run(arguments: Array(CommandLine.arguments.dropFirst(2))))
+}
+
 // Entry point
 let app = NSApplication.shared
 let delegate = AppDelegate()
@@ -718,7 +727,8 @@ class MeetingScribeService {
             transcriptionService.meetingRosterPrompt = RosterBuilder.buildPrompt(
                 participants: resolvedParticipants,
                 contacts: resolvedContacts,
-                glossary: config.glossaryEntries
+                glossary: config.glossaryEntries,
+                corrections: CorrectionDictionary.correctionsMap(file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
             )
             let fileURL = URL(fileURLWithPath: audioPath)
             let transcript = try await transcriptionService.transcribe(audioFileURL: fileURL)
@@ -1102,7 +1112,8 @@ class MeetingScribeService {
             transcriptionService.meetingRosterPrompt = RosterBuilder.buildPrompt(
                 participants: resolvedParticipants,
                 contacts: resolvedContacts,
-                glossary: config.glossaryEntries
+                glossary: config.glossaryEntries,
+                corrections: CorrectionDictionary.correctionsMap(file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
             )
             let audioURL = URL(fileURLWithPath: audioFilePath)
             let transcript = try await transcriptionService.transcribe(audioFileURL: audioURL)
@@ -1140,10 +1151,60 @@ class MeetingScribeService {
             )
             
             logger.info("Resolved \(labelMap.count) speaker labels, \(knownPeople.count) known people")
-            
-            // 3. Generate notes with participant context
+
+            // 2d. P1-3: persist the immutable raw artifact (raw ASR/diarized
+            // transcript, raw SPEAKER_XX labels kept). Written once, never
+            // overwritten — reprocessing diffs against this.
+            let meetingID = ArtifactWriter.meetingID(audioFilePath: audioFilePath)
+            let rawArtifactText: String
+            if let diarized = diarized {
+                rawArtifactText = VerificationPass.rawText(of: diarized)
+            } else {
+                rawArtifactText = transcriptionService.lastRawPrePostProcessing ?? transcript
+            }
+            ArtifactWriter.writeRaw(meetingID: meetingID, rawTranscript: rawArtifactText)
+            logger.info("Raw artifact persisted: \(meetingID).raw.md (\(rawArtifactText.count) chars)")
+
+            // 2e. P1-2: verification second pass — edit-only LLM pass over the
+            // transcript with roster + taught corrections in the prompt.
+            // Falls back to label-normalized transcript on any failure.
+            if config.config.transcription.postProcessing.enabled,
+               let verificationProvider = notesService.makeProviderIfConfigured() {
+                let rosterNames = NameResolver.attendeesList(
+                    participants: resolvedParticipants,
+                    labelMap: labelMap,
+                    contacts: resolvedContacts
+                )
+                let corrections = CorrectionDictionary.correctionsMap(
+                    file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
+                var verified = ""
+                for chunk in chunkedText(transcript, maxSize: 8000) {
+                    let piece = await VerificationPass.verifyChunk(
+                        chunk, provider: verificationProvider,
+                        rosterNames: rosterNames, corrections: corrections,
+                        labelMap: labelMap)
+                    verified += (verified.isEmpty ? "" : "\n") + piece
+                }
+                transcript = verified
+                logger.info("Verification pass complete (\(transcript.count) chars)")
+            } else {
+                // Verification unavailable: still normalize labels deterministically.
+                transcript = VerificationPass.normalizeLabels(transcript, labelMap: labelMap)
+            }
+
+            // Build attendees list using NameResolver (display names, not just first names)
+            attendeesList = NameResolver.attendeesList(
+                participants: resolvedParticipants,
+                labelMap: labelMap,
+                contacts: resolvedContacts
+            )
+
+            // 3. Generate notes with participant context.
+            // P1-3: the notes LLM receives the RAW artifact — its mandate is
+            // transform + gated entity corrections, never authoring.
             logger.info("Generating notes...")
-            let generatedNotes = try await notesService.generateNotes(transcript: transcript, participantContext: participantContext)
+            let generatedNotes = try await notesService.generateNotes(
+                transcript: rawArtifactText, participantContext: participantContext)
             logger.info("Notes generation complete")
             
             // 4. Split notes to get summary
@@ -1215,11 +1276,15 @@ class MeetingScribeService {
             )
             
             let renderedNote = try templateEngine.render(noteData: noteData)
-            
+
+            // P1-3: persist the formatted note artifact locally (regenerable;
+            // the raw artifact written earlier stays immutable).
+            ArtifactWriter.writeNote(meetingID: meetingID, note: renderedNote)
+
             // 6. Save to plugin
             logger.info("Saving notes...")
             let result = try await notesPlugin.save(note: renderedNote, title: noteData.title)
-            
+
             logger.info("Processing complete: \(result.message)")
             sendNotification(title: "Notes Ready", body: result.message)
             
@@ -1235,6 +1300,27 @@ class MeetingScribeService {
         }
     }
     
+    /// Split text into chunks of at most maxSize characters, keeping lines
+    /// (speaker turns) intact. Mirrors TranscriptPostProcessor.splitTranscriptIntoChunks.
+    private func chunkedText(_ text: String, maxSize: Int) -> [String] {
+        var chunks: [String] = []
+        var current = ""
+        for line in text.components(separatedBy: "\n") {
+            if current.count + line.count + 1 > maxSize && !current.isEmpty {
+                chunks.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+                current = ""
+            }
+            if !line.isEmpty {
+                if !current.isEmpty { current += "\n" }
+                current += line
+            }
+        }
+        if !current.isEmpty {
+            chunks.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return chunks.isEmpty && text.isEmpty ? [] : (chunks.isEmpty ? [text] : chunks)
+    }
+
     private func formatDuration(_ duration: TimeInterval) -> String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60

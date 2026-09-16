@@ -35,9 +35,14 @@ struct RosterBuilder {
     ///   - participants: Calendar-resolved meeting participants (nil if calendar resolution failed).
     ///   - contacts: Contacts fetched for the meeting's attendee emails.
     ///   - glossary: Glossary entries (person-context entries ranked first).
-    ///   - corrections: Stored wrong→right name mappings (P1-1 flywheel; empty until then).
+    ///   - corrections: Stored wrong→right name mappings (P1-1 flywheel).
     ///   - priorNames: Names seen in prior meetings for these attendees (repeat attendees).
     /// - Returns: The prompt string, or "" when there is nothing meeting-specific to add.
+    ///
+    /// P1-1: taught corrections are the HIGHEST-priority tier — they are placed
+    /// FIRST (before names) so the budget never drops them in favor of
+    /// lower-value glossary terms. The 200-word/208-token cap still applies
+    /// overall; corrections are capped at 10 pairs to keep the roster viable.
     static func buildPrompt(
         participants: MeetingParticipants?,
         contacts: [ContactInfo],
@@ -52,15 +57,43 @@ struct RosterBuilder {
         let names = rankedNames(participants: participants, contacts: contacts, priorNames: priorNames)
         guard !names.isEmpty else { return "" }
 
-        // Names section — always the priority; drop tail names whole (never mid-name) if over budget.
+        var prompt = namesSection(names)
+
+        // Corrections (P1-1 flywheel) — highest authority, first so the
+        // drop-tail budget can never evict them in favor of glossary terms.
+        if !corrections.isEmpty {
+            let cappedPairs = corrections
+                .sorted { $0.key.lowercased() < $1.key.lowercased() }
+                .prefix(10)
+            let correctionsIntro = "Common corrections: "
+            var keptPairs: [String] = []
+            for pair in cappedPairs {
+                let trial = prompt + " " + correctionsIntro
+                    + (keptPairs.isEmpty ? "" : keptPairs.joined(separator: ", ") + ", ")
+                    + "\(pair.key)→\(pair.value)" + "."
+                if estimateTokens(trial) <= tokenBudget && wordCount(trial) <= wordBudget {
+                    keptPairs.append("\(pair.key)→\(pair.value)")
+                } else {
+                    break
+                }
+            }
+            if !keptPairs.isEmpty {
+                prompt += " " + correctionsIntro + keptPairs.joined(separator: ", ") + "."
+            }
+        }
+
+        // Names section — drop tail names whole (never mid-name) if over budget.
         var keptNames = names
-        var prompt = sentence(for: keptNames)
         while keptNames.count > 1 &&
               (estimateTokens(prompt) > tokenBudget || wordCount(prompt) > wordBudget) {
             keptNames.removeLast()
-            prompt = sentence(for: keptNames)
+            prompt = namesSection(keptNames)
+            if !corrections.isEmpty {
+                // Re-append any corrections that still fit with the shrunken roster.
+                prompt = appendCorrections(prompt, corrections: corrections)
+            }
         }
-        guard !keptNames.isEmpty, estimateTokens(prompt) <= tokenBudget else { return "" }
+        guard estimateTokens(prompt) <= tokenBudget else { return "" }
         if keptNames.count < names.count {
             // Tail dropped — could log at call site; prompt stays honest about what it kept.
         }
@@ -85,29 +118,37 @@ struct RosterBuilder {
             }
         }
 
-        // Corrections — wrong→right mappings, highest authority, appended while they fit.
-        if !corrections.isEmpty {
-            let correctionsIntro = "Common corrections: "
-            let pairs = corrections
-                .sorted { $0.key < $1.key }
-                .map { "\($0.key)→\($0.value)" }
-            var keptPairs: [String] = []
-            for pair in pairs {
-                let trial = prompt + " " + correctionsIntro
-                    + (keptPairs.isEmpty ? "" : keptPairs.joined(separator: ", ") + ", ")
-                    + pair + "."
-                if estimateTokens(trial) <= tokenBudget && wordCount(trial) <= wordBudget {
-                    keptPairs.append(pair)
-                } else {
-                    break
-                }
-            }
-            if !keptPairs.isEmpty {
-                prompt += " " + correctionsIntro + keptPairs.joined(separator: ", ") + "."
+        return prompt
+    }
+
+    // MARK: - Prompt section helpers
+
+    private static func namesSection(for names: [String]) -> String {
+        "The following people may be mentioned in this meeting: " + names.joined(separator: ", ") + "."
+    }
+
+    /// Append the "Common corrections:" section to a prompt while it fits the budget.
+    /// Used by buildPrompt so corrections survive roster shrinkage (P1-1).
+    private static func appendCorrections(_ prompt: String, corrections: [String: String]) -> String {
+        guard !corrections.isEmpty else { return prompt }
+        let correctionsIntro = "Common corrections: "
+        let cappedPairs = corrections
+            .sorted { $0.key.lowercased() < $1.key.lowercased() }
+            .prefix(10)
+        var keptPairs: [String] = []
+        for pair in cappedPairs {
+            let rendered = "\(pair.key)→\(pair.value)"
+            let trial = prompt + " " + correctionsIntro
+                + (keptPairs.isEmpty ? "" : keptPairs.joined(separator: ", ") + ", ")
+                + rendered + "."
+            if estimateTokens(trial) <= tokenBudget && wordCount(trial) <= wordBudget {
+                keptPairs.append(rendered)
+            } else {
+                break
             }
         }
-
-        return prompt
+        if keptPairs.isEmpty { return prompt }
+        return prompt + " " + correctionsIntro + keptPairs.joined(separator: ", ") + "."
     }
 
     // MARK: - Name resolution & ranking
@@ -226,6 +267,6 @@ struct RosterBuilder {
     }
 
     private static func sentence(for names: [String]) -> String {
-        "The following people may be mentioned in this meeting: " + names.joined(separator: ", ") + "."
+        namesSection(for: names)
     }
 }
