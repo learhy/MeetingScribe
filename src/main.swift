@@ -18,11 +18,20 @@ if CommandLine.arguments.count > 1,
     exit(TeachCommand.run(arguments: Array(CommandLine.arguments.dropFirst(2))))
 }
 
-// Entry point
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.run()
+// Entry point.
+// GUARD: `swift test` links this executable target and RUNS its top-level
+// code inside the test process. Booting the full daemon there would run
+// FirstRunInstaller / ConfigManager against the REAL ~/.meetingscribe —
+// which has already wiped a live config once (2026-09-29). Skip entirely
+// under XCTest.
+let isTestRun = NSClassFromString("XCTestCase") != nil
+    || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+if !isTestRun {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.run()
+}
 
 class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private let logger = DualLogger(category: "MeetingScribe")
@@ -774,7 +783,10 @@ class MeetingScribeService {
                 for chunk in chunkedText(transcript, maxSize: 8000) {
                     let piece = await VerificationPass.verifyChunk(
                         chunk, provider: verificationProvider,
-                        rosterNames: attendeesList.isEmpty ? NameResolver.attendeesList(participants: resolvedParticipants, labelMap: labelMap, contacts: resolvedContacts) : attendeesList,
+                        rosterNames: (attendeesList.isEmpty ? NameResolver.attendeesList(participants: resolvedParticipants, labelMap: labelMap, contacts: resolvedContacts) : attendeesList)
+                            .split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty },
                         corrections: corrections,
                         labelMap: labelMap)
                     verified += (verified.isEmpty ? "" : "\n") + piece
@@ -973,6 +985,9 @@ class MeetingScribeService {
         case "ollama":
             // Ollama doesn't require API key
             return true
+        case "nous":
+            // Nous: static key OR OAuth token file
+            return !llmConfig.nous.apiKey.isEmpty || !llmConfig.nous.authTokenFile.isEmpty
         default:
             // Unknown provider, default to anthropic validation
             return !llmConfig.anthropic.apiKey.isEmpty
@@ -1219,6 +1234,9 @@ class MeetingScribeService {
                     labelMap: labelMap,
                     contacts: resolvedContacts
                 )
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
                 let corrections = CorrectionDictionary.correctionsMap(
                     file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
                 var verified = ""

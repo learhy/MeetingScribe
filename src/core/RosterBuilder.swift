@@ -57,7 +57,7 @@ struct RosterBuilder {
         let names = rankedNames(participants: participants, contacts: contacts, priorNames: priorNames)
         guard !names.isEmpty else { return "" }
 
-        var prompt = namesSection(names)
+        var prompt = namesSection(for: names)
 
         // Corrections (P1-1 flywheel) — highest authority, first so the
         // drop-tail budget can never evict them in favor of glossary terms.
@@ -68,9 +68,11 @@ struct RosterBuilder {
             let correctionsIntro = "Common corrections: "
             var keptPairs: [String] = []
             for pair in cappedPairs {
-                let trial = prompt + " " + correctionsIntro
-                    + (keptPairs.isEmpty ? "" : keptPairs.joined(separator: ", ") + ", ")
-                    + "\(pair.key)→\(pair.value)" + "."
+                var trial = prompt + " " + correctionsIntro
+                if !keptPairs.isEmpty {
+                    trial += keptPairs.joined(separator: ", ") + ", "
+                }
+                trial += "\(pair.key)→\(pair.value)" + "."
                 if estimateTokens(trial) <= tokenBudget && wordCount(trial) <= wordBudget {
                     keptPairs.append("\(pair.key)→\(pair.value)")
                 } else {
@@ -87,7 +89,7 @@ struct RosterBuilder {
         while keptNames.count > 1 &&
               (estimateTokens(prompt) > tokenBudget || wordCount(prompt) > wordBudget) {
             keptNames.removeLast()
-            prompt = namesSection(keptNames)
+            prompt = namesSection(for: keptNames)
             if !corrections.isEmpty {
                 // Re-append any corrections that still fit with the shrunken roster.
                 prompt = appendCorrections(prompt, corrections: corrections)
@@ -104,9 +106,11 @@ struct RosterBuilder {
             let termsIntro = "Technical terms that may come up: "
             var keptTerms: [String] = []
             for term in terms {
-                let trial = prompt + " " + termsIntro
-                    + (keptTerms.isEmpty ? "" : keptTerms.joined(separator: ", ") + ", ")
-                    + term + "."
+                var trial = prompt + " " + termsIntro
+                if !keptTerms.isEmpty {
+                    trial += keptTerms.joined(separator: ", ") + ", "
+                }
+                trial += term + "."
                 if estimateTokens(trial) <= tokenBudget && wordCount(trial) <= wordBudget {
                     keptTerms.append(term)
                 } else {

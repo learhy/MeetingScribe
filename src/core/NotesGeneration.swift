@@ -245,6 +245,317 @@ class OllamaProvider: LLMProvider {
     }
 }
 
+// MARK: - Nous Provider
+
+/// Nous Research inference portal (OpenAI-compatible chat completions).
+///
+/// Auth resolves per call, in this order:
+/// 1. Static `apiKey` (portal API key) when non-empty.
+/// 2. OAuth token file (`authTokenFile`): JSON with access_token, refresh_token,
+///    client_id, expires_at, portal_base_url, inference_base_url. Stale tokens
+///    are refreshed via the portal and written back atomically (0600).
+class NousProvider: LLMProvider {
+    static let defaultInferenceBase = "https://inference-api.nousresearch.com/v1"
+    static let defaultPortalBase = "https://portal.nousresearch.com"
+    static let defaultModel = "z-ai/glm-5.3-flash"
+
+    private let apiKey: String
+    private let model: String
+    private let authTokenFile: String
+    private let logger = DualLogger(category: "Nous")
+    private let timeoutSeconds: TimeInterval
+
+    /// Serializes token refreshes across provider instances (the service
+    /// constructs a fresh provider per call). Refresh tokens may be
+    /// single-use, so concurrent refreshes must not race.
+    private static let refreshLock = NSLock()
+
+    init(apiKey: String = "", model: String = NousProvider.defaultModel,
+         authTokenFile: String = "", timeoutSeconds: TimeInterval = 120) {
+        self.apiKey = apiKey
+        self.model = model
+        self.authTokenFile = authTokenFile
+        self.timeoutSeconds = timeoutSeconds
+    }
+
+    struct TokenState: Codable {
+        let access_token: String
+        let refresh_token: String?
+        let client_id: String?
+        let expires_at: String?
+        let portal_base_url: String?
+        let inference_base_url: String?
+    }
+
+    func generate(userMessage: String, systemPrompt: String) async throws -> String {
+        logger.info("Generating notes with Nous \(model)")
+
+        let token = try resolveBearerToken()
+        let data: Data
+        do {
+            data = try await postChatCompletions(bearer: token, systemPrompt: systemPrompt, userMessage: userMessage)
+        } catch let httpError as NousHTTPError {
+            // A rotated/revoked token surfaces as 401/403: force one refresh and retry.
+            logger.warning("Bearer rejected (HTTP \(httpError.statusCode)); forcing refresh and retrying once")
+            let refreshed = try refreshNow(force: true)
+            data = try await postChatCompletions(bearer: refreshed, systemPrompt: systemPrompt, userMessage: userMessage)
+        }
+        return try parseContent(data)
+    }
+
+    // MARK: - Auth resolution
+
+    private func resolveBearerToken() throws -> String {
+        if !apiKey.isEmpty {
+            return apiKey
+        }
+        guard !authTokenFile.isEmpty else {
+            throw NotesGenerationError.apiError(
+                "Nous auth not configured — set notes.llm.nous.apiKey or notes.llm.nous.authTokenFile in ~/.meetingscribe/config.json")
+        }
+        return try refreshNow(force: false)
+    }
+
+    private func tokenFileURL() -> URL {
+        let expanded = NSString(string: authTokenFile).expandingTildeInPath
+        return URL(fileURLWithPath: expanded)
+    }
+
+    /// Load the token file, refreshing when stale (or when `force`).
+    /// Re-checks the file inside the lock so a refresh by another process
+    /// (or provider instance) is honored instead of double-refreshing.
+    private func refreshNow(force: Bool) throws -> String {
+        try NousProvider.withRefreshLock {
+            let url = tokenFileURL()
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw NotesGenerationError.apiError("Nous auth token file not found: \(authTokenFile)")
+            }
+            let data = try Data(contentsOf: url)
+            let state = try JSONDecoder().decode(TokenState.self, from: data)
+
+            if !force, !NousProvider.isTokenStale(state.expires_at) {
+                return state.access_token
+            }
+
+            let portal = (state.portal_base_url ?? NousProvider.defaultPortalBase).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard !portal.isEmpty, let refresh = state.refresh_token, !refresh.isEmpty else {
+                // Nothing to refresh with; if the stored token still looks valid, use it.
+                if let exp = state.expires_at, !NousProvider.isTokenStale(exp) {
+                    return state.access_token
+                }
+                throw NotesGenerationError.apiError("Nous access token is stale and no refresh token is available in \(authTokenFile)")
+            }
+
+            logger.info("Refreshing Nous access token via portal")
+            var request = URLRequest(url: URL(string: "\(portal)/api/oauth/token")!)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 30
+            request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            var body = URLComponents()
+            body.queryItems = [
+                URLQueryItem(name: "grant_type", value: "refresh_token"),
+                URLQueryItem(name: "client_id", value: state.client_id ?? "hermes-cli"),
+                URLQueryItem(name: "refresh_token", value: refresh)
+            ]
+            request.httpBody = body.percentEncodedQuery?.data(using: .utf8)
+
+            let config = URLSessionConfiguration.ephemeral
+            config.timeoutIntervalForRequest = 30
+            config.timeoutIntervalForResource = 30
+            let session = URLSession(configuration: config)
+
+            let respData: Data
+            let resp: URLResponse
+            do {
+                // Synchronous request: refreshNow holds the refresh lock across
+                // the call by design (refresh tokens may be single-use).
+                let semaphore = DispatchSemaphore(value: 0)
+                var outData: Data?
+                var outResp: URLResponse?
+                var outError: Error?
+                let task = session.dataTask(with: request) { data, response, error in
+                    outData = data
+                    outResp = response
+                    outError = error
+                    semaphore.signal()
+                }
+                task.resume()
+                semaphore.wait()
+                if let error = outError {
+                    throw NotesGenerationError.networkError(error)
+                }
+                guard let d = outData, let r = outResp else {
+                    throw NotesGenerationError.invalidResponse
+                }
+                respData = d
+                resp = r
+            } catch let error as NotesGenerationError {
+                throw error
+            }
+            guard let httpResponse = resp as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                let detail = String(data: respData, encoding: .utf8) ?? ""
+                logger.error("Token refresh failed: \(detail.prefix(300))")
+                throw NotesGenerationError.apiError("Nous token refresh failed (HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1))")
+            }
+
+            struct RefreshResponse: Codable {
+                let access_token: String
+                let refresh_token: String?
+                let expires_in: Int?
+            }
+            let refreshResp = try JSONDecoder().decode(RefreshResponse.self, from: respData)
+
+            var newState: [String: Any] = [
+                "access_token": refreshResp.access_token,
+                "refresh_token": refreshResp.refresh_token ?? refresh,
+                "client_id": state.client_id ?? "hermes-cli",
+                "expires_at": NousProvider.isoString(from: Date().addingTimeInterval(TimeInterval(refreshResp.expires_in ?? 3600))),
+                "portal_base_url": state.portal_base_url ?? NousProvider.defaultPortalBase,
+                "inference_base_url": state.inference_base_url ?? NousProvider.defaultInferenceBase
+            ]
+            if let scope = try? JSONDecoder().decode([String: String].self, from: respData)["scope"] {
+                newState["scope"] = scope
+            }
+
+            let out = try JSONSerialization.data(withJSONObject: newState, options: [.prettyPrinted, .sortedKeys])
+            let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).tmp-\(UUID().uuidString)")
+            try out.write(to: tmp)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tmp.path)
+            _ = try? FileManager.default.replaceItemAt(url, withItemAt: tmp)
+            if !FileManager.default.fileExists(atPath: url.path) {
+                // replaceItemAt can fail across volumes; fall back to remove+rename
+                try? FileManager.default.removeItem(at: url)
+                try FileManager.default.moveItem(at: tmp, to: url)
+            }
+            logger.info("Nous access token refreshed and written back")
+            return refreshResp.access_token
+        }
+    }
+
+    /// Errors thrown for auth-retryable HTTP statuses.
+    struct NousHTTPError: Error {
+        let statusCode: Int
+    }
+
+    private func postChatCompletions(bearer: String, systemPrompt: String, userMessage: String) async throws -> Data {
+        var request = URLRequest(url: URL(string: "\(NousProvider.defaultInferenceBase)/chat/completions")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = timeoutSeconds
+        request.addValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let requestBody: [String: Any] = [
+            "model": model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userMessage]
+            ],
+            "max_tokens": 4096
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        config.timeoutIntervalForResource = timeoutSeconds
+        let session = URLSession(configuration: config)
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NotesGenerationError.invalidResponse
+            }
+            guard httpResponse.statusCode == 200 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                logger.error("API error (\(httpResponse.statusCode)): \(errorMessage)")
+                if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                    throw NousHTTPError(statusCode: httpResponse.statusCode)
+                }
+                throw NotesGenerationError.apiError(errorMessage)
+            }
+            return data
+        } catch let error as NotesGenerationError {
+            throw error
+        } catch let error as NousHTTPError {
+            throw error
+        } catch {
+            logger.error("Network error: \(error.localizedDescription)")
+            throw NotesGenerationError.networkError(error)
+        }
+    }
+
+    private struct OpenAIResponse: Codable {
+        struct Choice: Codable {
+            struct Message: Codable {
+                let content: String?
+            }
+            let message: Message
+        }
+        let choices: [Choice]
+    }
+
+    private func parseContent(_ data: Data) throws -> String {
+        let decoded: OpenAIResponse
+        do {
+            decoded = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+        } catch {
+            logger.error("Response decode failed: \(error.localizedDescription)")
+            throw NotesGenerationError.invalidResponse
+        }
+        guard let raw = decoded.choices.first?.message.content else {
+            throw NotesGenerationError.invalidResponse
+        }
+        let notes = NousProvider.stripThinking(from: raw)
+        guard !notes.isEmpty else {
+            logger.error("Empty notes content from Nous (reasoning-only response?)")
+            throw NotesGenerationError.invalidResponse
+        }
+        logger.info("Notes generated successfully")
+        return notes
+    }
+
+    // MARK: - Static helpers (unit-testable)
+
+    /// Reasoning models (GLM/DeepSeek families) may wrap chain-of-thought in
+    /// <think>...</think> before the answer. Notes must never contain it.
+    static func stripThinking(from text: String) -> String {
+        var out = text
+        if let regex = try? NSRegularExpression(pattern: "<think>[\\s\\S]*?</think>\\s*", options: []) {
+            out = regex.stringByReplacingMatches(in: out, options: [], range: NSRange(out.startIndex..., in: out), withTemplate: "")
+        }
+        return out.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// True when the token is missing, unparseable, or expires within `skew`.
+    static func isTokenStale(_ expiresAt: String?, now: Date = Date(), skew: TimeInterval = 300) -> Bool {
+        guard let expiresAt = expiresAt, !expiresAt.isEmpty else { return true }
+        let formatters: [ISO8601DateFormatter] = {
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return [plain, fractional]
+        }()
+        for formatter in formatters {
+            if let date = formatter.date(from: expiresAt) {
+                return date.timeIntervalSince(now) < skew
+            }
+        }
+        return true
+    }
+
+    private static func isoString(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
+    }
+
+    private static func withRefreshLock<T>(_ body: () throws -> T) throws -> T {
+        refreshLock.lock()
+        defer { refreshLock.unlock() }
+        return try body()
+    }
+}
+
 // MARK: - Notes Generation Service
 
 class NotesGenerationService {
@@ -372,6 +683,12 @@ class NotesGenerationService {
             return notesConfig.anthropic.apiKey.isEmpty ? nil : AnthropicProvider(apiKey: notesConfig.anthropic.apiKey, model: notesConfig.anthropic.model, timeoutSeconds: 180)
         case "ollama":
             return OllamaProvider(endpoint: notesConfig.ollama.endpoint, model: notesConfig.ollama.model, timeoutSeconds: 300)
+        case "nous":
+            let nous = notesConfig.nous
+            if nous.apiKey.isEmpty && nous.authTokenFile.isEmpty {
+                return nil
+            }
+            return NousProvider(apiKey: nous.apiKey, model: nous.model, authTokenFile: nous.authTokenFile, timeoutSeconds: 180)
         default:
             return nil
         }
@@ -396,7 +713,14 @@ class NotesGenerationService {
             
         case "ollama":
             return OllamaProvider(endpoint: notesConfig.ollama.endpoint, model: notesConfig.ollama.model, timeoutSeconds: timeoutSeconds)
-            
+
+        case "nous":
+            let nous = notesConfig.nous
+            guard !nous.apiKey.isEmpty || !nous.authTokenFile.isEmpty else {
+                throw NotesGenerationError.apiError("Nous auth not configured — set notes.llm.nous.apiKey or notes.llm.nous.authTokenFile in ~/.meetingscribe/config.json")
+            }
+            return NousProvider(apiKey: nous.apiKey, model: nous.model, authTokenFile: nous.authTokenFile, timeoutSeconds: timeoutSeconds)
+
         default:
             logger.warning("Unknown provider '\(notesConfig.provider)', falling back to Anthropic")
             let apiKey = notesConfig.anthropic.apiKey

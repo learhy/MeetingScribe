@@ -461,6 +461,18 @@ class TranscriptPostProcessor {
                 timeoutSeconds: 300
             )
             
+        case "nous":
+            let nous = llmConfig.nous
+            guard !nous.apiKey.isEmpty || !nous.authTokenFile.isEmpty else {
+                throw PostProcessingError.noProviderConfigured
+            }
+            return NousProvider(
+                apiKey: nous.apiKey,
+                model: nous.model,
+                authTokenFile: nous.authTokenFile,
+                timeoutSeconds: 300
+            )
+            
         default:
             logger.error("Unknown LLM provider: \(llmConfig.provider)")
             throw PostProcessingError.noProviderConfigured
