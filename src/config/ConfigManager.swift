@@ -9,6 +9,19 @@ struct AppConfiguration: Codable {
         var pollInterval: Double = 2.0
         var debounceChecks: Int = 2
         var confidenceThreshold: Int = 85
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            pollInterval = try container.decodeIfPresent(Double.self, forKey: .pollInterval) ?? 2.0
+            debounceChecks = try container.decodeIfPresent(Int.self, forKey: .debounceChecks) ?? 2
+            confidenceThreshold = try container.decodeIfPresent(Int.self, forKey: .confidenceThreshold) ?? 85
+        }
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey {
+            case pollInterval, debounceChecks, confidenceThreshold
+        }
     }
     
     struct Audio: Codable {
@@ -212,6 +225,28 @@ struct AppConfiguration: Codable {
         var postProcessing: PostProcessing = PostProcessing()
         var glossary: Glossary = Glossary()
         var smartPrompt: SmartPrompt = SmartPrompt()
+
+        // Custom decoder for backwards compatibility with existing config files
+        // (configs written before the assemblyai section existed must not fail
+        // to decode — a failed decode makes ConfigManager save DEFAULTS over
+        // the user's real config)
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? "local"
+            openai = try container.decodeIfPresent(OpenAI.self, forKey: .openai) ?? OpenAI()
+            local = try container.decodeIfPresent(Local.self, forKey: .local) ?? Local()
+            assemblyai = try container.decodeIfPresent(AssemblyAI.self, forKey: .assemblyai) ?? AssemblyAI()
+            diarization = try container.decodeIfPresent(Diarization.self, forKey: .diarization) ?? Diarization()
+            postProcessing = try container.decodeIfPresent(PostProcessing.self, forKey: .postProcessing) ?? PostProcessing()
+            glossary = try container.decodeIfPresent(Glossary.self, forKey: .glossary) ?? Glossary()
+            smartPrompt = try container.decodeIfPresent(SmartPrompt.self, forKey: .smartPrompt) ?? SmartPrompt()
+        }
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey {
+            case provider, openai, local, assemblyai, diarization, postProcessing, glossary, smartPrompt
+        }
     }
     
     struct Notes: Codable {
@@ -284,13 +319,27 @@ struct AppConfiguration: Codable {
         var llm: LLM = LLM()
         var templateFile: String = "~/.meetingscribe/templates/default.md"
         var backend: String = "bear"  // "bear" | "notion" | "obsidian"
-        
+
         struct Bear: Codable {
             var tags: [String] = ["#meetings", "#teams"]
             var fallbackDirectory: String = "~/Documents/MeetingScribe/notes/"
         }
-        
+
         var bear: Bear = Bear()
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            llm = try container.decodeIfPresent(LLM.self, forKey: .llm) ?? LLM()
+            templateFile = try container.decodeIfPresent(String.self, forKey: .templateFile) ?? "~/.meetingscribe/templates/default.md"
+            backend = try container.decodeIfPresent(String.self, forKey: .backend) ?? "bear"
+            bear = try container.decodeIfPresent(Bear.self, forKey: .bear) ?? Bear()
+        }
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey {
+            case llm, templateFile, backend, bear
+        }
     }
     
     struct UI: Codable {
@@ -298,16 +347,45 @@ struct AppConfiguration: Codable {
         var notifyOnStart: Bool = true
         var notifyOnEnd: Bool = true
         var autoRecordingEnabled: Bool = true
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            showNotifications = try container.decodeIfPresent(Bool.self, forKey: .showNotifications) ?? true
+            notifyOnStart = try container.decodeIfPresent(Bool.self, forKey: .notifyOnStart) ?? true
+            notifyOnEnd = try container.decodeIfPresent(Bool.self, forKey: .notifyOnEnd) ?? true
+            autoRecordingEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoRecordingEnabled) ?? true
+        }
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey {
+            case showNotifications, notifyOnStart, notifyOnEnd, autoRecordingEnabled
+        }
     }
-    
+
     struct Participants: Codable {
         var enabled: Bool = true
         var calendarSource: String = "eventkit"  // "eventkit" | "outlook" | "both"
         var eventKitCalendarName: String = "Calendar"
         var outlookDatabasePath: String = "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
         var debugLogging: Bool = false
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            calendarSource = try container.decodeIfPresent(String.self, forKey: .calendarSource) ?? "eventkit"
+            eventKitCalendarName = try container.decodeIfPresent(String.self, forKey: .eventKitCalendarName) ?? "Calendar"
+            outlookDatabasePath = try container.decodeIfPresent(String.self, forKey: .outlookDatabasePath) ?? "~/Library/Group Containers/UBF8T346G9.Office/Outlook/Outlook 15 Profiles/Main Profile/Data/"
+            debugLogging = try container.decodeIfPresent(Bool.self, forKey: .debugLogging) ?? false
+        }
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey {
+            case enabled, calendarSource, eventKitCalendarName, outlookDatabasePath, debugLogging
+        }
     }
-    
+
     var version: String = "1.0"
     var detection: Detection = Detection()
     var audio: Audio = Audio()
@@ -315,6 +393,23 @@ struct AppConfiguration: Codable {
     var notes: Notes = Notes()
     var ui: UI = UI()
     var participants: Participants = Participants()
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(String.self, forKey: .version) ?? "1.0"
+        detection = try container.decodeIfPresent(Detection.self, forKey: .detection) ?? Detection()
+        audio = try container.decodeIfPresent(Audio.self, forKey: .audio) ?? Audio()
+        transcription = try container.decodeIfPresent(Transcription.self, forKey: .transcription) ?? Transcription()
+        notes = try container.decodeIfPresent(Notes.self, forKey: .notes) ?? Notes()
+        ui = try container.decodeIfPresent(UI.self, forKey: .ui) ?? UI()
+        participants = try container.decodeIfPresent(Participants.self, forKey: .participants) ?? Participants()
+    }
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case version, detection, audio, transcription, notes, ui, participants
+    }
 }
 
 class ConfigManager {

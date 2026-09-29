@@ -18,11 +18,20 @@ if CommandLine.arguments.count > 1,
     exit(TeachCommand.run(arguments: Array(CommandLine.arguments.dropFirst(2))))
 }
 
-// Entry point
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.run()
+// Entry point.
+// GUARD: `swift test` links this executable target and RUNS its top-level
+// code inside the test process. Booting the full daemon there would run
+// FirstRunInstaller / ConfigManager against the REAL ~/.meetingscribe —
+// which has already wiped a live config once (2026-09-29). Skip entirely
+// under XCTest.
+let isTestRun = NSClassFromString("XCTestCase") != nil
+    || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+if !isTestRun {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.run()
+}
 
 class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private let logger = DualLogger(category: "MeetingScribe")
