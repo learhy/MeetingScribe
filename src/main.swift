@@ -774,7 +774,10 @@ class MeetingScribeService {
                 for chunk in chunkedText(transcript, maxSize: 8000) {
                     let piece = await VerificationPass.verifyChunk(
                         chunk, provider: verificationProvider,
-                        rosterNames: attendeesList.isEmpty ? NameResolver.attendeesList(participants: resolvedParticipants, labelMap: labelMap, contacts: resolvedContacts) : attendeesList,
+                        rosterNames: (attendeesList.isEmpty ? NameResolver.attendeesList(participants: resolvedParticipants, labelMap: labelMap, contacts: resolvedContacts) : attendeesList)
+                            .split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty },
                         corrections: corrections,
                         labelMap: labelMap)
                     verified += (verified.isEmpty ? "" : "\n") + piece
@@ -973,6 +976,9 @@ class MeetingScribeService {
         case "ollama":
             // Ollama doesn't require API key
             return true
+        case "nous":
+            // Nous: static key OR OAuth token file
+            return !llmConfig.nous.apiKey.isEmpty || !llmConfig.nous.authTokenFile.isEmpty
         default:
             // Unknown provider, default to anthropic validation
             return !llmConfig.anthropic.apiKey.isEmpty
@@ -1219,6 +1225,9 @@ class MeetingScribeService {
                     labelMap: labelMap,
                     contacts: resolvedContacts
                 )
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
                 let corrections = CorrectionDictionary.correctionsMap(
                     file: CorrectionDictionary.load(path: CorrectionDictionary.defaultPath()))
                 var verified = ""

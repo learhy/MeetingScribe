@@ -246,6 +246,14 @@ class ConfigValidator {
                 errors.append(error)
             }
             
+        case "nous":
+            if notes.llm.nous.apiKey.isEmpty && notes.llm.nous.authTokenFile.isEmpty {
+                errors.append(ValidationError(field: "Nous Auth", message: "Either an API key or an auth token file is required"))
+            }
+            if let error = validateNonEmpty(notes.llm.nous.model, field: "Nous Model") {
+                errors.append(error)
+            }
+            
         default:
             errors.append(ValidationError(field: "LLM Provider", message: "Invalid LLM provider"))
         }

@@ -216,27 +216,69 @@ struct AppConfiguration: Codable {
     
     struct Notes: Codable {
         struct LLM: Codable {
-            var provider: String = "anthropic"  // "openai" | "anthropic" | "ollama"
-            
+            var provider: String = "anthropic"  // "openai" | "anthropic" | "ollama" | "nous"
+
             struct OpenAI: Codable {
                 var apiKey: String = ""
                 var model: String = "gpt-4"
             }
-            
+
             struct Anthropic: Codable {
                 var apiKey: String = ""
                 var model: String = "claude-sonnet-4-5"
             }
-            
+
             struct Ollama: Codable {
                 var endpoint: String = "http://localhost:11434"
                 var model: String = "llama3"
             }
-            
+
+            /// Nous Research inference portal (OpenAI-compatible).
+            /// Auth: static `apiKey`, or an OAuth token file refreshed in place
+            /// (keys: access_token, refresh_token, client_id, expires_at,
+            ///  portal_base_url, inference_base_url).
+            struct Nous: Codable {
+                var apiKey: String = ""
+                var model: String = "z-ai/glm-5.3-flash"
+                var authTokenFile: String = ""
+
+                init(from decoder: Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+                    model = try container.decodeIfPresent(String.self, forKey: .model) ?? "z-ai/glm-5.3-flash"
+                    authTokenFile = try container.decodeIfPresent(String.self, forKey: .authTokenFile) ?? ""
+                }
+
+                init() {}
+
+                private enum CodingKeys: String, CodingKey {
+                    case apiKey, model, authTokenFile
+                }
+            }
+
             var openai: OpenAI = OpenAI()
             var anthropic: Anthropic = Anthropic()
             var ollama: Ollama = Ollama()
+            var nous: Nous = Nous()
             var systemPromptFile: String = "~/.meetingscribe/prompts/default.txt"
+
+            // Custom decoder for backwards compatibility with existing config files
+            // (configs written before a section existed must not fail to decode)
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? "anthropic"
+                openai = try container.decodeIfPresent(OpenAI.self, forKey: .openai) ?? OpenAI()
+                anthropic = try container.decodeIfPresent(Anthropic.self, forKey: .anthropic) ?? Anthropic()
+                ollama = try container.decodeIfPresent(Ollama.self, forKey: .ollama) ?? Ollama()
+                nous = try container.decodeIfPresent(Nous.self, forKey: .nous) ?? Nous()
+                systemPromptFile = try container.decodeIfPresent(String.self, forKey: .systemPromptFile) ?? "~/.meetingscribe/prompts/default.txt"
+            }
+
+            init() {}
+
+            private enum CodingKeys: String, CodingKey {
+                case provider, openai, anthropic, ollama, nous, systemPromptFile
+            }
         }
         
         var llm: LLM = LLM()
@@ -463,6 +505,8 @@ class ConfigManager {
             return !config.notes.llm.anthropic.apiKey.isEmpty
         case "ollama":
             return !config.notes.llm.ollama.endpoint.isEmpty
+        case "nous":
+            return !config.notes.llm.nous.apiKey.isEmpty || !config.notes.llm.nous.authTokenFile.isEmpty
         default:
             return false
         }
@@ -480,6 +524,8 @@ class ConfigManager {
             hasKey = !config.notes.llm.anthropic.apiKey.isEmpty
         case "ollama":
             hasKey = !config.notes.llm.ollama.endpoint.isEmpty
+        case "nous":
+            hasKey = !config.notes.llm.nous.apiKey.isEmpty || !config.notes.llm.nous.authTokenFile.isEmpty
         default:
             hasKey = false
         }
