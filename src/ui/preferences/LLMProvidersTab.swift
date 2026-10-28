@@ -11,11 +11,13 @@ class LLMProvidersTab: BasePreferencesTab {
     private var anthropicRadio: NSButton!
     private var openaiRadio: NSButton!
     private var ollamaRadio: NSButton!
+    private var nousRadio: NSButton!
     
     // Provider containers
     private var anthropicContainer: NSView!
     private var openaiContainer: NSView!
     private var ollamaContainer: NSView!
+    private var nousContainer: NSView!
     
     // Anthropic fields
     private var anthropicApiKeyField: NSTextField!
@@ -31,6 +33,12 @@ class LLMProvidersTab: BasePreferencesTab {
     private var ollamaEndpointField: NSTextField!
     private var ollamaModelField: NSTextField!
     private var ollamaTestButton: NSButton!
+    
+    // Nous fields
+    private var nousApiKeyField: NSTextField!
+    private var nousAuthTokenFileField: NSTextField!
+    private var nousModelPopup: NSPopUpButton!
+    private var nousTestButton: NSButton!
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -76,16 +84,20 @@ class LLMProvidersTab: BasePreferencesTab {
         
         // Radio buttons
         anthropicRadio = NSButton(radioButtonWithTitle: "Anthropic (Claude)", target: self, action: #selector(providerChanged))
-        anthropicRadio.frame = NSRect(x: 20, y: yPos, width: 180, height: 20)
+        anthropicRadio.frame = NSRect(x: 20, y: yPos, width: 170, height: 20)
         addSubview(anthropicRadio)
         
         openaiRadio = NSButton(radioButtonWithTitle: "OpenAI", target: self, action: #selector(providerChanged))
-        openaiRadio.frame = NSRect(x: 210, y: yPos, width: 100, height: 20)
+        openaiRadio.frame = NSRect(x: 195, y: yPos, width: 85, height: 20)
         addSubview(openaiRadio)
         
         ollamaRadio = NSButton(radioButtonWithTitle: "Ollama (Local)", target: self, action: #selector(providerChanged))
-        ollamaRadio.frame = NSRect(x: 320, y: yPos, width: 150, height: 20)
+        ollamaRadio.frame = NSRect(x: 285, y: yPos, width: 140, height: 20)
         addSubview(ollamaRadio)
+        
+        nousRadio = NSButton(radioButtonWithTitle: "Nous Research", target: self, action: #selector(providerChanged))
+        nousRadio.frame = NSRect(x: 430, y: yPos, width: 145, height: 20)
+        addSubview(nousRadio)
         yPos -= 35
         
         // Provider containers
@@ -102,6 +114,11 @@ class LLMProvidersTab: BasePreferencesTab {
         ollamaContainer.isHidden = true
         addSubview(ollamaContainer)
         setupOllamaFields()
+        
+        nousContainer = NSView(frame: NSRect(x: 20, y: yPos - 100, width: 560, height: 100))
+        nousContainer.isHidden = true
+        addSubview(nousContainer)
+        setupNousFields()
     }
     
     private func setupAnthropicFields() {
@@ -216,10 +233,62 @@ class LLMProvidersTab: BasePreferencesTab {
         ollamaContainer.addSubview(ollamaTestButton)
     }
     
+    private func setupNousFields() {
+        var yPos = 75
+        
+        let apiKeyLabel = NSTextField(labelWithString: "API Key:")
+        apiKeyLabel.frame = NSRect(x: 0, y: yPos, width: 80, height: 20)
+        apiKeyLabel.alignment = .right
+        nousContainer.addSubview(apiKeyLabel)
+        
+        nousApiKeyField = NSTextField(frame: NSRect(x: 90, y: yPos, width: 250, height: 22))
+        nousApiKeyField.placeholderString = "optional — leave empty to use token file"
+        nousApiKeyField.target = self
+        nousApiKeyField.action = #selector(fieldChanged)
+        nousContainer.addSubview(nousApiKeyField)
+        yPos -= 35
+        
+        let tokenLabel = NSTextField(labelWithString: "Token File:")
+        tokenLabel.frame = NSRect(x: 0, y: yPos, width: 80, height: 20)
+        tokenLabel.alignment = .right
+        nousContainer.addSubview(tokenLabel)
+        
+        nousAuthTokenFileField = NSTextField(frame: NSRect(x: 90, y: yPos, width: 380, height: 22))
+        nousAuthTokenFileField.placeholderString = "~/.hermes/shared/nous_auth.json"
+        nousAuthTokenFileField.target = self
+        nousAuthTokenFileField.action = #selector(fieldChanged)
+        nousContainer.addSubview(nousAuthTokenFileField)
+        yPos -= 35
+        
+        let modelLabel = NSTextField(labelWithString: "Model:")
+        modelLabel.frame = NSRect(x: 0, y: yPos, width: 80, height: 20)
+        modelLabel.alignment = .right
+        nousContainer.addSubview(modelLabel)
+        
+        nousModelPopup = NSPopUpButton(frame: NSRect(x: 90, y: yPos - 2, width: 250, height: 25), pullsDown: false)
+        nousModelPopup.addItems(withTitles: [
+            "z-ai/glm-5.3-flash",
+            "minimax/minimax-m3",
+            "deepseek/deepseek-chat-v3.1",
+            "moonshotai/kimi-k2.5",
+            "qwen/qwen3-235b-a22b",
+            "openai/gpt-oss-120b"
+        ])
+        nousModelPopup.target = self
+        nousModelPopup.action = #selector(fieldChanged)
+        nousContainer.addSubview(nousModelPopup)
+        
+        nousTestButton = NSButton(title: "Test API", target: self, action: #selector(testNous))
+        nousTestButton.frame = NSRect(x: 350, y: yPos - 2, width: 90, height: 25)
+        nousTestButton.bezelStyle = .rounded
+        nousContainer.addSubview(nousTestButton)
+    }
+    
     @objc private func providerChanged() {
         anthropicContainer.isHidden = (anthropicRadio.state != .on)
         openaiContainer.isHidden = (openaiRadio.state != .on)
         ollamaContainer.isHidden = (ollamaRadio.state != .on)
+        nousContainer.isHidden = (nousRadio.state != .on)
         markDirty()
     }
     
@@ -323,6 +392,30 @@ class LLMProvidersTab: BasePreferencesTab {
         }
     }
     
+    @objc private func testNous() {
+        let apiKey = nousApiKeyField.stringValue
+        let authTokenFile = nousAuthTokenFileField.stringValue
+        let model = nousModelPopup.titleOfSelectedItem ?? "z-ai/glm-5.3-flash"
+        
+        guard !apiKey.isEmpty || !authTokenFile.isEmpty else {
+            showTestResult(success: false, message: "Enter an API key or an auth token file first")
+            return
+        }
+        
+        // Disable button during test
+        nousTestButton.isEnabled = false
+        nousTestButton.title = "Testing..."
+        
+        Task {
+            let result = await testNousAPI(apiKey: apiKey, authTokenFile: authTokenFile, model: model)
+            DispatchQueue.main.async { [weak self] in
+                self?.nousTestButton.isEnabled = true
+                self?.nousTestButton.title = "Test API"
+                self?.showTestResult(success: result.success, message: result.message)
+            }
+        }
+    }
+    
     private func showTestResult(success: Bool?, message: String) {
         let alert = NSAlert()
         
@@ -351,18 +444,27 @@ class LLMProvidersTab: BasePreferencesTab {
             anthropicRadio.state = .on
             openaiRadio.state = .off
             ollamaRadio.state = .off
+            nousRadio.state = .off
         case "openai":
             anthropicRadio.state = .off
             openaiRadio.state = .on
             ollamaRadio.state = .off
+            nousRadio.state = .off
         case "ollama":
             anthropicRadio.state = .off
             openaiRadio.state = .off
             ollamaRadio.state = .on
+            nousRadio.state = .off
+        case "nous":
+            anthropicRadio.state = .off
+            openaiRadio.state = .off
+            ollamaRadio.state = .off
+            nousRadio.state = .on
         default:
             anthropicRadio.state = .on
             openaiRadio.state = .off
             ollamaRadio.state = .off
+            nousRadio.state = .off
         }
         providerChanged()
         
@@ -377,6 +479,11 @@ class LLMProvidersTab: BasePreferencesTab {
         // Ollama
         ollamaEndpointField.stringValue = config.notes.llm.ollama.endpoint
         ollamaModelField.stringValue = config.notes.llm.ollama.model
+        
+        // Nous
+        nousApiKeyField.stringValue = config.notes.llm.nous.apiKey
+        nousAuthTokenFileField.stringValue = config.notes.llm.nous.authTokenFile
+        nousModelPopup.selectItem(withTitle: config.notes.llm.nous.model)
         
         resetDirtyState()
     }
@@ -394,6 +501,8 @@ class LLMProvidersTab: BasePreferencesTab {
             config.notes.llm.provider = "anthropic"
         } else if openaiRadio.state == .on {
             config.notes.llm.provider = "openai"
+        } else if nousRadio.state == .on {
+            config.notes.llm.provider = "nous"
         } else {
             config.notes.llm.provider = "ollama"
         }
@@ -405,6 +514,11 @@ class LLMProvidersTab: BasePreferencesTab {
         // OpenAI
         config.notes.llm.openai.apiKey = openaiApiKeyField.stringValue
         config.notes.llm.openai.model = openaiModelPopup.titleOfSelectedItem ?? "gpt-4o"
+        
+        // Nous
+        config.notes.llm.nous.apiKey = nousApiKeyField.stringValue
+        config.notes.llm.nous.authTokenFile = nousAuthTokenFileField.stringValue
+        config.notes.llm.nous.model = nousModelPopup.titleOfSelectedItem ?? "z-ai/glm-5.3-flash"
         
         // Ollama
         config.notes.llm.ollama.endpoint = ollamaEndpointField.stringValue
@@ -531,6 +645,24 @@ class LLMProvidersTab: BasePreferencesTab {
             }
         } catch {
             return (false, "Could not connect to Ollama\n\(error.localizedDescription)\n\nMake sure Ollama is running:\n  ollama serve")
+        }
+    }
+    
+    private func testNousAPI(apiKey: String, authTokenFile: String, model: String) async -> (success: Bool, message: String) {
+        // Exercise the real provider path (including token-file auth/refresh)
+        let provider = NousProvider(apiKey: apiKey, model: model, authTokenFile: authTokenFile, timeoutSeconds: 30)
+        do {
+            _ = try await provider.generate(
+                userMessage: "Reply with exactly: OK",
+                systemPrompt: "You are a connection test. Reply with exactly: OK"
+            )
+            var message = "Successfully connected to Nous API\nModel: \(model)"
+            if !authTokenFile.isEmpty {
+                message += "\nAuth: token file"
+            }
+            return (true, message)
+        } catch {
+            return (false, "Connection failed\n\(error.localizedDescription)")
         }
     }
 }

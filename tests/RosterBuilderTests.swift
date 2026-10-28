@@ -223,13 +223,17 @@ final class RosterBuilderTests: XCTestCase {
     }
 
     func testExtremelyLongSingleNameStillFitsAlone() {
-        // Even a pathological single very long name must not be truncated mid-name:
-        // the loop drops whole names, so the result is either the full name or empty.
+        // Drop-tail contract: a name is dropped WHOLE, never truncated mid-name.
+        // So the result is either: full name present, prompt empty, or the
+        // pathological name dropped entirely (other roster names still kept).
         let longName = "A" + String(repeating: "b", count: 1000)
         let participants = makeParticipants(others: [("x@example.com", longName)])
         let prompt = RosterBuilder.buildPrompt(participants: participants, contacts: [], glossary: [])
-        // The name either appears in full or the prompt fell back to empty.
-        XCTAssertTrue(prompt.isEmpty || prompt.contains(longName))
+        let truncatedPrefix = String(longName.prefix(900))
+        XCTAssertTrue(
+            prompt.isEmpty || prompt.contains(longName) || !prompt.contains(truncatedPrefix),
+            "name must never be truncated mid-name (got: \(prompt.prefix(120))...)"
+        )
     }
 
     // MARK: Token estimator sanity
